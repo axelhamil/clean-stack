@@ -28,6 +28,7 @@ export interface EmailMessageRecord {
   lastError: Option<string>;
   idempotencyKey: Option<string>;
   batchKey: Option<string>;
+  unsettledInBatch: Option<number>;
   createdAt: Date;
 }
 
@@ -56,6 +57,9 @@ export interface IEmailQueue {
     leases: EmailLease[],
     batchKey: string,
   ): Promise<Result<EmailLease[], EmailQueueError>>;
-  markFailed(lease: EmailLease, failure: EmailFailure): Promise<Result<boolean, EmailQueueError>>;
-  release(leases: EmailLease[]): Promise<Result<number, EmailQueueError>>;
+  markFailed(
+    leases: EmailLease[],
+    failure: EmailFailure,
+  ): Promise<Result<EmailLease[], EmailQueueError>>;
+  release(leases: EmailLease[], delaySeconds?: number): Promise<Result<number, EmailQueueError>>;
 }

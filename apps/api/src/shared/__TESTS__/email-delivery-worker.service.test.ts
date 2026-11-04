@@ -4,6 +4,7 @@ import { EventTypes } from "@packages/events";
 import type { Locale } from "@packages/i18n";
 import { mockPort, type PortMock } from "@packages/test/bun";
 import { mockUnitOfWork, type UnitOfWorkMock } from "@packages/test/bun/unit-of-work";
+import type { ErrorResponse } from "resend";
 import { mockInstrumentation } from "../../__TESTS__/mock-instrumentation";
 import type { Logger } from "../logger";
 import type {
@@ -29,7 +30,11 @@ const OPTIONS = { leaseSeconds: 120, deadRetrySeconds: 21_600, deadReplayWindowH
 type BatchResult = {
   data: Array<{ id: string }> | null;
   errors?: Array<{ index: number; message: string }>;
-  error: null | { statusCode?: number; message: string; name?: string };
+  error: null | {
+    kind: "retryable" | "in_flight" | "conflict" | "rejected";
+    statusCode: number;
+    message: string;
+  };
 };
 
 const row = (over: Partial<EmailMessageRecord>): EmailMessageRecord => ({
@@ -46,6 +51,7 @@ const row = (over: Partial<EmailMessageRecord>): EmailMessageRecord => ({
   lastError: Option.none<string>(),
   idempotencyKey: Option.none<string>(),
   batchKey: Option.none<string>(),
+  unsettledInBatch: Option.none<number>(),
   createdAt: new Date("2026-08-04T00:00:00Z"),
   ...over,
 });
@@ -85,9 +91,16 @@ function worker(
   );
 }
 
-const failures = (): EmailFailure[] => queue.markFailed.mock.calls.map(([, failure]) => failure);
+const failures = (): EmailFailure[] =>
+  queue.markFailed.mock.calls.flatMap(([leases, failure]) => leases.map(() => failure));
 const failureById = () =>
-  Object.fromEntries(queue.markFailed.mock.calls.map(([lease, failure]) => [lease.id, failure]));
+  Object.fromEntries(
+    queue.markFailed.mock.calls.flatMap(([leases, failure]) =>
+      leases.map(({ id }) => [id, failure]),
+    ),
+  );
+const releasedIds = () =>
+  queue.release.mock.calls.flatMap(([leases]) => leases.map(({ id }) => id));
 const sentIds = () => queue.markSent.mock.calls.flatMap(([leases]) => leases.map(({ id }) => id));
 
 beforeEach(() => {
@@ -103,9 +116,9 @@ beforeEach(() => {
     return Result.ok(leases);
   });
   queue.markSent.mockImplementation(async (leases: EmailLease[]) => Result.ok(leases));
-  queue.markFailed.mockImplementation(async () => {
+  queue.markFailed.mockImplementation(async (leases: EmailLease[]) => {
     failedIn.push(UnitOfWorkContext.transaction());
-    return Result.ok(true);
+    return Result.ok(leases);
   });
   queue.release.mockImplementation(async (leases: EmailLease[]) => Result.ok(leases.length));
 });
@@ -148,7 +161,10 @@ describe("EmailDeliveryWorker.drainOnce", () => {
 
   it("a timed-out send keeps the rows pending for a retry", async () => {
     claims([row({ id: "1" })]);
-    batch = async () => ({ data: null, error: { statusCode: 0, message: "timed out" } });
+    batch = async () => ({
+      data: null,
+      error: { kind: "retryable", statusCode: 0, message: "timed out" },
+    });
 
     await worker().drainOnce();
 
@@ -223,7 +239,10 @@ describe("EmailDeliveryWorker.drainOnce", () => {
 
   it("retryable error under max attempts keeps the row pending with a retry delay", async () => {
     claims([row({ id: "1", attempts: 2 }), row({ id: "2", attempts: 2 })]);
-    batch = async () => ({ data: null, error: { statusCode: 429, message: "rate limited" } });
+    batch = async () => ({
+      data: null,
+      error: { kind: "retryable", statusCode: 429, message: "rate limited" },
+    });
 
     await worker().drainOnce();
 
@@ -237,7 +256,10 @@ describe("EmailDeliveryWorker.drainOnce", () => {
 
   it("a third failed send stays pending, as before the lease model", async () => {
     claims([row({ id: "1", attempts: 3 })]);
-    batch = async () => ({ data: null, error: { statusCode: 503, message: "down" } });
+    batch = async () => ({
+      data: null,
+      error: { kind: "retryable", statusCode: 503, message: "down" },
+    });
 
     await worker().drainOnce();
 
@@ -247,7 +269,10 @@ describe("EmailDeliveryWorker.drainOnce", () => {
 
   it("exhausted retries mark the row dead on the fourth send and emit EMAIL_DELIVERY_EXHAUSTED once", async () => {
     claims([row({ id: "1", attempts: 4 })]);
-    batch = async () => ({ data: null, error: { statusCode: 503, message: "down" } });
+    batch = async () => ({
+      data: null,
+      error: { kind: "retryable", statusCode: 503, message: "down" },
+    });
 
     await worker().drainOnce();
 
@@ -265,7 +290,10 @@ describe("EmailDeliveryWorker.drainOnce", () => {
 
   it("a dead replay that fails again stays dead and emits nothing", async () => {
     claims([row({ id: "1", status: "dead", attempts: 6 })]);
-    batch = async () => ({ data: null, error: { statusCode: 503, message: "down" } });
+    batch = async () => ({
+      data: null,
+      error: { kind: "retryable", statusCode: 503, message: "down" },
+    });
 
     await worker().drainOnce();
 
@@ -294,8 +322,11 @@ describe("EmailDeliveryWorker.drainOnce", () => {
 
   it("a settle that wrote nothing emits nothing", async () => {
     claims([row({ id: "1", attempts: 5 })]);
-    batch = async () => ({ data: null, error: { statusCode: 422, message: "rejected" } });
-    queue.markFailed.mockResolvedValue(Result.ok(false));
+    batch = async () => ({
+      data: null,
+      error: { kind: "rejected", statusCode: 422, message: "rejected" },
+    });
+    queue.markFailed.mockResolvedValue(Result.ok([]));
 
     await worker().drainOnce();
 
@@ -356,16 +387,18 @@ describe("resendBatchSender", () => {
     const client = {
       batch: {
         send: (_entries: never, options: { signal: AbortSignal }) =>
-          new Promise<{ data: null; error: { message: string; statusCode: number | null } }>(
-            (resolve) => {
-              options.signal.addEventListener("abort", () =>
-                resolve({
-                  data: null,
-                  error: { message: "Unable to fetch data", statusCode: null },
-                }),
-              );
-            },
-          ),
+          new Promise<{ data: null; error: ErrorResponse }>((resolve) => {
+            options.signal.addEventListener("abort", () =>
+              resolve({
+                data: null,
+                error: {
+                  message: "Unable to fetch data",
+                  statusCode: null,
+                  name: "application_error",
+                },
+              }),
+            );
+          }),
       },
     };
 
@@ -375,35 +408,34 @@ describe("resendBatchSender", () => {
     );
 
     expect(result.error).toEqual({
+      kind: "retryable",
       statusCode: 0,
       message: "email batch send timed out after 10ms",
     });
   });
 
-  it("passes the provider error name through so the worker can tell idempotency conflicts apart", async () => {
-    const client = {
-      batch: {
-        send: async () => ({
-          data: null,
-          error: {
-            message: "still processing",
-            statusCode: 409,
-            name: "concurrent_idempotent_requests",
-          },
-        }),
-      },
-    };
+  it("maps each provider error to the outcome the worker acts on", async () => {
+    type Kind = "retryable" | "in_flight" | "conflict" | "rejected";
+    const cases: [ErrorResponse, Kind][] = [
+      [{ message: "m", statusCode: 409, name: "concurrent_idempotent_requests" }, "in_flight"],
+      [{ message: "m", statusCode: 409, name: "invalid_idempotent_request" }, "conflict"],
+      [{ message: "m", statusCode: 429, name: "rate_limit_exceeded" }, "retryable"],
+      [{ message: "m", statusCode: null, name: "application_error" }, "retryable"],
+      [{ message: "m", statusCode: 422, name: "validation_error" }, "rejected"],
+    ];
 
-    const result = await resendBatchSender(client, new NoOpInstrumentation(), logger).batchSend(
-      [{ to: "a@x.test" }],
-      Option.some("key"),
+    const kinds = await Promise.all(
+      cases.map(async ([error]) => {
+        const client = { batch: { send: async () => ({ data: null, error }) } };
+        const result = await resendBatchSender(client, new NoOpInstrumentation(), logger).batchSend(
+          [{ to: "a@x.test" }],
+          Option.some("key"),
+        );
+        return result.error?.kind;
+      }),
     );
 
-    expect(result.error).toEqual({
-      statusCode: 409,
-      message: "still processing",
-      name: "concurrent_idempotent_requests",
-    });
+    expect(kinds).toEqual(cases.map(([, kind]) => kind));
   });
 });
 
@@ -485,11 +517,11 @@ describe("EmailDeliveryWorker batch replay", () => {
   const keys: string[] = [];
   const unavailable = async (_entries: unknown[], idempotencyKey: Option<string>) => {
     keys.push(idempotencyKey.unwrapOr("none"));
-    return { data: null, error: { statusCode: 503, message: "down" } };
+    return { data: null, error: { kind: "retryable" as const, statusCode: 503, message: "down" } };
   };
-  const rejectedAs = (name: string) => async () => ({
+  const rejectedAs = (kind: "in_flight" | "conflict") => async () => ({
     data: null,
-    error: { statusCode: 409, message: name, name },
+    error: { kind, statusCode: 409, message: "idempotency" },
   });
 
   beforeEach(() => {
@@ -556,15 +588,31 @@ describe("EmailDeliveryWorker batch replay", () => {
     expect(failures()).toEqual([]);
   });
 
-  it("settles every row of the failed chunk in one unit of work so they come due together", async () => {
+  it("settles every row of the failed chunk in one write so they come due together", async () => {
     claims([row({ id: "1" }), row({ id: "2" })]);
     batch = unavailable;
 
     await worker().drainOnce();
 
-    expect(failedIn).toHaveLength(2);
+    expect(queue.markFailed.mock.calls.map(([leases]) => leases.map(({ id }) => id))).toEqual([
+      ["1", "2"],
+    ]);
     expect(failedIn[0]).toBeDefined();
-    expect(failedIn[1]).toBe(failedIn[0]);
+  });
+
+  it("announces every row a whole-chunk rejection settled, and only those", async () => {
+    claims([row({ id: "1" }), row({ id: "2" })]);
+    batch = async () => ({
+      data: null,
+      error: { kind: "rejected", statusCode: 422, message: "rejected" },
+    });
+    queue.markFailed.mockImplementation(async (leases: EmailLease[]) => Result.ok(leases.slice(1)));
+
+    await worker().drainOnce();
+
+    expect(enqueuedEvents(outbox).map(({ payload }) => payload)).toEqual([
+      expect.objectContaining({ messageId: "2" }),
+    ]);
   });
 
   it("decides a batch's fate from its highest attempts so a batch never splits", async () => {
@@ -636,35 +684,71 @@ describe("EmailDeliveryWorker batch replay", () => {
     ]);
   });
 
-  it("retries a request the provider is still processing under the same key, a minute later at least", async () => {
-    claims([row({ id: "1" }), row({ id: "2" })]);
-    batch = rejectedAs("concurrent_idempotent_requests");
+  it("puts a batch the provider is still processing back a minute later, without spending an attempt nor announcing", async () => {
+    claims([row({ id: "1", attempts: 4 }), row({ id: "2", attempts: 4 })]);
+    batch = rejectedAs("in_flight");
 
     await worker().drainOnce();
 
-    expect(failures().map((f) => f.status)).toEqual(["pending", "pending"]);
-    for (const failure of failures()) {
-      expect(failure.status === "pending" && failure.retryAfterSeconds).toBeGreaterThanOrEqual(60);
-    }
+    expect(failures()).toEqual([]);
+    expect(queue.release.mock.calls).toEqual([
+      [
+        [
+          expect.objectContaining({ id: "1", attempts: 4 }),
+          expect.objectContaining({ id: "2", attempts: 4 }),
+        ],
+        60,
+      ],
+    ]);
     expect(enqueuedEvents(outbox)).toEqual([]);
   });
 
   it("fails loudly when the provider refuses a changed payload under the same key", async () => {
     const instrumentation = mockInstrumentation();
     claims([row({ id: "1" })]);
-    batch = rejectedAs("invalid_idempotent_request");
+    batch = rejectedAs("conflict");
 
     await worker(OPTIONS, () => now, instrumentation).drainOnce();
 
     expect(failures()).toEqual([
       {
         status: "failed",
-        lastError: expect.stringContaining("invalid_idempotent_request"),
+        lastError: expect.stringContaining("different payload"),
       },
     ]);
     expect(instrumentation.capture).toHaveBeenCalledTimes(1);
     expect(enqueuedEvents(outbox).map(({ eventType }) => eventType)).toEqual([
       EventTypes.EMAIL_DELIVERY_EXHAUSTED,
     ]);
+  });
+
+  it("releases a batch the claim brought back incomplete, never sending it under another key", async () => {
+    const split = { batchKey: Option.some("k"), unsettledInBatch: Option.some(3) };
+    claims([row({ id: "1", ...split }), row({ id: "2", ...split }), row({ id: "3" })]);
+    const requests: number[] = [];
+    batch = async (entries) => {
+      requests.push(entries.length);
+      return accepted(entries);
+    };
+
+    await worker().drainOnce();
+
+    expect(requests).toEqual([1]);
+    expect(sentIds()).toEqual(["3"]);
+    expect(releasedIds()).toEqual(["1", "2"]);
+    expect([...assigned.keys()]).toEqual(["3"]);
+    expect(logger.warn.mock.calls.map(([, message]) => message)).toContain(
+      "email batch claimed incomplete, released until its siblings are free",
+    );
+  });
+
+  it("sends a whole batch under the batch key it already carries", async () => {
+    const whole = { batchKey: Option.some("k"), unsettledInBatch: Option.some(2) };
+    claims([row({ id: "1", ...whole }), row({ id: "2", ...whole })]);
+
+    await worker().drainOnce();
+
+    expect([...assigned.values()]).toEqual(["k", "k"]);
+    expect(sentIds()).toEqual(["1", "2"]);
   });
 });

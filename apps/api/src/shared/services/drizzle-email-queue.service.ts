@@ -2,6 +2,7 @@ import { Option, Result, uuidv7 } from "@packages/ddd-kit";
 import {
   and,
   claimedSet,
+  count,
   db,
   dbNow,
   deadShareOf,
@@ -54,12 +55,10 @@ function claimQuery(
   { limit, leaseSeconds, deadReplayWindowHours }: EmailClaimRequest,
 ) {
   const claimable = { id: em.id, createdAt: em.createdAt, batchKey: em.batchKey };
+  const inWindow = gt(em.createdAt, sql`now() - make_interval(hours => ${deadReplayWindowHours})`);
   const pendingDue = and(eq(em.status, "pending"), isDue(em.nextAttemptAt));
-  const deadReplayable = and(eq(em.status, "dead"), isDeadDue(em.nextAttemptAt));
-  const deadDue = and(
-    deadReplayable,
-    gt(em.createdAt, sql`now() - make_interval(hours => ${deadReplayWindowHours})`),
-  );
+  const deadDue = and(eq(em.status, "dead"), isDeadDue(em.nextAttemptAt), inWindow);
+  const replayable = and(unsettled, or(eq(em.status, "pending"), inWindow));
   const live = db
     .$with("live")
     .as(
@@ -94,20 +93,28 @@ function claimQuery(
       .where(
         and(
           inArray(em.batchKey, db.select({ batchKey: picked.batchKey }).from(picked)),
-          or(pendingDue, deadReplayable),
+          or(pendingDue, deadDue),
         ),
       )
       .for("update", { skipLocked: true }),
   );
   const due = db.$with("due").as(db.select().from(picked).union(db.select().from(siblings)));
+  const batchSizes = db.$with("batch_sizes").as(
+    db
+      .select({ batchKey: em.batchKey, unsettled: count().as("unsettled") })
+      .from(em)
+      .where(and(inArray(em.batchKey, db.select({ batchKey: due.batchKey }).from(due)), replayable))
+      .groupBy(em.batchKey),
+  );
 
   return exec
-    .with(live, dead, picked, siblings, due)
+    .with(live, dead, picked, siblings, due, batchSizes)
     .update(em)
     .set(claimedSet(em, leaseSeconds))
     .from(due)
-    .where(eq(em.id, due.id))
-    .returning(getTableColumns(em));
+    .leftJoin(batchSizes, eq(batchSizes.batchKey, due.batchKey))
+    .where(and(eq(em.id, due.id), unsettled))
+    .returning({ ...getTableColumns(em), unsettledInBatch: batchSizes.unsettled });
 }
 
 function failureChanges(failure: EmailFailure): PgUpdateSetSource<typeof em> {
@@ -121,7 +128,9 @@ function failureChanges(failure: EmailFailure): PgUpdateSetSource<typeof em> {
   };
 }
 
-function toRecord(row: typeof em.$inferSelect): EmailMessageRecord {
+function toRecord(
+  row: typeof em.$inferSelect & { unsettledInBatch: number | null },
+): EmailMessageRecord {
   return {
     ...row,
     template: Option.fromNullable(row.template),
@@ -130,6 +139,7 @@ function toRecord(row: typeof em.$inferSelect): EmailMessageRecord {
     lastError: Option.fromNullable(row.lastError),
     idempotencyKey: Option.fromNullable(row.idempotencyKey),
     batchKey: Option.fromNullable(row.batchKey),
+    unsettledInBatch: Option.fromNullable(row.unsettledInBatch),
   };
 }
 
@@ -258,31 +268,13 @@ export class DrizzleEmailQueue implements IEmailQueue {
   }
 
   async markFailed(
-    lease: EmailLease,
+    leases: EmailLease[],
     failure: EmailFailure,
-  ): Promise<Result<boolean, EmailQueueError>> {
-    const exec = resolveExecutor();
-    return this.instrumentation.startSpan({ name: "DrizzleEmailQueue > markFailed" }, async () => {
-      try {
-        const query = exec
-          .update(em)
-          .set(failureChanges(failure))
-          .where(leasedAll([lease]))
-          .returning({ id: em.id });
-        const written = await this.instrumentation.startSpan(
-          { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
-          () => query.execute(),
-        );
-
-        return Result.ok(written.length > 0);
-      } catch (err) {
-        this.instrumentation.capture(err);
-        return fail(err, "markFailed failed");
-      }
-    });
+  ): Promise<Result<EmailLease[], EmailQueueError>> {
+    return this.updateLeased("markFailed", leases, () => failureChanges(failure));
   }
 
-  async release(leases: EmailLease[]): Promise<Result<number, EmailQueueError>> {
+  async release(leases: EmailLease[], delaySeconds = 0): Promise<Result<number, EmailQueueError>> {
     const exec = resolveExecutor();
     return this.instrumentation.startSpan({ name: "DrizzleEmailQueue > release" }, async () => {
       if (leases.length === 0) return Result.ok(0);
@@ -290,7 +282,7 @@ export class DrizzleEmailQueue implements IEmailQueue {
       try {
         const query = exec
           .update(em)
-          .set(releasedSet(em))
+          .set({ ...releasedSet(em), nextAttemptAt: secondsFromNow(delaySeconds) })
           .where(leasedAll(leases))
           .returning({ id: em.id });
         const written = await this.instrumentation.startSpan(

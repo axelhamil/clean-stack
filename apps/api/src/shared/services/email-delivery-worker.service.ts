@@ -1,8 +1,8 @@
-import { type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
+import { type IUnitOfWork, Option, type Result } from "@packages/ddd-kit";
 import { type EmailTemplateKey, renderTemplate } from "@packages/emails";
 import { EventTypes } from "@packages/events";
 import { DEFAULT_LOCALE } from "@packages/i18n";
-import { Resend } from "resend";
+import { type ErrorResponse, Resend } from "resend";
 import { env } from "../env";
 import { EMAIL_SEND_TIMEOUT_SECONDS, EMAIL_SETTLE_MARGIN_SECONDS } from "../env-bounds";
 import { emitEvent } from "../event-emitter";
@@ -11,12 +11,14 @@ import { type Clock, leaseCountdown, monotonicClock, unitsWithinLease } from "..
 import type { Logger } from "../logger";
 import type {
   EmailFailure,
+  EmailLease,
   EmailMessageRecord,
   EmailQueueError,
   IEmailQueue,
 } from "../ports/email-queue.port";
 import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IOutboxRepository } from "../ports/outbox.port";
+import { canonicalize } from "./audit-hash";
 
 export const EMAIL_BATCH_CHUNK_SIZE = 100;
 const POLL_INTERVAL_MS = 2_000;
@@ -26,7 +28,6 @@ const CHUNK_BUDGET = {
   unitSeconds: EMAIL_SEND_TIMEOUT_SECONDS,
   marginSeconds: EMAIL_SETTLE_MARGIN_SECONDS,
 };
-const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 const STILL_PROCESSING_RETRY_SECONDS = 60;
 
 export const TEMPLATE_IDS: Record<string, string> = {
@@ -49,7 +50,8 @@ type BatchResult = {
   errors?: Array<{ index: number; message: string }>;
   error: null | BatchError;
 };
-type BatchError = { statusCode?: number; message: string; name?: string };
+type BatchErrorKind = "retryable" | "in_flight" | "conflict" | "rejected";
+type BatchError = { kind: BatchErrorKind; statusCode: number; message: string };
 export interface EmailDeliveryOptions {
   leaseSeconds: number;
   deadRetrySeconds: number;
@@ -67,7 +69,7 @@ interface ResendBatchClient {
       options: { batchValidation: "permissive"; idempotencyKey?: string; signal: AbortSignal },
     ): Promise<
       | { data: { data: Array<{ id: string }>; errors?: BatchResult["errors"] }; error: null }
-      | { data: null; error: { message: string; statusCode: number | null; name?: string } }
+      | { data: null; error: ErrorResponse }
     >;
   };
 }
@@ -159,11 +161,17 @@ export class EmailDeliveryWorker {
           return;
         }
 
-        const chunks = groupRows(claimed.getValue()).flatMap((group) =>
-          Array.from({ length: Math.ceil(group.length / EMAIL_BATCH_CHUNK_SIZE) }, (_, i) =>
-            group.slice(i * EMAIL_BATCH_CHUNK_SIZE, (i + 1) * EMAIL_BATCH_CHUNK_SIZE),
-          ),
-        );
+        const groups = groupRows(claimed.getValue());
+        const incomplete = groups.filter((group) => !isWholeBatch(group));
+        if (incomplete.length > 0) await this.releaseIncomplete(incomplete);
+
+        const chunks = groups
+          .filter(isWholeBatch)
+          .flatMap((group) =>
+            Array.from({ length: Math.ceil(group.length / EMAIL_BATCH_CHUNK_SIZE) }, (_, i) =>
+              group.slice(i * EMAIL_BATCH_CHUNK_SIZE, (i + 1) * EMAIL_BATCH_CHUNK_SIZE),
+            ),
+          );
         for (const [index, chunk] of chunks.entries()) {
           if (this.stopping || (index > 0 && !lease.coversNextUnit()))
             return this.release(chunks.slice(index).flat());
@@ -176,8 +184,22 @@ export class EmailDeliveryWorker {
     });
   }
 
-  private async release(rows: EmailMessageRecord[]): Promise<void> {
-    const released = await this.queue.release(rows);
+  private async releaseIncomplete(groups: EmailMessageRecord[][]): Promise<void> {
+    this.logger.warn(
+      {
+        batches: groups.map((group) => ({
+          batchKey: group[0]?.batchKey.toNull(),
+          claimed: group.length,
+          unsettled: group[0]?.unsettledInBatch.toNull(),
+        })),
+      },
+      "email batch claimed incomplete, released until its siblings are free",
+    );
+    await this.release(groups.flat());
+  }
+
+  private async release(rows: EmailMessageRecord[], delaySeconds = 0): Promise<void> {
+    const released = await this.queue.release(rows, delaySeconds);
     if (released.isFailure) {
       this.logger.error({ err: released.getError() }, "email release failed");
       return;
@@ -210,7 +232,8 @@ export class EmailDeliveryWorker {
     }
     if (chunk.length === 0) return;
 
-    const batchKey = await chunkBatchKey(chunk);
+    const carried = chunk[0]?.batchKey ?? Option.none<string>();
+    const batchKey = carried.isSome() ? carried.unwrap() : await chunkBatchKey(chunk);
     if (!(await this.assignBatch(chunk, batchKey))) return this.release(chunk);
 
     const idempotencyKey = await chunkIdempotencyKey(batchKey, entries);
@@ -269,62 +292,47 @@ export class EmailDeliveryWorker {
   }
 
   private async settleRejected(chunk: EmailMessageRecord[], error: BatchError): Promise<void> {
-    const status = error.statusCode ?? 500;
-    const lastError = `HTTP ${status}: ${error.message}`;
-    if (error.name === "concurrent_idempotent_requests") {
-      return this.settleFailures(
-        chunk,
-        this.failureOfChunk(chunk, lastError, STILL_PROCESSING_RETRY_SECONDS),
-      );
-    }
-    if (RETRYABLE_STATUSES.has(status) || status === 0)
-      return this.settleFailures(chunk, this.failureOfChunk(chunk, lastError, 0));
-
-    const failure: EmailFailure = {
-      lastError: this.rejectionError(error, lastError),
-      status: "failed",
-    };
-    for (const r of chunk) {
-      await this.settleFailures([r], failure);
+    const lastError = `HTTP ${error.statusCode}: ${error.message}`;
+    switch (error.kind) {
+      case "in_flight":
+        this.logger.info(
+          { messageIds: chunk.map(({ id }) => id) },
+          "email batch still processing at the provider, retried later under the same key",
+        );
+        return this.release(chunk, STILL_PROCESSING_RETRY_SECONDS);
+      case "retryable":
+        return this.settleFailures(chunk, this.failureOfChunk(chunk, lastError));
+      case "conflict": {
+        const explained = conflictError(lastError);
+        this.instrumentation.capture(new Error(explained));
+        return this.settleFailures(chunk, { lastError: explained, status: "failed" });
+      }
+      case "rejected":
+        return this.settleFailures(chunk, { lastError, status: "failed" });
     }
   }
 
-  private rejectionError(error: BatchError, lastError: string): string {
-    if (error.name !== "invalid_idempotent_request") return lastError;
-
-    const explained = `${lastError} (invalid_idempotent_request: the provider already holds a different payload under this chunk's idempotency key; not resent to avoid a duplicate)`;
-    this.instrumentation.capture(new Error(explained));
-    return explained;
-  }
-
-  private failureOfChunk(
-    chunk: EmailMessageRecord[],
-    lastError: string,
-    minRetrySeconds: number,
-  ): EmailFailure {
+  private failureOfChunk(chunk: EmailMessageRecord[], lastError: string): EmailFailure {
     const { dead, retryAfterSeconds } = failureSchedule(Math.max(...chunk.map((r) => r.attempts)), {
       wasDead: chunk.some((r) => r.status === "dead"),
       maxAttempts: EMAIL_MAX_ATTEMPTS,
       deadRetrySeconds: this.options.deadRetrySeconds,
     });
 
-    return {
-      lastError,
-      status: dead ? "dead" : "pending",
-      retryAfterSeconds: Math.max(retryAfterSeconds, minRetrySeconds),
-    };
+    return { lastError, status: dead ? "dead" : "pending", retryAfterSeconds };
   }
 
   private async settleFailures(rows: EmailMessageRecord[], failure: EmailFailure): Promise<void> {
-    const settled = await this.uow.run(async (): Promise<Result<boolean, EmailQueueError>> => {
-      for (const row of rows) {
-        const written = await this.queue.markFailed(row, failure);
-        if (written.isFailure) return written;
+    const settled = await this.uow.run(async (): Promise<Result<EmailLease[], EmailQueueError>> => {
+      const written = await this.queue.markFailed(rows, failure);
+      if (written.isFailure || failure.status === "pending") return written;
 
-        const announces = failure.status !== "pending" && row.status !== "dead";
-        if (written.getValue() && announces) await this.announceExhausted(row, failure.lastError);
+      const writtenIds = new Set(written.getValue().map(({ id }) => id));
+      for (const row of rows) {
+        if (writtenIds.has(row.id) && row.status !== "dead")
+          await this.announceExhausted(row, failure.lastError);
       }
-      return Result.ok(true);
+      return written;
     });
     if (settled.isFailure) {
       this.logger.error(
@@ -387,22 +395,19 @@ export async function chunkBatchKey(chunk: EmailMessageRecord[]): Promise<string
   );
 }
 
-function canonical(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonical);
-  if (value === null || typeof value !== "object") return value;
-
-  return Object.fromEntries(
-    Object.entries(value)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-      .map(([key, nested]) => [key, canonical(nested)]),
-  );
-}
-
 export async function chunkIdempotencyKey(
   batchKey: string,
   entries: BatchEntry[],
 ): Promise<string> {
-  return sha256Hex(`${batchKey}|${JSON.stringify(canonical(entries))}`);
+  return sha256Hex(`${batchKey}|${canonicalize(entries)}`);
+}
+
+function conflictError(lastError: string): string {
+  return `${lastError} (the provider already holds a different payload under this chunk's idempotency key; not resent to avoid a duplicate)`;
+}
+
+function isWholeBatch(group: EmailMessageRecord[]): boolean {
+  return group.every((r) => group.length >= r.unsettledInBatch.unwrapOr(0));
 }
 
 export function groupRows(rows: EmailMessageRecord[]): EmailMessageRecord[][] {
@@ -419,13 +424,26 @@ export function groupRows(rows: EmailMessageRecord[]): EmailMessageRecord[][] {
   return [...groups.values()];
 }
 
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+
+function kindOf(error: ErrorResponse): BatchErrorKind {
+  if (error.name === "concurrent_idempotent_requests") return "in_flight";
+  if (error.name === "invalid_idempotent_request") return "conflict";
+
+  return RETRYABLE_STATUSES.has(error.statusCode ?? 500) ? "retryable" : "rejected";
+}
+
 export function resendBatchSender(
   client: ResendBatchClient | null,
   instrumentation: IInstrumentation,
   logger: Logger,
   timeoutMs: number = EMAIL_SEND_TIMEOUT_SECONDS * 1000,
 ): BatchSender {
-  const timedOut = { statusCode: 0, message: `email batch send timed out after ${timeoutMs}ms` };
+  const timedOut: BatchError = {
+    kind: "retryable",
+    statusCode: 0,
+    message: `email batch send timed out after ${timeoutMs}ms`,
+  };
 
   return {
     async batchSend(entries: BatchEntry[], idempotencyKey: Option<string>): Promise<BatchResult> {
@@ -465,7 +483,7 @@ export function resendBatchSender(
               if (status >= 500) instrumentation.capture(res.error);
               return {
                 data: null,
-                error: { statusCode: status, message: res.error.message, name: res.error.name },
+                error: { kind: kindOf(res.error), statusCode: status, message: res.error.message },
               };
             }
             return { data: res.data.data, errors: res.data.errors ?? [], error: null };
@@ -476,6 +494,7 @@ export function resendBatchSender(
             return {
               data: null,
               error: {
+                kind: "retryable",
                 statusCode: 0,
                 message: err instanceof Error ? err.message : "network error",
               },
