@@ -63,7 +63,13 @@ Hard bounces are filtered **provider-side and automatically**: Resend's domain-s
 
 ### Idempotency
 
-`Idempotency-Key` is **per batch request** (not per recipient). The worker derives a key from the chunk's claim window; callers can pass `options.idempotencyKey` which the queue service fans out as `${key}/${index}` per recipient.
+`Idempotency-Key` is **per batch request** (not per recipient). The worker sends each chunk (up to 100 emails) in one batch call. Before the call, it stores `batch_key` (the sha256 of the chunk's row ids) on every row of the chunk. The key sent to Resend is the sha256 of `batch_key` and of the entries actually sent. On a retryable failure (timeout, 429, 5xx) the whole chunk gets one shared retry delay. A 409 `concurrent_idempotent_requests` means Resend is still processing the original request: the chunk is released, due again 60 s later, without spending an attempt, so it never turns dead nor announces an exhaustion for it. A 409 `invalid_idempotent_request` settles the chunk `failed` and is reported. The replay sends the same rows with the same content, so the same key, and Resend returns the original response instead of sending again, within its 24 h key window. If the content changed in between (sender, template), the key changes too: at worst one duplicate, never a lost email. `EMAIL_DEAD_REPLAY_WINDOW_HOURS` cannot exceed 24 for that reason. Callers can pass `options.idempotencyKey`, which the queue service fans out as `${key}#${index}` per recipient.
+
+**Split batches.** Two workers that claim at the same moment can each get part of one batch, since each skips the rows the other has locked. The claim also returns how many unsettled rows of each batch are still in the table (`pending`, or `dead` inside the replay window). A worker that holds fewer rows than that releases its part with a warning and sends nothing, so a batch is never sent under a second key. Rows that are `sent`, `failed`, purged or `dead` past the window do not count, so a batch is never stuck waiting for them.
+
+**Known limits.**
+- During a deploy where the old and the new version run side by side, the old version can still split a batch and send it under a new key. The risk is one duplicate, and only if Resend had already accepted the original request.
+- A claim can lock more rows than its `limit`: it pulls every due sibling of a batch it picked, so a batch is never cut by the limit. Each picked batch adds at most its own 100 rows.
 
 ### DNS hardening (mandatory before sending in production)
 

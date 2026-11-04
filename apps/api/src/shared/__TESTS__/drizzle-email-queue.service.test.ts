@@ -193,14 +193,18 @@ describe("DrizzleEmailQueue.markSent", () => {
 describe("DrizzleEmailQueue.markFailed", () => {
   it("markFailed reports whether it wrote", async () => {
     const queue = new DrizzleEmailQueue(new NoOpInstrumentation());
-    const failure = { lastError: "HTTP 503", status: "pending", retryAfterSeconds: 3 } as const;
+    const failure = {
+      lastError: "HTTP 503",
+      status: "pending",
+      retryAfterSeconds: 3,
+    } as const;
 
-    executor = chainResolving(async () => [{ id: "m1" }]);
-    const written = await queue.markFailed(lease, failure);
+    executor = chainResolving(async () => [lease]);
+    const written = await queue.markFailed([lease], failure);
     executor = chainResolving(async () => []);
-    const stale = await queue.markFailed(lease, failure);
+    const stale = await queue.markFailed([lease], failure);
 
-    expect(written.isSuccess && written.getValue()).toBe(true);
-    expect(stale.isSuccess && stale.getValue()).toBe(false);
+    expect(written.isSuccess && written.getValue()).toEqual([lease]);
+    expect(stale.isSuccess && stale.getValue()).toEqual([]);
   });
 });

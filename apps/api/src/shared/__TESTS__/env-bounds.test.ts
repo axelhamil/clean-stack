@@ -171,6 +171,22 @@ describe("validateEnvBounds", () => {
     expect(equal.success).toBe(false);
   });
 
+  it("rejects an email replay window that outlives the provider's idempotency key", () => {
+    const bounds = {
+      SERVER_IDLE_TIMEOUT_SECONDS: 120,
+      SWEEP_DEADLINE_MS: 90_000,
+      INTERNAL_FETCH_TIMEOUT_MS: 150_000,
+      ...SHUTDOWN_DEFAULTS,
+      ...QUEUE_DEFAULTS,
+    };
+
+    const day = boundsSchema.safeParse({ ...bounds, EMAIL_DEAD_REPLAY_WINDOW_HOURS: 24 });
+    const longer = boundsSchema.safeParse({ ...bounds, EMAIL_DEAD_REPLAY_WINDOW_HOURS: 25 });
+
+    expect(day.success).toBe(true);
+    expect(longer.success).toBe(false);
+  });
+
   it("rejects an email lease shorter than one send timeout plus the settle margin", () => {
     const bounds = {
       SERVER_IDLE_TIMEOUT_SECONDS: 120,

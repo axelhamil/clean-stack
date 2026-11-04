@@ -221,9 +221,9 @@ Resend is **optional everywhere**: without `RESEND_API_KEY` (or with unconfigure
 | | |
 |---|---|
 | **SDK** | [`resend`](https://resend.com/docs) |
-| **Templates** | dashboard-managed, retry + idempotency, provider-side suppression |
+| **Templates** | dashboard-managed, a failed chunk is replayed with the same idempotency key, provider-side suppression |
 | **DNS prereq prod** | SPF + DKIM (3 CNAMEs) + DMARC: see [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md#email) |
-| **EU region** | supported via `region: "eu-west-1"` in adapter config |
+| **Region** | chosen per sending domain in Resend (e.g. `eu-west-1`); it only changes where mail is sent from, account data and logs stay in the US; no adapter option |
 
 ### Billing: Stripe (opt-in)
 

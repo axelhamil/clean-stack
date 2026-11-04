@@ -72,7 +72,7 @@ Every rejection, rate-limit, CSP violation, CSRF, is recorded as an audit event.
 
 Files go straight to your object store; your server never proxies the bytes. A three-step flow, presign, direct upload, server-side confirm, verifies size and type *after* the transfer and stores everything under owner-scoped keys, so one user can never reach another's files. The provider is a single environment variable: Cloudflare R2, AWS S3, Backblaze B2, Wasabi, or Tigris in production, SeaweedFS locally.
 
-Email runs on Resend with nine typed templates and idempotency keys, so a retry never sends twice. Provider-side suppression keeps hard bounces and complaints from hurting your sender reputation. Without a key configured, emails log to stdout in dev instead of crashing, you can smoke-deploy before wiring the provider.
+Email runs on Resend with nine typed templates and idempotency keys. A failed batch is replayed with the same key, so Resend can drop the duplicate within 24 h. Provider-side suppression keeps hard bounces and complaints from hurting your sender reputation. Without a key configured, emails log to stdout in dev instead of crashing, you can smoke-deploy before wiring the provider.
 
 ## The hard distributed-systems part, already solved
 

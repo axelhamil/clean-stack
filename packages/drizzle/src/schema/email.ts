@@ -21,6 +21,7 @@ export const emailMessage = pgTable(
     lastError: text("last_error"),
     providerMessageId: text("provider_message_id"),
     idempotencyKey: text("idempotency_key"),
+    batchKey: text("batch_key"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
@@ -28,10 +29,16 @@ export const emailMessage = pgTable(
     index("email_message_pending_idx")
       .on(table.nextAttemptAt, table.createdAt)
       .where(sql`${table.status} = 'pending'`),
+    index("email_message_pending_created_idx")
+      .on(table.createdAt)
+      .where(sql`${table.status} = 'pending'`),
     index("email_message_sweep_idx").on(table.sentAt).where(sql`${table.status} = 'sent'`),
     index("email_message_dead_retry_idx")
       .on(table.nextAttemptAt)
       .where(sql`${table.status} = 'dead'`),
+    index("email_message_batch_idx")
+      .on(table.batchKey)
+      .where(sql`${table.status} in ('pending', 'dead')`),
     index("email_message_failed_sweep_idx")
       .on(table.createdAt)
       .where(sql`${table.status} in ('failed', 'dead')`),

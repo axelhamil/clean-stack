@@ -12,6 +12,7 @@ import {
 export const OUTBOX_SETTLE_MARGIN_SECONDS = 10;
 export const EMAIL_SEND_TIMEOUT_SECONDS = 30;
 export const EMAIL_SETTLE_MARGIN_SECONDS = 15;
+const EMAIL_IDEMPOTENCY_KEY_TTL_HOURS = 24;
 export const WEBHOOK_DNS_TIMEOUT_SECONDS = 5;
 export const WEBHOOK_FETCH_TIMEOUT_SECONDS = 30;
 export const WEBHOOK_SETTLE_MARGIN_SECONDS = 30;
@@ -97,6 +98,14 @@ export function validateEnvBounds(
       code: "custom",
       path: ["EMAIL_DEAD_REPLAY_WINDOW_HOURS"],
       message: `EMAIL_DEAD_REPLAY_WINDOW_HOURS (${value.EMAIL_DEAD_REPLAY_WINDOW_HOURS}) must exceed EMAIL_DEAD_RETRY_HOURS (${value.EMAIL_DEAD_RETRY_HOURS}), or a dead email leaves its replay window before its first replay is due and is never retried.`,
+    });
+  }
+
+  if (value.EMAIL_DEAD_REPLAY_WINDOW_HOURS > EMAIL_IDEMPOTENCY_KEY_TTL_HOURS) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["EMAIL_DEAD_REPLAY_WINDOW_HOURS"],
+      message: `EMAIL_DEAD_REPLAY_WINDOW_HOURS (${value.EMAIL_DEAD_REPLAY_WINDOW_HOURS}) must be at most ${EMAIL_IDEMPOTENCY_KEY_TTL_HOURS}: the provider keeps an idempotency key for ${EMAIL_IDEMPOTENCY_KEY_TTL_HOURS} hours, so a later replay of a batch it already accepted would send every email twice.`,
     });
   }
 

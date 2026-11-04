@@ -132,7 +132,7 @@ Status is shipped for every row. "Detail" links the as-built record.
 | Phase | When | Why | Scope | Detail |
 |---|---|---|---|---|
 | **Auth (BetterAuth)** | Jan 2026 | One identity layer wired once | Sign-in and sign-up, MFA, passkey, magic link, bearer, `customSession`, email hooks | [HISTORY](docs/HISTORY.md#auth-betterauth-end-to-end--phase-1--phase-2-organization) |
-| **Email (Resend port and adapter)** | Jan 2026 | Typed templates behind a port | Template registry, idempotency, retry, EU region option | [HISTORY](docs/HISTORY.md#email-resend-dashboard-templates--phase-1) |
+| **Email (Resend port and adapter)** | Jan 2026 | Typed templates behind a port | Template registry, idempotency, retry, per-domain sending region (set in Resend) | [HISTORY](docs/HISTORY.md#email-resend-dashboard-templates--phase-1) |
 | **Multi-tenant and access-control SSOT** | Apr 2026 | Tenancy and permissions decided in one place | Organization plugin, Personal org self-heal, capability predicate on front and back, `<Can>` | [HISTORY](docs/HISTORY.md#multi-tenant-betterauth-organization-plugin--phase-2) |
 | **Storage (S3-compatible)** | Apr 2026 | Uploads without trusting the client | Presign, PUT, confirm, owner-scoped key, server-verified `HeadObject` (R2 in prod, SeaweedFS in dev) | [HISTORY](docs/HISTORY.md#storage-cloudflare-r2-prod--seaweedfs-dev-opt-in--phase-1) |
 | **RGPD core (Art. 17, Art. 20)** | Apr 2026 | Erasure and export are legal duties | 7-day grace, 2FA gate, sole-owner preflight, cron sweep, `/legal/data-rights` | [HISTORY](docs/HISTORY.md#rgpd--ccpa-data-deletion-art-17--export-art-20--phase-1) |

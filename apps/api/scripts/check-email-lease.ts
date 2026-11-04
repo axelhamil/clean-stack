@@ -3,7 +3,7 @@ import { requireLocalDatabase } from "./require-local-database";
 requireLocalDatabase("check-email-lease");
 
 import { uuidv7 } from "@packages/ddd-kit";
-import { db, emailSchema, eq, like } from "@packages/drizzle";
+import { db, emailSchema, eq, inArray, like } from "@packages/drizzle";
 import type { EmailClaimRequest, EmailMessageRecord } from "../src/shared/ports/email-queue.port";
 import { DrizzleEmailQueue } from "../src/shared/services/drizzle-email-queue.service";
 import { checkRun, probeClaims, recordingInstrumentation, withClockAhead } from "./check-harness";
@@ -71,8 +71,8 @@ async function main(): Promise<void> {
   await claimed({ limit: 1 });
   const claimSql = spans.find((name) => name.includes('from "due"')) ?? "";
   await step(
-    "the claim locks both CTEs with for update skip locked and settles them in one update",
-    claimSql.match(/for update skip locked/g)?.length === 2 &&
+    "the claim locks its three CTEs with for update skip locked and settles them in one update",
+    claimSql.match(/for update skip locked/g)?.length === 3 &&
       claimSql.includes("union all") &&
       /update "email_message" set .* from "due"/.test(claimSql),
     claimSql,
@@ -115,10 +115,11 @@ async function main(): Promise<void> {
   );
 
   const staleSent = await queue.markSent([{ id: leasedId, attempts: 1 }], { [leasedId]: "p" });
-  const staleFailed = await queue.markFailed(
-    { id: leasedId, attempts: 1 },
-    { lastError: "stale", status: "dead", retryAfterSeconds: 0 },
-  );
+  const staleFailed = await queue.markFailed([{ id: leasedId, attempts: 1 }], {
+    lastError: "stale",
+    status: "dead",
+    retryAfterSeconds: 0,
+  });
   const afterStale = await rowOf(leasedId);
   await step(
     "markSent with a stale attempts value writes nothing and says so",
@@ -130,20 +131,23 @@ async function main(): Promise<void> {
   );
   await step(
     "markFailed with a stale attempts value writes nothing and says so",
-    staleFailed.isSuccess && staleFailed.getValue() === false && afterStale.lastError !== "stale",
+    staleFailed.isSuccess &&
+      staleFailed.getValue().length === 0 &&
+      afterStale.lastError !== "stale",
     afterStale,
   );
 
-  const retried = await queue.markFailed(
-    { id: leasedId, attempts: 2 },
-    { lastError: "HTTP 503", status: "pending", retryAfterSeconds: 3_600 },
-  );
+  const retried = await queue.markFailed([{ id: leasedId, attempts: 2 }], {
+    lastError: "HTTP 503",
+    status: "pending",
+    retryAfterSeconds: 3_600,
+  });
   const afterRetry = await rowOf(leasedId);
   const notDue = await claimed();
   await step(
     "markFailed on the current lease schedules the retry on the database clock",
     retried.isSuccess &&
-      retried.getValue() === true &&
+      retried.getValue().length === 1 &&
       afterRetry.status === "pending" &&
       afterRetry.attempts === 2 &&
       (afterRetry.nextAttemptAt?.getTime() ?? 0) > Date.now() + HOUR_MS - 60_000 &&
@@ -227,16 +231,167 @@ async function main(): Promise<void> {
   );
 
   await cleanup();
+  const backlog = await seed(120);
+  const batchIds = backlog.slice(99, 102);
+  await db
+    .update(em)
+    .set({ batchKey: `${PROBE}-batch` })
+    .where(inArray(em.id, batchIds));
+  const acrossLimit = ids(await claimed({ limit: 100 }));
+  await step(
+    "a claim whose limit cuts a failed batch pulls the rest of the batch in the same claim",
+    batchIds.every((id) => acrossLimit.includes(id)) && acrossLimit.length === 102,
+    { claimed: acrossLimit.length, batch: batchIds.filter((id) => acrossLimit.includes(id)) },
+  );
+
+  await cleanup();
+  const [heldId = "", lostId = ""] = await seed(2);
+  const toAssign = await claimed();
+  const leaseOf = (id: string) => toAssign.find((record) => record.id === id)?.attempts ?? -1;
+  const assigned = await queue.assignBatch(
+    [
+      { id: heldId, attempts: leaseOf(heldId) },
+      { id: lostId, attempts: leaseOf(lostId) - 1 },
+    ],
+    `${PROBE}-key`,
+  );
+  const [afterHeld, afterLost] = [await rowOf(heldId), await rowOf(lostId)];
+  await step(
+    "the batch key is written before the send, only on the rows this worker still leases",
+    assigned.isSuccess &&
+      assigned
+        .getValue()
+        .map((lease) => lease.id)
+        .join() === heldId &&
+      afterHeld.batchKey === `${PROBE}-key` &&
+      afterLost.batchKey === null,
+    { held: afterHeld.batchKey, lost: afterLost.batchKey },
+  );
+  await queue.markFailed([{ id: heldId, attempts: leaseOf(heldId) }], {
+    lastError: "HTTP 503",
+    status: "pending",
+    retryAfterSeconds: 0,
+  });
+  const afterFailure = await rowOf(heldId);
+  await step(
+    "a retryable failure keeps the batch key so the replay rebuilds the same batch",
+    afterFailure.batchKey === `${PROBE}-key` && afterFailure.status === "pending",
+    afterFailure,
+  );
+
+  await cleanup();
+  const deadBatch = { status: "dead" as const, attempts: 5, batchKey: `${PROBE}-dead-batch` };
+  const [staleId = ""] = await seed(1, {
+    ...deadBatch,
+    nextAttemptAt: new Date(Date.now() - HOUR_MS),
+    createdAt: new Date(Date.now() - 30 * HOUR_MS),
+  });
+  const [freshId = ""] = await seed(1, {
+    ...deadBatch,
+    nextAttemptAt: new Date(Date.now() - HOUR_MS),
+    createdAt: new Date(Date.now() - 10 * HOUR_MS),
+  });
+  const deadReplay = await claimed({ deadReplayWindowHours: 24 });
+  const afterStaleDead = await rowOf(staleId);
+  await step(
+    "a dead row past the replay window is never pulled in by a younger sibling, nor counted against it",
+    ids(deadReplay).join() === freshId &&
+      deadReplay[0]?.unsettledInBatch.unwrapOr(-1) === 1 &&
+      afterStaleDead.status === "dead" &&
+      afterStaleDead.attempts === 5,
+    { claimed: ids(deadReplay), unsettled: deadReplay[0]?.unsettledInBatch.toNull() },
+  );
+
+  await cleanup();
+  const lockedBatch = await seed(3, { attempts: 1, batchKey: `${PROBE}-locked-batch` });
+  const [lockedId = ""] = lockedBatch;
+  let unlock: () => void = () => {};
+  const held = new Promise<void>((resolve) => {
+    unlock = resolve;
+  });
+  let locked: () => void = () => {};
+  const isLocked = new Promise<void>((resolve) => {
+    locked = resolve;
+  });
+  const holder = db.transaction(async (tx) => {
+    await tx.select({ id: em.id }).from(em).where(eq(em.id, lockedId)).for("update");
+    locked();
+    await held;
+  });
+  await isLocked;
+  const besideLock = await claimed();
+  unlock();
+  await holder;
+  await step(
+    "a claim that cannot lock a sibling reports the batch as larger than what it claimed",
+    besideLock.length === 2 &&
+      !ids(besideLock).includes(lockedId) &&
+      besideLock.every((record) => record.unsettledInBatch.unwrapOr(-1) === 3),
+    { claimed: ids(besideLock), unsettled: besideLock.map((r) => r.unsettledInBatch.toNull()) },
+  );
+
+  await cleanup();
+  const [leasedSibling = ""] = await seed(3, { attempts: 1, batchKey: `${PROBE}-leased-batch` });
+  await db
+    .update(em)
+    .set({ attempts: 2, nextAttemptAt: new Date(Date.now() + HOUR_MS) })
+    .where(eq(em.id, leasedSibling));
+  const besideLease = await claimed();
+  await step(
+    "a sibling leased by another worker still counts, so the claimed part is known incomplete",
+    besideLease.length === 2 &&
+      besideLease.every((record) => record.unsettledInBatch.unwrapOr(-1) === 3),
+    { claimed: ids(besideLease), unsettled: besideLease.map((r) => r.unsettledInBatch.toNull()) },
+  );
+
+  await cleanup();
+  const settledBatch = { batchKey: `${PROBE}-settled-batch` };
+  await seed(1, { ...settledBatch, status: "sent", sentAt: new Date() });
+  await seed(1, { ...settledBatch, status: "failed" });
+  await seed(2, { ...settledBatch, attempts: 1 });
+  const besideSettled = await claimed();
+  await step(
+    "sent or failed siblings are settled: they never make the rest of the batch incomplete",
+    besideSettled.length === 2 &&
+      besideSettled.every((record) => record.unsettledInBatch.unwrapOr(-1) === 2),
+    {
+      claimed: ids(besideSettled),
+      unsettled: besideSettled.map((r) => r.unsettledInBatch.toNull()),
+    },
+  );
+
+  await cleanup();
+  const [inFlightId = ""] = await seed(1, { attempts: 3 });
+  const [inFlight] = await claimed();
+  const postponed = await queue.release(
+    [{ id: inFlightId, attempts: inFlight?.attempts ?? -1 }],
+    60,
+  );
+  const afterPostpone = await rowOf(inFlightId);
+  const whilePostponed = await claimed();
+  await step(
+    "a delayed release gives the attempt back and keeps the row out of claims until the delay ends",
+    postponed.isSuccess &&
+      postponed.getValue() === 1 &&
+      afterPostpone.status === "pending" &&
+      afterPostpone.attempts === 3 &&
+      (afterPostpone.nextAttemptAt?.getTime() ?? 0) > Date.now() + 50_000 &&
+      whilePostponed.length === 0,
+    afterPostpone,
+  );
+
+  await cleanup();
   const [failedId = ""] = await seed(1, { status: "failed", attempts: 1 });
   await seed(1, { status: "sent", attempts: 1, sentAt: new Date() });
   const terminal = await claimed();
-  const settleFailed = await queue.markFailed(
-    { id: failedId, attempts: 1 },
-    { lastError: "again", status: "dead", retryAfterSeconds: 0 },
-  );
+  const settleFailed = await queue.markFailed([{ id: failedId, attempts: 1 }], {
+    lastError: "again",
+    status: "dead",
+    retryAfterSeconds: 0,
+  });
   await step(
     "a failed or sent message is never claimed nor settled again",
-    terminal.length === 0 && settleFailed.isSuccess && settleFailed.getValue() === false,
+    terminal.length === 0 && settleFailed.isSuccess && settleFailed.getValue().length === 0,
     ids(terminal),
   );
 }
