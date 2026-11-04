@@ -2,7 +2,7 @@ name: PR policy
 
 on:
   pull_request_target:
-    types: [opened, edited, reopened, synchronize, ready_for_review, labeled, unlabeled]
+    types: [opened, edited, reopened, synchronize, ready_for_review, labeled, unlabeled, assigned, unassigned]
 
 permissions:
   contents: read
@@ -53,19 +53,19 @@ jobs:
       pull-requests: read
       issues: read
     steps:
-      - name: Require the accepted label on the PR or its linked issue
+      - name: Require a triaged pull request that closes a triaged issue
         uses: actions/github-script@v9
         with:
           script: |
+            const TYPE_LABELS = ['bug', 'enhancement', 'integration', 'documentation', 'maintenance'];
+            const TRUSTED = ['OWNER', 'MEMBER', 'COLLABORATOR'];
             const pr = context.payload.pull_request;
             const repository = `${context.repo.owner}/${context.repo.repo}`;
-            const isTrusted = ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(pr.author_association);
             const isBot = pr.user.type === 'Bot';
             const isRelease = pr.base.ref === 'main' && pr.head.ref === 'dev' && pr.head.repo?.full_name === repository;
-            const isAcceptedPr = pr.labels.some((label) => label.name === 'accepted');
 
-            if (isTrusted || isBot || isRelease || isAcceptedPr) {
-              core.info('Exempt from the linked issue rule.');
+            if (isBot || isRelease) {
+              core.info('Exempt from the triage rule.');
               return;
             }
 
@@ -73,12 +73,16 @@ jobs:
               `query($owner: String!, $repo: String!, $number: Int!) {
                 repository(owner: $owner, name: $repo) {
                   pullRequest(number: $number) {
+                    authorAssociation
+                    labels(first: 50) { nodes { name } }
+                    assignees(first: 1) { totalCount }
                     closingIssuesReferences(first: 50) {
                       nodes {
                         number
                         state
                         repository { nameWithOwner }
                         labels(first: 50) { nodes { name } }
+                        assignees(first: 1) { totalCount }
                       }
                     }
                   }
@@ -87,23 +91,50 @@ jobs:
               { owner: context.repo.owner, repo: context.repo.repo, number: pr.number },
             );
 
-            const issues = result.repository.pullRequest.closingIssuesReferences.nodes;
-            const accepted = issues.find(
-              (issue) =>
-                issue.state === 'OPEN' &&
-                issue.repository.nameWithOwner === repository &&
-                issue.labels.nodes.some((label) => label.name === 'accepted'),
-            );
+            const current = result.repository.pullRequest;
+            const labelsOf = (item) => item.labels.nodes.map((label) => label.name);
+            const hasType = (item) => labelsOf(item).some((name) => TYPE_LABELS.includes(name));
+            const isAccepted = (item) => labelsOf(item).includes('accepted');
+            const isAssigned = (item) => item.assignees.totalCount > 0;
+            const typeList = TYPE_LABELS.map((name) => `\`${name}\``).join(', ');
+            const missing = [];
 
-            if (accepted) {
-              core.info(`Linked to accepted issue #${accepted.number}.`);
-              return;
+            if (!hasType(current)) missing.push(`This pull request needs a type label: ${typeList}.`);
+            if (!isAssigned(current)) missing.push('This pull request needs an assignee.');
+
+            const openIssues = current.closingIssuesReferences.nodes.filter(
+              (issue) => issue.state === 'OPEN' && issue.repository.nameWithOwner === repository,
+            );
+            const isTriaged = (issue) => isAccepted(issue) && hasType(issue) && isAssigned(issue);
+            const allTriaged = openIssues.length > 0 && openIssues.every(isTriaged);
+            const isExternal = !TRUSTED.includes(current.authorAssociation);
+
+            if (allTriaged) {
+              core.info(`Closes triaged issues ${openIssues.map((issue) => `#${issue.number}`).join(', ')}.`);
+            } else if (isExternal && isAccepted(current)) {
+              core.info('External pull request accepted by a maintainer.');
+            } else if (openIssues.length === 0) {
+              missing.push(
+                isExternal
+                  ? 'This pull request needs the `accepted` label from a maintainer, or `Closes #N` pointing to an accepted issue.'
+                  : 'This pull request must close an open issue of this repository: add `Closes #N` to its body.',
+              );
+            } else {
+              for (const issue of openIssues.filter((candidate) => !isTriaged(candidate))) {
+                const gaps = [];
+                if (!isAccepted(issue)) gaps.push('the `accepted` label');
+                if (!hasType(issue)) gaps.push(`a type label (${typeList})`);
+                if (!isAssigned(issue)) gaps.push('an assignee');
+                missing.push(`Issue #${issue.number} needs ${gaps.join(', ')}.`);
+              }
             }
 
+            if (missing.length === 0) return;
+
             const message = [
-              'Thanks for the pull request. It needs the `accepted` label before it can be merged.',
-              'Small fix: nothing to do, a maintainer will review it and add the label to this pull request.',
-              'Bigger change: open an issue with a template, wait for `accepted` on it, then add `Closes #N` to this pull request.',
+              'This pull request is not triaged yet. Missing:',
+              ...missing.map((item) => `- ${item}`),
+              'The check reruns when the pull request or its issue changes.',
               'See https://github.com/axelhamil/clean-stack/blob/dev/CONTRIBUTING.md',
             ].join('\n');
 
