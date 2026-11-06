@@ -731,7 +731,7 @@ describe("RgpdService", () => {
       expect(orgDeleted).toEqual(["org_personal", "org_solo"]);
     });
 
-    it("announces the membership of every surviving organization and each revoked api token", async () => {
+    it("announces the membership of every surviving organization and each revoked api token, deleted organizations included", async () => {
       const repo = makeRepo({
         getUserDeletionState: mock(async () =>
           Result.ok<Option<UserDeletionState>, RgpdError>(Option.some(elapsedState)),
@@ -746,6 +746,7 @@ describe("RgpdService", () => {
             revokedTokens: [
               { tokenId: "tok_personal", organizationId: Option.none() },
               { tokenId: "tok_team", organizationId: Option.some("org_team") },
+              { tokenId: "tok_personal_org", organizationId: Option.some("org_personal") },
             ],
           }),
         ),
@@ -784,6 +785,17 @@ describe("RgpdService", () => {
             actorUserId: "u1",
             organizationId: "org_team",
             tokenId: "tok_team",
+            reason: "user",
+          },
+        },
+        {
+          eventType: EventTypes.API_TOKEN_REVOKED,
+          aggregateId: "tok_personal_org",
+          payload: {
+            userId: "u1",
+            actorUserId: "u1",
+            organizationId: "org_personal",
+            tokenId: "tok_personal_org",
             reason: "user",
           },
         },

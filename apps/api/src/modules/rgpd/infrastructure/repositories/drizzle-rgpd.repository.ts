@@ -305,12 +305,6 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
       { name: "DrizzleRgpdRepository > executeWipe" },
       async () => {
         try {
-          const memberships = await exec
-            .select({ memberId: schema.member.id, organizationId: schema.member.organizationId })
-            .from(schema.member)
-            .where(eq(schema.member.userId, userId));
-          const userOrgIds = memberships.map((m) => m.organizationId);
-
           const anonymizedEmail = `deleted-${crypto.randomUUID()}@${ANONYMIZED_DOMAIN}`;
           const updatedRows = await exec
             .update(schema.user)
@@ -350,8 +344,29 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
           await exec.delete(schema.account).where(eq(schema.account.userId, userId));
           await exec.delete(schema.twoFactor).where(eq(schema.twoFactor.userId, userId));
           await exec.delete(schema.passkey).where(eq(schema.passkey.userId, userId));
-          await exec.delete(schema.member).where(eq(schema.member.userId, userId));
+          const memberships = await exec
+            .delete(schema.member)
+            .where(eq(schema.member.userId, userId))
+            .returning({
+              memberId: schema.member.id,
+              organizationId: schema.member.organizationId,
+            });
+          const userOrgIds = memberships.map((m) => m.organizationId);
           await exec.delete(schema.invitation).where(eq(schema.invitation.inviterId, userId));
+
+          const revokedTokens = await exec
+            .update(apiTokenSchema.apiToken)
+            .set({ revokedAt: new Date(), revokedReason: "user" })
+            .where(
+              and(
+                eq(apiTokenSchema.apiToken.userId, userId),
+                isNull(apiTokenSchema.apiToken.revokedAt),
+              ),
+            )
+            .returning({
+              tokenId: apiTokenSchema.apiToken.id,
+              organizationId: apiTokenSchema.apiToken.organizationId,
+            });
 
           const deletedOrgs =
             userOrgIds.length === 0
@@ -374,20 +389,6 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
                     ),
                   )
                   .returning({ id: schema.organization.id });
-
-          const revokedTokens = await exec
-            .update(apiTokenSchema.apiToken)
-            .set({ revokedAt: new Date(), revokedReason: "user" })
-            .where(
-              and(
-                eq(apiTokenSchema.apiToken.userId, userId),
-                isNull(apiTokenSchema.apiToken.revokedAt),
-              ),
-            )
-            .returning({
-              tokenId: apiTokenSchema.apiToken.id,
-              organizationId: apiTokenSchema.apiToken.organizationId,
-            });
 
           const deletedOrgIds = deletedOrgs.map((o) => o.id);
           return Result.ok({

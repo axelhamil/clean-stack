@@ -16,7 +16,8 @@
  * performs, then drops the constraint again in cleanup.
  *
  * A second probe then runs a wipe that succeeds and proves what the mocks cannot: the erased
- * account's api tokens are revoked in the same transaction, `ORG_MEMBER_REMOVED` reaches the
+ * account's api tokens are revoked in the same transaction (those of a deleted organization too,
+ * before the cascade removes them), `ORG_MEMBER_REMOVED` reaches the
  * outbox for each organization that survives, and the token no longer authenticates.
  *
  * WARNING: `ALTER TABLE ... ADD CONSTRAINT` takes an ACCESS EXCLUSIVE lock on the shared
@@ -76,6 +77,7 @@ const personalOrgId = `${erasedId}-personal`;
 const erasedMemberId = `${erasedId}-member`;
 const personalTokenId = `${erasedId}-token-personal`;
 const teamTokenId = `${erasedId}-token-team`;
+const personalOrgTokenId = `${erasedId}-token-personal-org`;
 const TOKEN_PREFIX = "clean_";
 const TOKEN_PEPPER = "p".repeat(32);
 
@@ -188,6 +190,7 @@ async function seedErasedAccount(): Promise<string> {
     .values([
       token(personalTokenId, null, hmacToken(raw, TOKEN_PEPPER)),
       token(teamTokenId, teamOrgId, `${teamTokenId}-hmac`),
+      token(personalOrgTokenId, personalOrgId, `${personalOrgTokenId}-hmac`),
     ]);
   return raw;
 }
@@ -207,6 +210,7 @@ async function cleanupErasedAccount(): Promise<void> {
         erasedMemberId,
         personalTokenId,
         teamTokenId,
+        personalOrgTokenId,
       ]),
     );
 }
@@ -244,7 +248,7 @@ async function checkErasedAccountLosesAccess(): Promise<void> {
     .from(apiTokenSchema.apiToken)
     .where(eq(apiTokenSchema.apiToken.userId, erasedId));
   check(
-    "every api token of the erased account is revoked",
+    "every api token left after the wipe is revoked",
     tokens.length === 2 && tokens.every((t) => t.revokedAt !== null),
     tokens,
   );
@@ -256,17 +260,23 @@ async function checkErasedAccountLosesAccess(): Promise<void> {
     })
     .from(outboxSchema.outboxEvent)
     .where(
-      inArray(outboxSchema.outboxEvent.aggregateId, [erasedMemberId, personalTokenId, teamTokenId]),
+      inArray(outboxSchema.outboxEvent.aggregateId, [
+        erasedMemberId,
+        personalTokenId,
+        teamTokenId,
+        personalOrgTokenId,
+      ]),
     );
   const announced = outboxRows.map((r) => `${r.eventType}:${r.aggregateId}`).sort();
   const expected = [
     `${EventTypes.ORG_MEMBER_REMOVED}:${erasedMemberId}`,
     `${EventTypes.API_TOKEN_REVOKED}:${personalTokenId}`,
     `${EventTypes.API_TOKEN_REVOKED}:${teamTokenId}`,
+    `${EventTypes.API_TOKEN_REVOKED}:${personalOrgTokenId}`,
     `${EventTypes.API_TOKEN_USED}:${personalTokenId}`,
   ].sort();
   check(
-    "the outbox announces the surviving membership and both revoked tokens",
+    "the outbox announces the surviving membership and every revoked token, deleted orgs included",
     JSON.stringify(announced) === JSON.stringify(expected),
     announced,
   );
