@@ -1,0 +1,1754 @@
+import { Hono } from "hono";
+import { type AuthVariables } from "./shared/middleware/auth.middleware";
+type AppEnv = {
+    Variables: AuthVariables & {
+        requestId: string;
+    };
+};
+declare const app: Hono<AppEnv, import("hono/types").BlankSchema, "/">;
+declare const routes: import("hono/hono-base").HonoBase<AppEnv, import("hono/types").BlankSchema | import("hono/types").MergeSchemaPath<{
+    "/export": {
+        $post: {
+            input: {};
+            output: {
+                ok: true;
+                expiresAt: string;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/delete/preflight": {
+        $get: {
+            input: {};
+            output: {
+                blockingOrgs: {
+                    orgId: string;
+                    orgName: string;
+                    otherMembersCount: number;
+                }[];
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/delete": {
+        $post: {
+            input: {
+                json: {
+                    totpCode?: string | undefined;
+                    password?: string | undefined;
+                };
+            };
+            output: {
+                pendingDeletionUntil: string;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/delete": {
+        $delete: {
+            input: {};
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+}, "/me"> | import("hono/types").MergeSchemaPath<{
+    "/locale": {
+        $put: {
+            input: {
+                json: {
+                    locale: "en" | "fr";
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+}, "/me"> | import("hono/types").MergeSchemaPath<{
+    "/accept": {
+        $post: {
+            input: {
+                json: {
+                    types?: ("privacy" | "terms")[] | undefined;
+                };
+            };
+            output: {
+                privacy: {
+                    current: boolean;
+                    acceptedVersion: string | null;
+                };
+                terms: {
+                    current: boolean;
+                    acceptedVersion: string | null;
+                };
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/": {
+        $get: {
+            input: {};
+            output: {
+                privacy: {
+                    current: boolean;
+                    acceptedVersion: string | null;
+                };
+                terms: {
+                    current: boolean;
+                    acceptedVersion: string | null;
+                };
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+}, "/me/policies"> | import("hono/types").MergeSchemaPath<{
+    "/presign": {
+        $post: {
+            input: {
+                json: {
+                    filename: string;
+                    contentType: string;
+                    size: number;
+                    scope?: string | undefined;
+                    expiresInSeconds?: number | undefined;
+                };
+            };
+            output: {
+                url: string;
+                key: string;
+                publicUrl: string;
+                expiresAt: string;
+                expectedSize: number;
+                expectedContentType: string;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/confirm": {
+        $post: {
+            input: {
+                json: {
+                    key: string;
+                    expectedSize: number;
+                    expectedContentType: string;
+                };
+            };
+            output: {
+                key: string;
+                size: number;
+                contentType: string;
+                publicUrl: string;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/download": {
+        $post: {
+            input: {
+                json: {
+                    key: string;
+                    expiresInSeconds?: number | undefined;
+                };
+            };
+            output: {
+                url: string;
+                expiresAt: string;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/": {
+        $delete: {
+            input: {
+                json: {
+                    key: string;
+                } | {
+                    url: string;
+                };
+            };
+            output: {
+                deleted: boolean;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+}, "/uploads"> | import("hono/types").MergeSchemaPath<{
+    "/me": {
+        $get: {
+            input: {};
+            output: {
+                id: string;
+                email: string;
+                role: "manager" | "support" | "auditor";
+                permissions: ("users.read" | "users.moderate" | "users.role" | "users.delete" | "users.impersonate" | "orgs.read" | "orgs.sso" | "notes.write" | "audit.read" | "ops.read" | "ops.manage" | "billing.override" | "approvals.decide" | "staff.manage")[];
+                mfa: boolean;
+                stepUpValidUntil: string | null;
+                policy: {
+                    requireMfa: boolean;
+                };
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/step-up": {
+        $post: {
+            input: {
+                json: {
+                    code: string;
+                };
+            };
+            output: {
+                validUntil: string;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/staff": {
+        $get: {
+            input: {};
+            output: {
+                items: {
+                    createdAt: string;
+                    userId: string;
+                    email: string;
+                    name: string;
+                    role: import("@packages/access-control").StaffRole;
+                    source: import("./shared/ports/staff-store.port").StaffSource;
+                }[];
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/staff/:id/role": {
+        $put: {
+            input: {
+                json: {
+                    role: "manager" | "support" | "auditor";
+                };
+            } & {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                approvalId: string;
+            };
+            outputFormat: "json";
+            status: 202;
+        } | {
+            input: {
+                json: {
+                    role: "manager" | "support" | "auditor";
+                };
+            } & {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/staff/:id": {
+        $delete: {
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                approvalId: string;
+            };
+            outputFormat: "json";
+            status: 202;
+        } | {
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/staff/:id/overrides": {
+        $get: {
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                items: {
+                    id: string;
+                    permission: "users.read" | "users.moderate" | "users.role" | "users.delete" | "users.impersonate" | "orgs.read" | "orgs.sso" | "notes.write" | "audit.read" | "ops.read" | "ops.manage" | "billing.override" | "approvals.decide" | "staff.manage";
+                    effect: "grant" | "deny";
+                    expiresAt: string | null;
+                    createdAt: string;
+                }[];
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/staff/:id/overrides": {
+        $post: {
+            input: {
+                json: {
+                    permission: "users.read" | "users.moderate" | "users.role" | "users.delete" | "users.impersonate" | "orgs.read" | "orgs.sso" | "notes.write" | "audit.read" | "ops.read" | "ops.manage" | "billing.override" | "approvals.decide" | "staff.manage";
+                    effect: "grant" | "deny";
+                    expiresAt: string | null;
+                };
+            } & {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                approvalId: string;
+            };
+            outputFormat: "json";
+            status: 202;
+        } | {
+            input: {
+                json: {
+                    permission: "users.read" | "users.moderate" | "users.role" | "users.delete" | "users.impersonate" | "orgs.read" | "orgs.sso" | "notes.write" | "audit.read" | "ops.read" | "ops.manage" | "billing.override" | "approvals.decide" | "staff.manage";
+                    effect: "grant" | "deny";
+                    expiresAt: string | null;
+                };
+            } & {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/staff/:id/overrides/:overrideId": {
+        $delete: {
+            input: {
+                param: {
+                    id: string;
+                } & {
+                    overrideId: string;
+                };
+            };
+            output: {
+                approvalId: string;
+            };
+            outputFormat: "json";
+            status: 202;
+        } | {
+            input: {
+                param: {
+                    id: string;
+                } & {
+                    overrideId: string;
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+}, "/admin"> | import("hono/types").MergeSchemaPath<{
+    "/inbox": {
+        $get: {
+            input: {};
+            output: {
+                approvals: {
+                    status: "failed";
+                } | {
+                    status: "ok";
+                    total: number;
+                    items: {
+                        id: string;
+                        action: "user.ban_permanent" | "staff.role_change" | "staff.revoke" | "staff.permission_override";
+                        requestedBy: string;
+                        createdAt: string;
+                    }[];
+                } | null;
+                queues: {
+                    status: "failed";
+                } | {
+                    deadEvents: number;
+                    deadEmails: number;
+                    deadWebhooks: number;
+                    status: "ok";
+                } | null;
+                sweeps: {
+                    status: "failed";
+                } | {
+                    status: "ok";
+                    items: {
+                        label: string;
+                        outcome: import("./client").SweepOutcome;
+                        late: boolean;
+                        finishedAt: string;
+                    }[];
+                } | null;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/views": {
+        $get: {
+            input: {};
+            output: {
+                items: ({
+                    screen: "users";
+                    name: string;
+                    filters: {
+                        q?: string | undefined;
+                        status?: "active" | "suspended" | undefined;
+                        org?: string | undefined;
+                    };
+                    id: string;
+                } | {
+                    screen: "orgs";
+                    name: string;
+                    filters: {
+                        q?: string | undefined;
+                    };
+                    id: string;
+                } | {
+                    screen: "audit";
+                    name: string;
+                    filters: {
+                        action?: "user." | "org." | "billing." | "security." | "webhook." | "admin." | undefined;
+                        actor?: string | undefined;
+                        org?: string | undefined;
+                        from?: string | undefined;
+                        to?: string | undefined;
+                    };
+                    id: string;
+                })[];
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/views": {
+        $post: {
+            input: {
+                json: {
+                    screen: "users";
+                    name: string;
+                    filters: {
+                        q?: string | undefined;
+                        status?: "active" | "suspended" | undefined;
+                        org?: string | undefined;
+                    };
+                } | {
+                    screen: "orgs";
+                    name: string;
+                    filters: {
+                        q?: string | undefined;
+                    };
+                } | {
+                    screen: "audit";
+                    name: string;
+                    filters: {
+                        action?: "user." | "org." | "billing." | "security." | "webhook." | "admin." | undefined;
+                        actor?: string | undefined;
+                        org?: string | undefined;
+                        from?: string | undefined;
+                        to?: string | undefined;
+                    };
+                };
+            };
+            output: {
+                id: string;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/views/:id": {
+        $delete: {
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+}, "/admin"> | import("hono/types").MergeSchemaPath<{
+    "/": {
+        $get: {
+            input: {
+                query: {
+                    status?: "pending" | "failed" | "expired" | "cancelled" | "approved" | "rejected" | "executed" | undefined;
+                    cursor?: string | undefined;
+                    limit?: unknown;
+                };
+            };
+            output: {
+                items: {
+                    id: string;
+                    action: "user.ban_permanent" | "staff.role_change" | "staff.revoke" | "staff.permission_override";
+                    subjectId: string;
+                    params: import("hono/utils/types").JSONValue;
+                    requestedBy: string;
+                    status: "pending" | "failed" | "expired" | "cancelled" | "approved" | "rejected" | "executed";
+                    decidedBy: string | null;
+                    decisionNote: string | null;
+                    failureReason: string | null;
+                    expiresAt: string;
+                    decidedAt: string | null;
+                    createdAt: string;
+                    version: number;
+                }[];
+                nextCursor: string | null;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/:id": {
+        $get: {
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                id: string;
+                action: "user.ban_permanent" | "staff.role_change" | "staff.revoke" | "staff.permission_override";
+                subjectId: string;
+                params: import("hono/utils/types").JSONValue;
+                requestedBy: string;
+                status: "pending" | "failed" | "expired" | "cancelled" | "approved" | "rejected" | "executed";
+                decidedBy: string | null;
+                decisionNote: string | null;
+                failureReason: string | null;
+                expiresAt: string;
+                decidedAt: string | null;
+                createdAt: string;
+                version: number;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/:id/decide": {
+        $post: {
+            input: {
+                json: {
+                    decision: "approve" | "reject";
+                    note: string;
+                };
+            } & {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/:id/cancel": {
+        $post: {
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+}, "/admin/approvals"> | import("hono/types").MergeSchemaPath<{
+    "/": {
+        $get: {
+            input: {
+                query: {
+                    search?: string | undefined;
+                    banned?: "true" | "false" | undefined;
+                    organizationId?: string | undefined;
+                    cursor?: string | undefined;
+                    limit?: unknown;
+                };
+            };
+            output: {
+                items: {
+                    banReason: string | null;
+                    banExpires: string | null;
+                    createdAt: string;
+                    id: string;
+                    email: string;
+                    name: string;
+                    banned: boolean;
+                    twoFactorEnabled: boolean;
+                }[];
+                nextCursor: string | null;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/:id": {
+        $get: {
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                sessions: {
+                    id: string;
+                    createdAt: string;
+                    expiresAt: string;
+                    ipAddress: string | null;
+                    userAgent: string | null;
+                    impersonatedBy: string | null;
+                }[];
+                memberships: {
+                    organizationId: string;
+                    organizationName: string;
+                    role: string;
+                }[];
+                banReason: string | null;
+                banExpires: string | null;
+                createdAt: string;
+                id: string;
+                email: string;
+                name: string;
+                banned: boolean;
+                twoFactorEnabled: boolean;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/:id/ban": {
+        $post: {
+            input: {
+                json: {
+                    reason: string;
+                    expiresIn?: number | undefined;
+                };
+            } & {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                approvalId: string;
+            };
+            outputFormat: "json";
+            status: 202;
+        } | {
+            input: {
+                json: {
+                    reason: string;
+                    expiresIn?: number | undefined;
+                };
+            } & {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/:id/unban": {
+        $post: {
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/:id/reset-password": {
+        $post: {
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/:id/sessions": {
+        $delete: {
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/:id/notes": {
+        $get: {
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                items: {
+                    id: string;
+                    authorName: string | null;
+                    body: string;
+                    createdAt: string;
+                }[];
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/:id/notes": {
+        $post: {
+            input: {
+                json: {
+                    body: string;
+                };
+            } & {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+}, "/admin/users"> | import("hono/types").MergeSchemaPath<{
+    "/": {
+        $get: {
+            input: {
+                query: {
+                    search?: string | undefined;
+                    cursor?: string | undefined;
+                    limit?: unknown;
+                };
+            };
+            output: {
+                items: {
+                    createdAt: string;
+                    id: string;
+                    name: string;
+                    slug: string;
+                    memberCount: number;
+                    ssoEnforced: boolean;
+                }[];
+                nextCursor: string | null;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/:id": {
+        $get: {
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                createdAt: string;
+                planOverride: {
+                    tier: string;
+                    note: string;
+                    expiresAt: string;
+                } | null;
+                id: string;
+                name: string;
+                slug: string;
+                memberCount: number;
+                ssoEnforced: boolean;
+                members: {
+                    userId: string;
+                    email: string;
+                    role: string;
+                }[];
+                plan: string;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/:id/plan-override": {
+        $post: {
+            input: {
+                json: {
+                    tier: "pro" | "business";
+                    expiresAt: string;
+                    note: string;
+                };
+            } & {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/:id/plan-override": {
+        $delete: {
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/:id/notes": {
+        $get: {
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                items: {
+                    id: string;
+                    authorName: string | null;
+                    body: string;
+                    createdAt: string;
+                }[];
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/:id/notes": {
+        $post: {
+            input: {
+                json: {
+                    body: string;
+                };
+            } & {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/:id/sso-enforcement": {
+        $post: {
+            input: {
+                json: {
+                    enforced: boolean;
+                };
+            } & {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+}, "/admin/orgs"> | import("hono/types").MergeSchemaPath<{
+    "/dead-letters": {
+        $get: {
+            input: {};
+            output: {
+                outbox: {
+                    total: number;
+                    items: {
+                        id: string;
+                        eventType: string;
+                        attempts: number;
+                        deadAt: string;
+                        lastError: string | null;
+                    }[];
+                };
+                queues: {
+                    emails: number;
+                    webhooks: number;
+                };
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/outbox/requeue": {
+        $post: {
+            input: {
+                json: {
+                    ids: string[];
+                };
+            };
+            output: {
+                requeued: number;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/sweeps": {
+        $get: {
+            input: {};
+            output: {
+                items: {
+                    label: string;
+                    outcome: import("./client").SweepOutcome;
+                    count: number;
+                    late: boolean;
+                    finishedAt: string;
+                }[];
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/stripe-events": {
+        $get: {
+            input: {};
+            output: {
+                configured: boolean;
+                items: {
+                    id: string;
+                    type: string;
+                    status: import("./client").StripeEventStatus;
+                    receivedAt: string;
+                    lastError: string | null;
+                    replayedAt: string | null;
+                    replayable: boolean;
+                }[];
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/stripe-events/:id/replay": {
+        $post: {
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+}, "/admin/ops"> | import("hono/types").MergeSchemaPath<{
+    "/:id/start": {
+        $post: {
+            input: {
+                json: {
+                    reason: string;
+                    ticketRef?: string | undefined;
+                };
+            } & {
+                param: {
+                    id: string;
+                };
+            };
+            output: {};
+            outputFormat: string;
+            status: import("hono/utils/http-status").StatusCode;
+        };
+    };
+} & {
+    "/stop": {
+        $post: {
+            input: {};
+            output: {};
+            outputFormat: string;
+            status: import("hono/utils/http-status").StatusCode;
+        };
+    };
+}, "/admin/impersonation"> | import("hono/types").MergeSchemaPath<{
+    "/": {
+        $get: {
+            input: {
+                query: {
+                    actorId?: string | undefined;
+                    organizationId?: string | undefined;
+                    targetType?: string | undefined;
+                    targetId?: string | undefined;
+                    actionPrefix?: string | undefined;
+                    occurredFrom?: string | undefined;
+                    occurredTo?: string | undefined;
+                    limit?: unknown;
+                    cursor?: string | undefined;
+                };
+            };
+            output: {
+                items: {
+                    actorId: string | null;
+                    organizationId: string | null;
+                    prevHash: string | null;
+                    hash: string | null;
+                    actorType: import("@packages/drizzle").AuditActorType;
+                    action: string;
+                    targetType: string;
+                    targetId: string;
+                    metadata: import("hono/utils/types").JSONValue;
+                    requestId?: string | undefined;
+                    retention: import("@packages/drizzle").AuditRetention;
+                    id: string;
+                    occurredAt: string;
+                }[];
+                nextCursor: string | null;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/verify": {
+        $get: {
+            input: {};
+            output: {
+                verified: boolean;
+                rowCount: number;
+                brokenAtId: string | null;
+                brokenAtSequence: number | null;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+}, "/admin/audit-log"> | import("hono/types").MergeSchemaPath<{
+    "/": {
+        $get: {
+            input: {};
+            output: {
+                items: {
+                    id: string;
+                    userId: string;
+                    organizationId: string | null;
+                    name: string;
+                    scopes: string[];
+                    tokenStart: string;
+                    lastUsedAt: string | null;
+                    expiresAt: string | null;
+                    revokedAt: string | null;
+                    revokedReason: "user" | "membership_lost" | "leaked" | null;
+                    createdAt: string;
+                }[];
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/": {
+        $post: {
+            input: {
+                json: {
+                    name: string;
+                    scopes: ("read:profile" | "write:profile" | "read:organizations")[];
+                    organizationId?: string | null | undefined;
+                    expiresInDays?: number | null | undefined;
+                };
+            };
+            output: {
+                token: string;
+                record: {
+                    id: string;
+                    userId: string;
+                    organizationId: string | null;
+                    name: string;
+                    scopes: string[];
+                    tokenStart: string;
+                    lastUsedAt: string | null;
+                    expiresAt: string | null;
+                    revokedAt: string | null;
+                    revokedReason: "user" | "membership_lost" | "leaked" | null;
+                    createdAt: string;
+                };
+            };
+            outputFormat: "json";
+            status: 201;
+        };
+    };
+} & {
+    "/:id": {
+        $delete: {
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                deleted: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+}, "/settings/tokens"> | import("hono/types").MergeSchemaPath<{
+    "/": {
+        $get: {
+            input: {};
+            output: {
+                items: {
+                    previousSecretExpiresAt: string | null;
+                    firstFailedAt: string | null;
+                    disabledAt: string | null;
+                    id: string;
+                    organizationId: string;
+                    url: string;
+                    eventTypes: string[];
+                    enabled: boolean;
+                    createdAt: string;
+                    updatedAt: string;
+                    consecutiveFailures: number;
+                }[];
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/": {
+        $post: {
+            input: {
+                json: {
+                    url: string;
+                    eventTypes: string[];
+                    enabled?: boolean | undefined;
+                };
+            };
+            output: {
+                secret: string;
+                previousSecretExpiresAt: string | null;
+                firstFailedAt: string | null;
+                disabledAt: string | null;
+                id: string;
+                organizationId: string;
+                url: string;
+                eventTypes: string[];
+                enabled: boolean;
+                createdAt: string;
+                updatedAt: string;
+                consecutiveFailures: number;
+            };
+            outputFormat: "json";
+            status: 201;
+        };
+    };
+} & {
+    "/:id": {
+        $patch: {
+            input: {
+                json: {
+                    url?: string | undefined;
+                    eventTypes?: string[] | undefined;
+                    enabled?: boolean | undefined;
+                };
+            } & {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                previousSecretExpiresAt: string | null;
+                firstFailedAt: string | null;
+                disabledAt: string | null;
+                id: string;
+                organizationId: string;
+                url: string;
+                eventTypes: string[];
+                enabled: boolean;
+                createdAt: string;
+                updatedAt: string;
+                consecutiveFailures: number;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/:id": {
+        $delete: {
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                deleted: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/:id/deliveries": {
+        $get: {
+            input: {
+                query: {
+                    status?: "success" | "pending" | "failed" | "dead_letter" | undefined;
+                    limit?: unknown;
+                    cursor?: string | undefined;
+                };
+            } & {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                items: {
+                    nextAttemptAt: string | null;
+                    lastError: string | null;
+                    lastResponseStatus: number | null;
+                    id: string;
+                    endpointId: string;
+                    outboxEventId: string;
+                    eventType: string;
+                    status: import("./app").WebhookDeliveryStatus;
+                    attempts: number;
+                    idempotencyKey: string;
+                    createdAt: string;
+                }[];
+                nextCursor: string | null;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/:id/deliveries/:deliveryId": {
+        $get: {
+            input: {
+                param: {
+                    id: string;
+                } & {
+                    deliveryId: string;
+                };
+            };
+            output: {
+                nextAttemptAt: string | null;
+                lastError: string | null;
+                lastResponseStatus: number | null;
+                attemptHistory: {
+                    requestHeaders: {
+                        [x: string]: string;
+                    } | null;
+                    requestBody: string | null;
+                    responseStatus: number | null;
+                    responseHeaders: {
+                        [x: string]: string;
+                    } | null;
+                    responseBody: string | null;
+                    durationMs: number | null;
+                    error: string | null;
+                    id: string;
+                    deliveryId: string;
+                    attemptNumber: number;
+                    createdAt: string;
+                }[];
+                id: string;
+                endpointId: string;
+                outboxEventId: string;
+                eventType: string;
+                payload: import("hono/utils/types").JSONValue;
+                status: import("./app").WebhookDeliveryStatus;
+                attempts: number;
+                idempotencyKey: string;
+                createdAt: string;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/:id/test": {
+        $post: {
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                nextAttemptAt: string | null;
+                lastError: string | null;
+                lastResponseStatus: number | null;
+                id: string;
+                endpointId: string;
+                outboxEventId: string;
+                eventType: string;
+                status: import("./app").WebhookDeliveryStatus;
+                attempts: number;
+                idempotencyKey: string;
+                createdAt: string;
+            };
+            outputFormat: "json";
+            status: 201;
+        };
+    };
+} & {
+    "/:id/rotate-secret": {
+        $post: {
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+            output: {
+                secret: string;
+                previousSecretExpiresAt: string | null;
+                firstFailedAt: string | null;
+                disabledAt: string | null;
+                id: string;
+                organizationId: string;
+                url: string;
+                eventTypes: string[];
+                enabled: boolean;
+                createdAt: string;
+                updatedAt: string;
+                consecutiveFailures: number;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/:id/deliveries/:deliveryId/replay": {
+        $post: {
+            input: {
+                param: {
+                    id: string;
+                } & {
+                    deliveryId: string;
+                };
+            };
+            output: {
+                nextAttemptAt: string | null;
+                lastError: string | null;
+                lastResponseStatus: number | null;
+                id: string;
+                endpointId: string;
+                outboxEventId: string;
+                eventType: string;
+                status: import("./app").WebhookDeliveryStatus;
+                attempts: number;
+                idempotencyKey: string;
+                createdAt: string;
+            };
+            outputFormat: "json";
+            status: 201;
+        };
+    };
+}, "/settings/webhooks"> | import("hono/types").MergeSchemaPath<{
+    "/sso-enforcement": {
+        $post: {
+            input: {
+                json: {
+                    enforced: boolean;
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/scim-connection": {
+        $get: {
+            input: {};
+            output: {
+                connection: {
+                    createdAt: string;
+                    tokenExpiresAt: string | null;
+                } | null;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/scim-connection": {
+        $post: {
+            input: {};
+            output: {
+                token: string;
+                expiresAt: string;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/scim-connection": {
+        $delete: {
+            input: {};
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+}, "/settings/organization"> | import("hono/types").MergeSchemaPath<{
+    "/": {
+        $post: {
+            input: {
+                json: {
+                    categories?: ("functional" | "analytics" | "marketing")[] | undefined;
+                };
+            };
+            output: {
+                categories: ("necessary" | "functional" | "analytics" | "marketing")[];
+                policyVersion: string;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/": {
+        $get: {
+            input: {};
+            output: {
+                categories: ("necessary" | "functional" | "analytics" | "marketing")[] | null;
+                policyVersion: string | null;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/": {
+        $delete: {
+            input: {};
+            output: {
+                withdrawn: false;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        } | {
+            input: {};
+            output: {
+                withdrawn: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+}, "/consents"> | import("hono/types").MergeSchemaPath<{
+    "/plans": {
+        $get: {
+            input: {};
+            output: {
+                plans: {
+                    tier: import("@packages/access-control").Tier;
+                    name: string;
+                    priceId: string | null;
+                    unitAmount: number;
+                    currency: string;
+                    interval: string | null;
+                    marketingFeatures: string[];
+                    rank: number;
+                    features: import("./shared/entitlements").Feature[];
+                    maxMembers: number | null;
+                }[];
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/subscription": {
+        $get: {
+            input: {};
+            output: {
+                tier: import("@packages/access-control").Tier;
+                status: string;
+                hasSubscription: boolean;
+                rank: number;
+                features: import("./shared/entitlements").Feature[];
+                maxMembers: number | null;
+                quotas: {
+                    uploads: number | null;
+                    projects: number | null;
+                    apiCallsPerMonth: number | null;
+                };
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/portal": {
+        $post: {
+            input: {};
+            output: {
+                url: string;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+}, "/billing"> | import("hono/types").MergeSchemaPath<{
+    "/": {
+        $get: {
+            input: {
+                query: {
+                    cursor?: string | undefined;
+                    limit?: unknown;
+                };
+            };
+            output: {
+                items: {
+                    organizationId: string | null;
+                    groupKey: string | null;
+                    readAt: string | null;
+                    payload: {
+                        [x: string]: import("hono/utils/types").JSONValue;
+                    };
+                    id: string;
+                    userId: string;
+                    category: string;
+                    eventType: string;
+                    createdAt: string;
+                }[];
+                nextCursor: string | null;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/unread-count": {
+        $get: {
+            input: {};
+            output: {
+                count: number;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/read": {
+        $post: {
+            input: {
+                json: {
+                    ids: string[];
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/read-all": {
+        $post: {
+            input: {};
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/preferences": {
+        $get: {
+            input: {};
+            output: {
+                items: {
+                    scope: import("./modules/notifications/application/ports/notification.port").PreferenceScope;
+                    scopeId: string;
+                    category: string;
+                    channel: import("@packages/events").NotificationChannel;
+                    enabled: boolean;
+                    frequency: import("@packages/events").NotificationFrequency;
+                    locked: boolean;
+                }[];
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/preferences": {
+        $put: {
+            input: {
+                json: {
+                    category: "org" | "billing" | "security" | "activity";
+                    channel: "email" | "in_app";
+                    enabled: boolean;
+                    frequency?: "immediate" | "hourly" | "daily" | undefined;
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/org-preferences": {
+        $get: {
+            input: {};
+            output: {
+                items: {
+                    scope: import("./modules/notifications/application/ports/notification.port").PreferenceScope;
+                    scopeId: string;
+                    category: string;
+                    channel: import("@packages/events").NotificationChannel;
+                    enabled: boolean;
+                    frequency: import("@packages/events").NotificationFrequency;
+                    locked: boolean;
+                }[];
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/org-preferences": {
+        $put: {
+            input: {
+                json: {
+                    category: "org" | "billing" | "security" | "activity";
+                    channel: "email" | "in_app";
+                    enabled: boolean;
+                    frequency?: "immediate" | "hourly" | "daily" | undefined;
+                    locked?: boolean | undefined;
+                };
+            };
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+        };
+    };
+} & {
+    "/stream": {
+        $get: {
+            input: {};
+            output: {};
+            outputFormat: string;
+            status: import("hono/utils/http-status").StatusCode;
+        };
+    };
+}, "/notifications">, "/", "/">;
+export { app, routes };
+export type AppType = typeof routes;
+export type { WebhookDeliveryStatus } from "./modules/webhooks/application/ports/webhook-delivery.port";

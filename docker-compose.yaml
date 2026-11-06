@@ -97,6 +97,12 @@ services:
           ignore:
             - node_modules/
             - dist/
+        - action: sync
+          path: ./modules
+          target: /repo/modules
+          ignore:
+            - node_modules/
+            - dist/
         - action: rebuild
           path: ./pnpm-lock.yaml
         - action: rebuild

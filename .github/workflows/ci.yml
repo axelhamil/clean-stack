@@ -40,6 +40,11 @@ jobs:
         # The hook relies on the local .env files; the api tests validate the env at import.
         run: pnpm bootstrap
 
+      - name: API shape
+        # The frozen AppType declaration and METHOD path inventory: a drift means the
+        # typed client or the served routes changed, refreeze with `pnpm api-shape:update`.
+        run: pnpm check:api-shape
+
       - name: Build, type-check and unit tests
         run: pnpm turbo run build type-check test --output-logs=errors-only
 
