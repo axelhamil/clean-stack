@@ -18,6 +18,7 @@ const ALLOWED_TX_PARAMETERS: Record<string, string> = {};
 const ALLOWED_TRANSACTION_OPENERS: Record<string, string> = {};
 
 const COMPOSED_MODULES = [
+  "admin",
   "api-token",
   "audit-log",
   "billing",
@@ -26,11 +27,14 @@ const COMPOSED_MODULES = [
   "policies",
   "profile",
   "quotas",
+  "rgpd",
   "uploads",
+  "webhooks",
 ];
 
 const HOST_REACH = [
   /from\s+["'][./]*container["']/,
+  /from\s+["'][./]*auth["']/,
   /from\s+["'][./]*shared\/env["']/,
   /from\s+["'][./]*shared\/middleware\//,
   /declare\s+module\s+["']inwire["']/,

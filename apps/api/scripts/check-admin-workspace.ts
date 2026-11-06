@@ -21,8 +21,9 @@ import {
 import { EventTypes } from "@packages/events";
 import { Hono } from "hono";
 import { di } from "../src/container";
-import { rgpdInternalRoutes } from "../src/modules/rgpd/internal.routes";
+import { createRgpdInternalRoutes } from "../src/modules/rgpd/internal.routes";
 import { flushNotificationEmailsRoutes } from "../src/shared/internal-routes/flush-notification-emails.route";
+import { internalLayers } from "../src/shared/internal-routes/internal-layers";
 import { adminProbes, appCall, codeOf } from "./admin-probes";
 import { checkRecorder, internalApp, signedInternalRequest } from "./check-harness";
 import { requireLocalDatabase } from "./require-local-database";
@@ -316,7 +317,18 @@ async function proveHeartbeats() {
   await db.delete(sweepRun).where(inArray(sweepRun.label, sweepLabels.slice(0, 2)));
 
   const app = internalApp(
-    new Hono().route("/", rgpdInternalRoutes).route("/", flushNotificationEmailsRoutes),
+    new Hono()
+      .route(
+        "/",
+        createRgpdInternalRoutes({
+          internalGuards: internalLayers,
+          ISweepRunStore: di.ISweepRunStore,
+          IInstrumentation: di.IInstrumentation,
+          RgpdService: di.RgpdService,
+          rgpdSettings: di.rgpdSettings,
+        }),
+      )
+      .route("/", flushNotificationEmailsRoutes),
   );
   for (const label of ["rgpd-sweep", "flush-notification-emails"]) {
     const dry = await signedInternalRequest(app, `/internal/${label}`, { dryRun: true });

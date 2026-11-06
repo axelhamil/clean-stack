@@ -3,16 +3,24 @@
 // deletes impersonation sessions past their expiry; each announces one event per row in the batch's unit of work.
 
 import { type AppError, AppErrorException, type Result } from "@packages/ddd-kit";
+import type { RouteGuard } from "@packages/http/route-guards";
 import { zV } from "@packages/http/validator";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
-import { di } from "../../container";
-import { internalLayers } from "../../shared/internal-routes/internal-layers";
-import { runSweepRequest } from "../../shared/internal-routes/sweep-route";
+import type { runSweepRequest } from "../../shared/internal-routes/sweep-route";
 import { type SweepBody, sweepBodySchema } from "../../shared/internal-routes/sweep-runner";
+import type { ApprovalService } from "./application/services/approval.service";
+import type { StaffService } from "./application/services/staff.service";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
+
+export interface AdminInternalRoutesDeps {
+  internalGuards: readonly RouteGuard[];
+  runSweep: typeof runSweepRequest;
+  ApprovalService: Pick<ApprovalService, "expireDue" | "countDue">;
+  StaffService: Pick<StaffService, "expireImpersonations" | "countExpiredImpersonations">;
+}
 
 async function valueOrThrow<T>(pending: Promise<Result<T, AppError>>): Promise<T> {
   const result = await pending;
@@ -22,12 +30,13 @@ async function valueOrThrow<T>(pending: Promise<Result<T, AppError>>): Promise<T
 }
 
 function dueRowsSweep(
+  runSweep: AdminInternalRoutesDeps["runSweep"],
   label: string,
   expireDue: (batchSize: number) => Promise<Result<number, AppError>>,
   countDue: () => Promise<Result<number, AppError>>,
 ) {
   return async (c: Context<HonoEnv>, body: SweepBody) => {
-    const response = await runSweepRequest({
+    const response = await runSweep({
       label,
       body,
       logger: c.var.logger,
@@ -45,23 +54,27 @@ function dueRowsSweep(
   };
 }
 
-const sweepApprovals = dueRowsSweep(
-  "sweep-admin-approvals",
-  (batchSize) => di.ApprovalService.expireDue(batchSize),
-  () => di.ApprovalService.countDue(),
-);
-
-const sweepImpersonations = dueRowsSweep(
-  "sweep-admin-impersonations",
-  (batchSize) => di.StaffService.expireImpersonations(batchSize),
-  () => di.StaffService.countExpiredImpersonations(),
-);
-
-export const adminInternalRoutes = new Hono<HonoEnv>()
-  .use("*", ...internalLayers)
-  .post("/sweep-admin-approvals", zV("json", sweepBodySchema), (c) =>
-    sweepApprovals(c, c.req.valid("json")),
-  )
-  .post("/sweep-admin-impersonations", zV("json", sweepBodySchema), (c) =>
-    sweepImpersonations(c, c.req.valid("json")),
+export function createAdminInternalRoutes(deps: AdminInternalRoutesDeps) {
+  const sweepApprovals = dueRowsSweep(
+    deps.runSweep,
+    "sweep-admin-approvals",
+    (batchSize) => deps.ApprovalService.expireDue(batchSize),
+    () => deps.ApprovalService.countDue(),
   );
+
+  const sweepImpersonations = dueRowsSweep(
+    deps.runSweep,
+    "sweep-admin-impersonations",
+    (batchSize) => deps.StaffService.expireImpersonations(batchSize),
+    () => deps.StaffService.countExpiredImpersonations(),
+  );
+
+  return new Hono<HonoEnv>()
+    .use("*", ...deps.internalGuards)
+    .post("/sweep-admin-approvals", zV("json", sweepBodySchema), (c) =>
+      sweepApprovals(c, c.req.valid("json")),
+    )
+    .post("/sweep-admin-impersonations", zV("json", sweepBodySchema), (c) =>
+      sweepImpersonations(c, c.req.valid("json")),
+    );
+}

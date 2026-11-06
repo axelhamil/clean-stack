@@ -146,6 +146,7 @@ function makeService(
     mockPort<IOutboxRepository>(),
     opts.masterKey ?? validMasterKey,
     new NoOpInstrumentation(),
+    { secretGraceHours: 24 },
   );
 }
 
@@ -240,6 +241,7 @@ describe("WebhooksService", () => {
         mockPort<IOutboxRepository>(),
         validMasterKey,
         instrumentation,
+        { secretGraceHours: 24 },
       );
 
       await service.createEndpoint({
@@ -352,6 +354,7 @@ describe("WebhooksService", () => {
         mockPort<IOutboxRepository>(),
         validMasterKey,
         instrumentation,
+        { secretGraceHours: 24 },
       );
 
       await service.updateEndpoint({
@@ -413,6 +416,7 @@ describe("WebhooksService", () => {
         mockPort<IOutboxRepository>(),
         validMasterKey,
         instrumentation,
+        { secretGraceHours: 24 },
       );
 
       await service.deleteEndpoint(ENDPOINT_ID, ORG_ID, USER_ID);
@@ -469,6 +473,7 @@ describe("WebhooksService", () => {
         mockPort<IOutboxRepository>(),
         validMasterKey,
         instrumentation,
+        { secretGraceHours: 24 },
       );
 
       await service.listEndpoints(ORG_ID);
@@ -524,6 +529,7 @@ describe("WebhooksService", () => {
         mockPort<IOutboxRepository>(),
         validMasterKey,
         instrumentation,
+        { secretGraceHours: 24 },
       );
 
       await service.findEndpoint(ENDPOINT_ID, ORG_ID);
@@ -587,6 +593,7 @@ describe("WebhooksService", () => {
         mockPort<IOutboxRepository>(),
         validMasterKey,
         instrumentation,
+        { secretGraceHours: 24 },
       );
 
       await service.listDeliveries({ endpointId: ENDPOINT_ID, organizationId: ORG_ID });
@@ -640,6 +647,7 @@ describe("WebhooksService", () => {
         spiedOutbox,
         validMasterKey,
         new NoOpInstrumentation(),
+        { secretGraceHours: 24 },
       );
       const r = await service.rotateSecret({
         id: ENDPOINT_ID,
@@ -722,6 +730,7 @@ describe("WebhooksService", () => {
         spiedOutbox,
         validMasterKey,
         new NoOpInstrumentation(),
+        { secretGraceHours: 24 },
       );
 
       const result = await service.sendTest({
@@ -778,6 +787,7 @@ describe("WebhooksService", () => {
         mockPort<IOutboxRepository>(),
         validMasterKey,
         instrumentation,
+        { secretGraceHours: 24 },
       );
 
       await service.sendTest({ id: ENDPOINT_ID, organizationId: ORG_ID, actorUserId: USER_ID });
@@ -819,6 +829,7 @@ describe("WebhooksService", () => {
         outbox,
         validMasterKey,
         new NoOpInstrumentation(),
+        { secretGraceHours: 24 },
       );
 
       await service.replayDelivery(DELIVERY_ID, ENDPOINT_ID, ORG_ID, USER_ID);
@@ -853,6 +864,7 @@ describe("WebhooksService", () => {
         outbox,
         validMasterKey,
         new NoOpInstrumentation(),
+        { secretGraceHours: 24 },
       );
 
       await service.replayDelivery("nonexistent", ENDPOINT_ID, ORG_ID, USER_ID);
@@ -912,6 +924,7 @@ describe("WebhooksService", () => {
         mockPort<IOutboxRepository>(),
         validMasterKey,
         instrumentation,
+        { secretGraceHours: 24 },
       );
 
       await service.replayDelivery(DELIVERY_ID, ENDPOINT_ID, ORG_ID, USER_ID);
@@ -960,6 +973,7 @@ describe("WebhooksService", () => {
         mockPort<IOutboxRepository>(),
         validMasterKey,
         instrumentation,
+        { secretGraceHours: 24 },
       );
 
       await service.findDelivery(DELIVERY_ID, ENDPOINT_ID, ORG_ID);

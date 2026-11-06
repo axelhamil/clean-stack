@@ -12,6 +12,7 @@ import {
   isLastManager,
   type StaffListing,
 } from "../../../../shared/staff-access";
+import type { RgpdSettings } from "../config/rgpd-settings";
 import type {
   ExecuteWipeOutput,
   IRgpdRepository,
@@ -21,13 +22,6 @@ import type {
 } from "../ports/rgpd.port";
 
 const EXPORT_DOWNLOAD_TTL_SECONDS = 7 * 24 * 60 * 60;
-
-export interface RgpdSettings {
-  appUrl: string;
-  gracePeriodDays: number;
-  exportRateLimitHours: number;
-  sweepDeadlineMs: number;
-}
 
 export interface PreflightAccountDeletionInput {
   userId: string;
@@ -93,7 +87,7 @@ export class RgpdService {
     private readonly staff: IStaffStore,
     private readonly staffEnv: StaffListing,
     private readonly totp: ITotpVerifier,
-    private readonly settings: RgpdSettings,
+    private readonly settings: Omit<RgpdSettings, "sweepBatchSize">,
     private readonly logger: ILogger,
   ) {}
 

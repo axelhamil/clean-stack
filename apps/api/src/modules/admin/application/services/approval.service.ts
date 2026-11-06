@@ -23,6 +23,7 @@ import {
   readApprovedAction,
   sameApprovalParams,
 } from "../approved-action";
+import type { AdminSettings } from "../config/admin-settings";
 import { approvalCursorOf, type ListApprovalsInput } from "../dto/list-approvals.dto";
 import type { AdminStoreError, IAdminUserStore } from "../ports/admin-user-store.port";
 import type {
@@ -31,11 +32,10 @@ import type {
   IApprovalStore,
 } from "../ports/approval-store.port";
 
-export interface ApprovalEnv extends StaffEnv {
-  ADMIN_APPROVAL_ENABLED: boolean;
-  ADMIN_APPROVAL_ACTIONS: readonly ApprovalAction[];
-  ADMIN_APPROVAL_TTL_HOURS: number;
-}
+export type ApprovalSettings = Pick<
+  AdminSettings,
+  "approvalEnabled" | "approvalActions" | "approvalTtlHours"
+>;
 
 export type ApprovalRequestError =
   | AppError
@@ -117,14 +117,15 @@ export class ApprovalService {
     private readonly uow: IUnitOfWork,
     private readonly instrumentation: IInstrumentation,
     private readonly handlers: ApprovalHandlers,
-    private readonly env: ApprovalEnv,
+    private readonly staffEnv: StaffEnv,
+    private readonly settings: ApprovalSettings,
   ) {}
 
   async gate<K extends ApprovalAction>(
     input: ApprovalRequest<K>,
   ): Promise<Result<Option<string>, ApprovalRequestError>> {
     const listed =
-      this.env.ADMIN_APPROVAL_ENABLED && this.env.ADMIN_APPROVAL_ACTIONS.includes(input.action);
+      this.settings.approvalEnabled && this.settings.approvalActions.includes(input.action);
     if (!listed) return Result.ok(Option.none());
 
     const prepared = await this.handlers[input.action].prepare(input, {
@@ -159,7 +160,7 @@ export class ApprovalService {
         subjectId: input.subjectId,
         params: prepared.getValue(),
         requestedBy: input.requestedBy,
-        ttlHours: this.env.ADMIN_APPROVAL_TTL_HOURS,
+        ttlHours: this.settings.approvalTtlHours,
       });
       if (created.isFailure) return Result.fail(created.getError());
 
@@ -327,7 +328,7 @@ export class ApprovalService {
     const permission = APPROVAL_ACTION_PERMISSION[record.action];
 
     return Result.ok(
-      staffAccessOf({ id: record.requestedBy }, unbanned, this.env)
+      staffAccessOf({ id: record.requestedBy }, unbanned, this.staffEnv)
         .map((access) => access.permissions.includes(permission))
         .unwrapOr(false),
     );

@@ -1,10 +1,21 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Result } from "@packages/ddd-kit";
+import { openRouteGuards } from "@packages/http/testing/route-guards";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
+import { mockPort } from "@packages/test/bun";
 import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { Hono } from "hono";
 import { createErrorHandler } from "../../../shared/middleware/error.middleware";
+import { requireRateLimit } from "../../../shared/middleware/rate-limit.middleware";
 import { ACCOUNT_DELETE_POLICY } from "../../../shared/middleware/rate-limit.policies";
-import type { RateLimitDecision, RateLimitError } from "../../../shared/ports/rate-limiter.port";
+import type {
+  IRateLimiter,
+  RateLimitDecision,
+  RateLimitError,
+} from "../../../shared/ports/rate-limiter.port";
+import type { RgpdError } from "../application/ports/rgpd.port";
+import type { RequestAccountDeletionOutput } from "../application/services/rgpd.service";
+import { createRgpdRoutes, type RgpdRoutesDeps } from "../routes";
 
 const consume = mock(async (_key: string) =>
   Result.ok<RateLimitDecision, RateLimitError>({
@@ -16,31 +27,30 @@ const consume = mock(async (_key: string) =>
     firstBlock: false,
   }),
 );
-const requestAccountDeletion = mock(async () => Result.ok({ scheduled: true }));
+const requestAccountDeletion = mock(async () =>
+  Result.ok<RequestAccountDeletionOutput, RgpdError>({
+    pendingDeletionUntil: "2099-01-01T00:00:00.000Z",
+  }),
+);
 
-mock.module("../../../container", () => ({
-  di: {
-    IRateLimiter: { consume },
-    IOutboxRepository: { enqueue: mock(async () => undefined) },
-    RgpdService: { requestAccountDeletion },
-  },
-}));
+const accountDeleteRateLimit = requireRateLimit(
+  { limiter: { ...mockPort<IRateLimiter>(), consume }, outbox: mockPort<IOutboxRepository>() },
+  ACCOUNT_DELETE_POLICY,
+);
 
-const realAuthMiddleware = await import("../../../shared/middleware/auth.middleware");
-mock.module("../../../shared/middleware/auth.middleware", () => ({
-  ...realAuthMiddleware,
-  // biome-ignore lint/suspicious/noExplicitAny: test stub
-  requireAuth: async (c: any, next: () => Promise<void>) => {
-    c.set("user", { id: "user-1" });
-    c.set("session", { id: "session-1", impersonatedBy: null });
-    await next();
-  },
-}));
-
-const { rgpdMeRoutes } = await import("../routes");
+const routes = createRgpdRoutes({
+  routeGuards: openRouteGuards({ userId: "user-1" }),
+  accountDeleteRateLimit,
+  RgpdService: { ...mockPort<RgpdRoutesDeps["RgpdService"]>(), requestAccountDeletion },
+});
 
 function postDelete() {
-  const app = new Hono().route("/me", rgpdMeRoutes);
+  const app = new Hono<{ Variables: { user: { id: string } } }>()
+    .use("*", async (c, next) => {
+      c.set("user", { id: "user-1" });
+      await next();
+    })
+    .route("/me", routes);
   app.onError(createErrorHandler(mockInstrumentation()));
 
   return app.request("/me/delete", {

@@ -1,31 +1,12 @@
 import { describe, expect, it, mock } from "bun:test";
-import { UnitOfWorkContext } from "@packages/ddd-kit";
+import { Option, UnitOfWorkContext } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import type { CurrentSession } from "@packages/http/route-guards";
+import { openRouteGuards } from "@packages/http/testing/route-guards";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import type { IAdminUserStore } from "../application/ports/admin-user-store.port";
-
-mock.module("hono/bun", () => ({
-  getConnInfo: () => ({ remote: { address: "127.0.0.1" } }),
-}));
-
-const { AdminModerationService } = await import("../application/services/admin-moderation.service");
-const { unitOfWork } = mockUnitOfWork();
-
-mock.module("../../../container", () => ({
-  di: {
-    IOutboxRepository: {},
-    IInstrumentation: { setSpanAttributes: () => {} },
-    get AdminModerationService() {
-      return new AdminModerationService(
-        mockPort<IAdminUserStore>(),
-        mockPort<IOutboxRepository>(),
-        unitOfWork,
-      );
-    },
-  },
-}));
 
 const emitted: { type: string; payload: Record<string, unknown> }[] = [];
 
@@ -44,50 +25,48 @@ mock.module("@packages/outbox/event-emitter", () => ({
   ),
 }));
 
+const { AdminModerationService } = await import("../application/services/admin-moderation.service");
+const { createAdminImpersonationRoutes } = await import("../admin-impersonation.routes");
+const { Hono } = await import("hono");
+const { createErrorHandler } = await import("../../../shared/middleware/error.middleware");
+const { NoOpInstrumentation } = await import("../../../shared/services/noop-instrumentation");
+
+const { unitOfWork } = mockUnitOfWork();
+
 const impersonated = new Response(JSON.stringify({ session: { id: "s-9" } }), { status: 200 });
 impersonated.headers.append("set-cookie", "session=impersonated; Path=/; HttpOnly");
 
 const stopResponse = new Response(JSON.stringify({ ok: true }), { status: 200 });
 stopResponse.headers.append("set-cookie", "session=admin-restored; Path=/; HttpOnly");
 
-const mockImpersonateUser = mock(async () => impersonated);
-const mockStopImpersonating = mock(async () => stopResponse);
+const mockImpersonateUser = mock(async (_userId: string, _headers: Headers) => impersonated);
+const mockStopImpersonating = mock(async (_headers: Headers) => stopResponse);
 
-mock.module("../../../auth", () => ({
-  auth: {
-    api: {
-      impersonateUser: mockImpersonateUser,
-      stopImpersonating: mockStopImpersonating,
-    },
-  },
-}));
-
-let currentSession: Record<string, unknown> = {
-  impersonatedBy: null,
+const adminSession: CurrentSession = {
+  id: "session-admin",
   userId: "admin-1",
-  createdAt: new Date(Date.now() - 10_000),
+  email: "admin-1@example.com",
+  twoFactorEnabled: true,
+  impersonatedBy: Option.none(),
 };
+let currentSession: CurrentSession = adminSession;
 
-mock.module("../../../shared/middleware/staff.middleware", () => ({
-  requireStaff: async (_c: unknown, next: () => Promise<void>) => next(),
-  requireStaffPermission: () => async (_c: unknown, next: () => Promise<void>) => next(),
-  requireStepUp: async (_c: unknown, next: () => Promise<void>) => next(),
-}));
-
-const realAuthMiddleware = await import("../../../shared/middleware/auth.middleware");
-mock.module("../../../shared/middleware/auth.middleware", () => ({
-  ...realAuthMiddleware,
-  requireAuth: async (c: { set: (k: string, v: unknown) => void }, next: () => Promise<void>) => {
-    c.set("user", { id: "admin-1", role: "admin", twoFactorEnabled: true });
-    c.set("session", currentSession);
-    await next();
+const routes = createAdminImpersonationRoutes({
+  routeGuards: {
+    ...openRouteGuards({ userId: "admin-1" }),
+    currentSession: () => currentSession,
   },
-}));
-
-const { adminImpersonationRoutes } = await import("../admin-impersonation.routes");
-const { Hono } = await import("hono");
-const { createErrorHandler } = await import("../../../shared/middleware/error.middleware");
-const { NoOpInstrumentation } = await import("../../../shared/services/noop-instrumentation");
+  IAuthProvider: {
+    impersonationTtlSeconds: 3600,
+    impersonateUser: mockImpersonateUser,
+    stopImpersonating: mockStopImpersonating,
+  },
+  AdminModerationService: new AdminModerationService(
+    mockPort<IAdminUserStore>(),
+    mockPort<IOutboxRepository>(),
+    unitOfWork,
+  ),
+});
 
 // Mounted behind the real error handler: a validation rejection is now an
 // `AppErrorException`, which only Hono's `onError` turns into a 400; a bare
@@ -97,7 +76,7 @@ const app = new Hono<{ Variables: { requestId: string } }>()
     c.set("requestId", "req-test");
     await next();
   })
-  .route("/", adminImpersonationRoutes);
+  .route("/", routes);
 app.onError(createErrorHandler(new NoOpInstrumentation()));
 
 describe("POST /admin/impersonation/:id/start", () => {
@@ -150,7 +129,7 @@ describe("POST /admin/impersonation/:id/start", () => {
 
 describe("POST /admin/impersonation/stop", () => {
   it("returns 400 when not impersonating", async () => {
-    currentSession = { impersonatedBy: null, userId: "admin-1", createdAt: new Date() };
+    currentSession = adminSession;
     const res = await app.request("/stop", {
       method: "POST",
     });
@@ -160,9 +139,9 @@ describe("POST /admin/impersonation/stop", () => {
   it("returns 403 and announces nothing when BetterAuth refuses stop", async () => {
     emitted.length = 0;
     currentSession = {
-      impersonatedBy: "admin-1",
+      ...adminSession,
       userId: "target-2",
-      createdAt: new Date(Date.now() - 5_000),
+      impersonatedBy: Option.some("admin-1"),
     };
     mockStopImpersonating.mockImplementationOnce(
       async () => new Response(JSON.stringify({ error: "forbidden" }), { status: 403 }),
@@ -177,9 +156,9 @@ describe("POST /admin/impersonation/stop", () => {
   it("stops outside any transaction and leaves the announcement to the session hook", async () => {
     emitted.length = 0;
     currentSession = {
-      impersonatedBy: "admin-1",
+      ...adminSession,
       userId: "target-2",
-      createdAt: new Date(Date.now() - 5_000),
+      impersonatedBy: Option.some("admin-1"),
     };
     let transactionAtStop: unknown = "unset";
     mockStopImpersonating.mockImplementationOnce(async () => {

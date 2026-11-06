@@ -11,9 +11,9 @@ import { EventTypes } from "@packages/events";
 import { emitEvent } from "@packages/outbox/event-emitter";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { deriveOrgSubKey, encryptSecret, masterKeyFromHex } from "../../../../shared/aead";
-import { env } from "../../../../shared/env";
 import { logger } from "../../../../shared/logger";
 import { assertPublicUrl } from "../../../../shared/ssrf-guard";
+import type { WebhookSettings } from "../config/webhook-settings";
 import type {
   DeliveryPage,
   IWebhookDeliveryRepository,
@@ -43,6 +43,7 @@ export class WebhooksService {
     private readonly outbox: IOutboxRepository,
     private readonly masterKey: MasterKeyProvider,
     private readonly instrumentation: IInstrumentation,
+    private readonly settings: Pick<WebhookSettings, "secretGraceHours">,
     private readonly secretGen: WebhookSecretGenerator = defaultSecretGenerator,
   ) {}
 
@@ -353,7 +354,7 @@ export class WebhooksService {
         const newPlaintext = this.secretGen();
         const newCipher = encryptSecret(newPlaintext, subKey);
         const previousSecretExpiresAt = new Date(
-          Date.now() + env.WEBHOOK_SECRET_GRACE_HOURS * 3_600_000,
+          Date.now() + this.settings.secretGraceHours * 3_600_000,
         );
 
         const rotated = await this.uow.run(async () => {

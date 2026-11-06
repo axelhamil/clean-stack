@@ -1,16 +1,16 @@
 import { AppErrorException } from "@packages/ddd-kit";
+import type { RouteEnv, RouteGuards } from "@packages/http/route-guards";
 import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
-import { di } from "../../container";
-import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
-import {
-  requireStaff,
-  requireStaffPermission,
-  requireStepUp,
-} from "../../shared/middleware/staff.middleware";
 import { decideApprovalBodySchema } from "./application/dto/decide-approval.dto";
 import { listApprovalsQuerySchema } from "./application/dto/list-approvals.dto";
 import type { ApprovalRecord } from "./application/ports/approval-store.port";
+import type { ApprovalService } from "./application/services/approval.service";
+
+export interface AdminApprovalRoutesDeps {
+  routeGuards: RouteGuards;
+  ApprovalService: Pick<ApprovalService, "list" | "get" | "decide" | "cancel">;
+}
 
 function serializeApproval(record: ApprovalRecord) {
   return {
@@ -30,52 +30,56 @@ function serializeApproval(record: ApprovalRecord) {
   };
 }
 
-export const adminApprovalRoutes = new Hono<{ Variables: AuthVariables }>()
-  .get(
-    "/",
-    requireAuth,
-    requireStaffPermission("approvals.decide"),
-    zV("query", listApprovalsQuerySchema),
-    async (c) => {
-      const input = c.req.valid("query");
-      const result = await di.ApprovalService.list(input);
+export function createAdminApprovalRoutes(deps: AdminApprovalRoutesDeps) {
+  const { routeGuards: g } = deps;
+
+  return new Hono<RouteEnv>()
+    .get(
+      "/",
+      g.requireAuth,
+      g.requireStaffPermission("approvals.decide"),
+      zV("query", listApprovalsQuerySchema),
+      async (c) => {
+        const input = c.req.valid("query");
+        const result = await deps.ApprovalService.list(input);
+        if (result.isFailure) throw new AppErrorException(result.getError());
+
+        const { items, nextCursor } = result.getValue();
+
+        return c.json({ items: items.map(serializeApproval), nextCursor: nextCursor.toNull() });
+      },
+    )
+    .get("/:id", g.requireAuth, g.requireStaffPermission("approvals.decide"), async (c) => {
+      const result = await deps.ApprovalService.get(c.req.param("id"));
       if (result.isFailure) throw new AppErrorException(result.getError());
 
-      const { items, nextCursor } = result.getValue();
+      return c.json(serializeApproval(result.getValue()));
+    })
+    .post(
+      "/:id/decide",
+      g.requireAuth,
+      g.requireStaffPermission("approvals.decide"),
+      g.requireStepUp,
+      zV("json", decideApprovalBodySchema),
+      async (c) => {
+        const result = await deps.ApprovalService.decide({
+          approvalId: c.req.param("id"),
+          deciderUserId: g.currentUserId(c),
+          deciderPermissions: g.currentStaff(c).permissions,
+          ...c.req.valid("json"),
+        });
+        if (result.isFailure) throw new AppErrorException(result.getError());
 
-      return c.json({ items: items.map(serializeApproval), nextCursor: nextCursor.toNull() });
-    },
-  )
-  .get("/:id", requireAuth, requireStaffPermission("approvals.decide"), async (c) => {
-    const result = await di.ApprovalService.get(c.req.param("id"));
-    if (result.isFailure) throw new AppErrorException(result.getError());
-
-    return c.json(serializeApproval(result.getValue()));
-  })
-  .post(
-    "/:id/decide",
-    requireAuth,
-    requireStaffPermission("approvals.decide"),
-    requireStepUp,
-    zV("json", decideApprovalBodySchema),
-    async (c) => {
-      const result = await di.ApprovalService.decide({
+        return c.json({ ok: true });
+      },
+    )
+    .post("/:id/cancel", g.requireAuth, g.requireStaff, async (c) => {
+      const result = await deps.ApprovalService.cancel({
         approvalId: c.req.param("id"),
-        deciderUserId: c.get("user").id,
-        deciderPermissions: c.get("staff").permissions,
-        ...c.req.valid("json"),
+        userId: g.currentUserId(c),
       });
       if (result.isFailure) throw new AppErrorException(result.getError());
 
       return c.json({ ok: true });
-    },
-  )
-  .post("/:id/cancel", requireAuth, requireStaff, async (c) => {
-    const result = await di.ApprovalService.cancel({
-      approvalId: c.req.param("id"),
-      userId: c.get("user").id,
     });
-    if (result.isFailure) throw new AppErrorException(result.getError());
-
-    return c.json({ ok: true });
-  });
+}

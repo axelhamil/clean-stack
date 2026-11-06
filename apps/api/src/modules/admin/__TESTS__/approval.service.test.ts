@@ -153,12 +153,11 @@ function setup(given: {
     uow.unitOfWork,
     instrumentation,
     handlers,
+    { PLATFORM_ADMIN_IDS: [], PLATFORM_ADMIN_REQUIRE_MFA: false },
     {
-      ADMIN_APPROVAL_ENABLED: given.enabled ?? true,
-      ADMIN_APPROVAL_ACTIONS: given.actions ?? ["staff.revoke", "user.ban_permanent"],
-      ADMIN_APPROVAL_TTL_HOURS: 72,
-      PLATFORM_ADMIN_IDS: [],
-      PLATFORM_ADMIN_REQUIRE_MFA: false,
+      approvalEnabled: given.enabled ?? true,
+      approvalActions: given.actions ?? ["staff.revoke", "user.ban_permanent"],
+      approvalTtlHours: 72,
     },
   );
 

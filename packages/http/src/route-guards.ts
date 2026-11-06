@@ -1,4 +1,4 @@
-import type { OrgPermissions, StaffPermission, Tier } from "@packages/access-control";
+import type { OrgPermissions, StaffAccess, StaffPermission, Tier } from "@packages/access-control";
 import type { ILogger, Option } from "@packages/ddd-kit";
 import type { Context, MiddlewareHandler } from "hono";
 
@@ -7,6 +7,14 @@ export interface RouteEnv {
 }
 
 export type RouteGuard = MiddlewareHandler;
+
+export interface CurrentSession {
+  id: string;
+  userId: string;
+  email: string;
+  twoFactorEnabled: boolean;
+  impersonatedBy: Option<string>;
+}
 
 export interface RouteGuards<TFeature extends string = string, TQuota extends string = string> {
   requireAuth: RouteGuard;
@@ -25,4 +33,7 @@ export interface RouteGuards<TFeature extends string = string, TQuota extends st
   currentOrgId(c: Context): string;
   activeOrgId(c: Context): Option<string>;
   clientIp(c: Context): string;
+  currentSession(c: Context): CurrentSession;
+  currentStaff(c: Context): StaffAccess;
+  assertStepUp(c: Context): Promise<void>;
 }

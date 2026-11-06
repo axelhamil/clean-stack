@@ -104,6 +104,7 @@ declare module "inwire" {
 }
 
 export const di = container()
+  .addModule(apiSettings(env))
   .add(
     "IInstrumentation",
     (): IInstrumentation =>
@@ -230,7 +231,7 @@ export const di = container()
         c.ITransactionService,
         c.IInstrumentation,
         env.NOTIFICATION_DIGEST_HOUR_UTC,
-        env,
+        c.staffSettings,
       ),
   )
   .add(
@@ -266,13 +267,10 @@ export const di = container()
         },
       ),
   )
-  .addModule(apiSettings(env))
   .addModule(auditLogSources)
-  .addModule(adminModule)
   .addModule(apiTokenModule)
   .addModule(healthModule)
   .addModule(uploadsModule)
-  .addModule(rgpdModule)
   .addModule(auditLogModule)
   .addModule(webhooksModule)
   .addModule(policyModule)
@@ -281,6 +279,8 @@ export const di = container()
   .addModule(billingModule)
   .addModule(notificationsModule)
   .addModule(profileModule)
+  .addModule(adminModule)
+  .addModule(rgpdModule)
   .add("BackupCodeUsedNotifier", (c) =>
     backupCodeUsedNotifier({ IEmailService: c.IEmailService, IProfileStore: c.IProfileStore }),
   )

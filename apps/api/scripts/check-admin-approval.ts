@@ -24,8 +24,9 @@ import { EventTypes } from "@packages/events";
 import { timeIdCursorSchema } from "@packages/http/time-id-cursor";
 import { Hono } from "hono";
 import { di } from "../src/container";
-import { adminInternalRoutes } from "../src/modules/admin/internal.routes";
-import { env } from "../src/shared/env";
+import { createAdminInternalRoutes } from "../src/modules/admin/internal.routes";
+import { internalLayers } from "../src/shared/internal-routes/internal-layers";
+import { runSweepRequest } from "../src/shared/internal-routes/sweep-route";
 import { staffRecipients } from "../src/shared/services/staff-recipients";
 import { staffAccessOf } from "../src/shared/staff-access";
 import {
@@ -49,6 +50,12 @@ const { adminApproval, staffMember, staffPermissionOverride } = staffSchema;
 
 const RACERS = 6;
 const SWEEP_PATH = "/internal/sweep-admin-approvals";
+const adminInternalRoutes = createAdminInternalRoutes({
+  internalGuards: internalLayers,
+  runSweep: runSweepRequest,
+  ApprovalService: di.ApprovalService,
+  StaffService: di.StaffService,
+});
 const sweepApp = internalApp(new Hono().route("/", adminInternalRoutes));
 
 interface Staff {
@@ -133,12 +140,12 @@ async function eventsOf(type: string, subjectId: string, approvalId: string) {
 async function proveOffChangesNothing(): Promise<void> {
   const requester = await manager("off-requester");
   const target = await probes.user("off-target");
-  Object.assign(env, { ADMIN_APPROVAL_ENABLED: false });
+  Object.assign(di.adminSettings, { approvalEnabled: false });
 
   const banned = await appCall(requester.cookie, "POST", `/admin/users/${target.id}/ban`, {
     reason: "probe",
   });
-  Object.assign(env, { ADMIN_APPROVAL_ENABLED: true });
+  Object.assign(di.adminSettings, { approvalEnabled: true });
 
   check("off, the ban answers 200 as today", banned.status === 200, banned.body);
   check("off, the ban happens at once", (await banOf(target.id)) === true);
@@ -443,10 +450,10 @@ async function proveImpossibleRequestsAreNotQueued(): Promise<void> {
 
   const listedId = requester.probe.id;
   const colleague = await manager("queue-colleague");
-  const previous = env.PLATFORM_ADMIN_IDS;
-  Object.assign(env, { PLATFORM_ADMIN_IDS: [listedId] });
+  const previous = di.staffSettings.PLATFORM_ADMIN_IDS;
+  Object.assign(di.staffSettings, { PLATFORM_ADMIN_IDS: [listedId] });
   const onListed = await appCall(colleague.cookie, "DELETE", `/admin/staff/${listedId}`);
-  Object.assign(env, { PLATFORM_ADMIN_IDS: previous });
+  Object.assign(di.staffSettings, { PLATFORM_ADMIN_IDS: previous });
   check(
     "a listed id cannot be queued for revocation",
     codeOf(onListed) === "ADMIN_STAFF_LISTED_FORBIDDEN",
@@ -1153,7 +1160,7 @@ async function proveWhoIsNotified(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  Object.assign(env, { ADMIN_APPROVAL_ENABLED: true, ADMIN_APPROVAL_ACTIONS: APPROVAL_ACTIONS });
+  Object.assign(di.adminSettings, { approvalEnabled: true, approvalActions: APPROVAL_ACTIONS });
 
   await proveOffChangesNothing();
   await proveSelfApprovalRefused();

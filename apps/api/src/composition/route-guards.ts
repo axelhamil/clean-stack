@@ -1,5 +1,6 @@
+import type { StaffAccess } from "@packages/access-control";
 import { Option } from "@packages/ddd-kit";
-import type { RouteGuards } from "@packages/http/route-guards";
+import type { CurrentSession, RouteGuards } from "@packages/http/route-guards";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { SessionData, SessionUser } from "../auth";
@@ -11,6 +12,7 @@ import { requireOrg, requireOrgPermission } from "../shared/middleware/org.middl
 import { requireCurrentPolicies } from "../shared/middleware/policy.middleware";
 import { resolveClientIp } from "../shared/middleware/rate-limit.ip";
 import {
+  assertStepUp,
   requireStaff,
   requireStaffPermission,
   requireStepUp,
@@ -22,6 +24,14 @@ function sessionUser(c: Context): Option<SessionUser> {
   const user: SessionUser | null | undefined = c.get("user");
 
   return Option.fromNullable(user);
+}
+
+function signedIn(c: Context): { user: SessionUser; session: SessionData } {
+  const user = sessionUser(c);
+  const session: SessionData | null | undefined = c.get("session");
+  if (user.isNone() || !session) throw new HTTPException(401, { message: "Unauthorized" });
+
+  return { user: user.unwrap(), session };
 }
 
 export const routeGuards: AppRouteGuards = {
@@ -59,4 +69,30 @@ export const routeGuards: AppRouteGuards = {
     return Option.fromNullable(session?.activeOrganizationId);
   },
   clientIp: resolveClientIp,
+  currentSession: (c): CurrentSession => {
+    const { user, session } = signedIn(c);
+
+    return {
+      id: session.id,
+      userId: user.id,
+      email: user.email,
+      twoFactorEnabled: user.twoFactorEnabled === true,
+      impersonatedBy: Option.fromNullable(session.impersonatedBy),
+    };
+  },
+  currentStaff: (c) => {
+    const staff: StaffAccess | undefined = c.get("staff");
+    if (!staff) {
+      throw new HTTPException(500, {
+        message: "currentStaff: staff missing, chain requireStaff before",
+      });
+    }
+
+    return staff;
+  },
+  assertStepUp: async (c) => {
+    const { user, session } = signedIn(c);
+
+    await assertStepUp(user, session);
+  },
 };

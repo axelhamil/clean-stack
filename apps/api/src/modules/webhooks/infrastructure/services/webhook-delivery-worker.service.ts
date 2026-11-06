@@ -10,7 +10,6 @@ import {
 } from "@packages/outbox/lease-budget";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { decryptSecret, deriveOrgSubKey } from "../../../../shared/aead";
-import { env } from "../../../../shared/env";
 import {
   WEBHOOK_DNS_TIMEOUT_SECONDS,
   WEBHOOK_FETCH_TIMEOUT_SECONDS,
@@ -18,6 +17,7 @@ import {
 } from "../../../../shared/env-bounds";
 import type { Logger } from "../../../../shared/logger";
 import { assertPublicUrl } from "../../../../shared/ssrf-guard";
+import type { WebhookDeliverySettings } from "../../application/config/webhook-settings";
 import type {
   DeliveryFailure,
   IWebhookDeliveryRepository,
@@ -40,10 +40,7 @@ const DELIVERY_BUDGET = {
   marginSeconds: WEBHOOK_SETTLE_MARGIN_SECONDS,
 };
 
-export interface WebhookDeliveryOptions {
-  leaseSeconds: number;
-  deadRetrySeconds: number;
-}
+export type WebhookDeliveryOptions = WebhookDeliverySettings;
 
 type AttemptLog = Omit<
   WebhookDeliveryAttemptRecord,
@@ -76,10 +73,11 @@ function errorText(err: unknown): string {
 function shouldAutoDisable(
   { consecutiveFailures, firstFailedAt }: { consecutiveFailures: number; firstFailedAt: Date },
   now: Date,
+  { autoDisableMinFailures, autoDisableAfterDays }: WebhookDeliveryOptions,
 ): boolean {
   return (
-    consecutiveFailures >= env.WEBHOOK_AUTO_DISABLE_MIN_FAILURES &&
-    now.getTime() - firstFailedAt.getTime() > env.WEBHOOK_AUTO_DISABLE_AFTER_DAYS * 86_400_000
+    consecutiveFailures >= autoDisableMinFailures &&
+    now.getTime() - firstFailedAt.getTime() > autoDisableAfterDays * 86_400_000
   );
 }
 
@@ -348,7 +346,7 @@ export class WebhookDeliveryWorker {
           res.headers.forEach((value, key) => {
             responseHeaders[key] = value;
           });
-          responseBody = await readCappedBody(res, env.WEBHOOK_RESPONSE_CAPTURE_BYTES);
+          responseBody = await readCappedBody(res, this.options.responseCaptureBytes);
           if (!res.ok) errorMessage = Option.some(`HTTP ${res.status}: ${res.statusText}`);
         } catch (err) {
           this.instrumentation.capture(err);
@@ -511,7 +509,7 @@ export class WebhookDeliveryWorker {
 
     const bumped = bumpedOpt.unwrap();
     const now = new Date();
-    if (!shouldAutoDisable(bumped, now)) return;
+    if (!shouldAutoDisable(bumped, now, this.options)) return;
 
     const disableRes = await this.endpoints.markDisabled(delivery.endpointId, organizationId, now);
     if (disableRes.isFailure) {

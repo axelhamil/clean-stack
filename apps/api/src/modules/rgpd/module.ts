@@ -1,22 +1,35 @@
+import type { IInstrumentation, IUnitOfWork } from "@packages/ddd-kit";
+import type { IEmailService } from "@packages/email/email.port";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { defineModule } from "inwire";
-import { env } from "../../shared/env";
 import { logger } from "../../shared/logger";
+import type { IStaffStore } from "../../shared/ports/staff-store.port";
 import type { IStorageService } from "../../shared/ports/storage.port";
+import type { ITotpVerifier } from "../../shared/ports/totp-verifier.port";
+import type { StaffListing } from "../../shared/staff-access";
+import type { RgpdSettings } from "./application/config/rgpd-settings";
 import type { IRgpdRepository } from "./application/ports/rgpd.port";
 import { RgpdService } from "./application/services/rgpd.service";
 import { DrizzleRgpdRepository } from "./infrastructure/repositories/drizzle-rgpd.repository";
 
-declare module "inwire" {
-  interface AppDeps {
-    IRgpdRepository: IRgpdRepository;
-    RgpdService: RgpdService;
-    IStorageService: IStorageService;
-  }
+export interface RgpdPrerequisites {
+  IInstrumentation: IInstrumentation;
+  ITransactionService: IUnitOfWork;
+  IOutboxRepository: IOutboxRepository;
+  IEmailService: IEmailService;
+  IStorageService: IStorageService;
+  IStaffStore: IStaffStore;
+  ITotpVerifier: ITotpVerifier;
+  staffSettings: StaffListing;
+  rgpdSettings: RgpdSettings;
 }
 
-export const rgpdModule = defineModule()((b) =>
+export const rgpdModule = defineModule<RgpdPrerequisites>()((b) =>
   b
-    .add("IRgpdRepository", (c) => new DrizzleRgpdRepository(logger, c.IInstrumentation))
+    .add(
+      "IRgpdRepository",
+      (c): IRgpdRepository => new DrizzleRgpdRepository(logger, c.IInstrumentation),
+    )
     .add(
       "RgpdService",
       (c) =>
@@ -28,14 +41,9 @@ export const rgpdModule = defineModule()((b) =>
           c.IOutboxRepository,
           c.IInstrumentation,
           c.IStaffStore,
-          env,
+          c.staffSettings,
           c.ITotpVerifier,
-          {
-            appUrl: env.APP_URL,
-            gracePeriodDays: env.RGPD_GRACE_PERIOD_DAYS,
-            exportRateLimitHours: env.RGPD_EXPORT_RATE_LIMIT_HOURS,
-            sweepDeadlineMs: env.SWEEP_DEADLINE_MS,
-          },
+          c.rgpdSettings,
           logger,
         ),
     ),
