@@ -187,7 +187,7 @@ Primitives for business domain only (never DDD for billing / auth / gating: see 
 
 - **pnpm 12** + **Turborepo** TUI. `globalDependencies` bust caches on `biome.json` / `pnpm-workspace.yaml` / `.env*`.
 - **Biome** (lint + format) · **knip** (unused exports) · **jscpd** (duplication) · **Husky + commitlint** (Conventional Commits) · **lint-staged** (Biome on staged files) · **pre-push**: `pnpm ci:check`.
-- **release-please** (`release-please-config.json`, `.github/workflows/release.yml`): one release PR kept open on `dev`, merging it tags, publishes the GitHub release and moves `main` to the tag; a `hotfix/*` PR into `main` deploys at once, and `sync-dev.yml` merges `main` back into `dev` so the fix ships in the next release. Both run with the `axelhamil-bot` GitHub App token so the release PR triggers CI.
+- **release-please** (`release-please-config.json`, `.github/workflows/release.yml`): one release PR kept open on `develop`, merging it tags, publishes the GitHub release and moves `main` to the tag; a `hotfix/*` PR into `main` deploys at once, and `sync-develop.yml` merges `main` back into `develop` so the fix ships in the next release. Both run with the `axelhamil-bot` GitHub App token so the release PR triggers CI.
 - **Testing**: `bun test` (api) + `vitest` (packages, app). BDD style, mock at port level.
 
 ---
@@ -220,7 +220,7 @@ VPS with Coolify v4, its API on the tailnet only, Cloudflare in front. Runbook: 
 - **`infra/coolify/services.ts`**: desired `api`, `app`, `admin` apps per environment (port, health check, stop grace 45 s on `api`, literal env, tasks `rgpd-sweep` `47 2 * * *`, `sweep` `17 3 * * *`, `flush-notification-emails` every minute), images `ghcr.io/<owner>/clean-stack-<app>`.
 - **`infra/coolify/apply.ts`**: dry run by default, `--apply` writes, never deletes, reports missing secrets by key presence and never prints a value, treats a value hidden by a token without `read:sensitive` as unknown, rewrites every literal on `--apply`.
 - **`infra/coolify/deploy.ts`** + **`gates.ts`**: deploy `api`, `app`, `admin` by sha256 digest in that order, wait for an idle `sweep` and `rgpd-sweep`, write `GIT_SHA`, restore the previous image and `GIT_SHA` of a failed app, stop at the first skip or failure inside a 45 min budget, report where each app was left; then `/readyz` and both `/health` must answer 200.
-- **`.github/workflows/deploy.yml`**: after a green CI on a push to `dev` (staging) or `main` (production), gated by `COOLIFY_DEPLOY == 'on'`; **`rollback.yml`** redeploys previous digests without building.
+- **`.github/workflows/deploy.yml`**: after a green CI on a push to `develop` (staging) or `main` (production), gated by `COOLIFY_DEPLOY == 'on'`; **`rollback.yml`** redeploys previous digests without building.
 - **`infra/coolify/*.test.ts`**: client, plan, deploy order, failures and restores, gates, the workflow guards parsed from the YAML, and the drift between the api env schema and the declared api env.
 - **`infra/vps/`**: `bootstrap.sh` for a Debian 13 host (unattended upgrades, Docker, Tailscale SSH, firewall unit), `host.nft` (inbound only loopback, established, `tailscale0`, the Coolify bridge and Cloudflare on 80 and 443, the same in forward against published ports), guarded by `host.test.ts` (rules, `nft -c` in a user namespace, timers through `systemd-analyze`).
 
@@ -508,7 +508,7 @@ No new event type: the catalog is consumed, not extended.
 
 ## Accessibility gate (A.6)
 
-`apps/app/a11y/`: Playwright as an axe driver, not an E2E suite. Run by `.github/workflows/ci.yml` on every PR into `dev`/`main`, and locally with `pnpm --filter app check:a11y`. Details and local setup in [`apps/app/a11y/README.md`](../apps/app/a11y/README.md).
+`apps/app/a11y/`: Playwright as an axe driver, not an E2E suite. Run by `.github/workflows/ci.yml` on every PR into `develop`/`main`, and locally with `pnpm --filter app check:a11y`. Details and local setup in [`apps/app/a11y/README.md`](../apps/app/a11y/README.md).
 
 - `pages.ts`: 7 public + 10 authenticated pages, each audited in light **and** dark (34 tests). Adding a page is one array entry.
 - `a11y.spec.ts`: zero `serious`/`critical` WCAG 2.1 A/AA violations, exactly one `<main>` and one `<h1>`, and an assertion on the **final URL**: a gate redirect (no session, stale policies) renders a page that passes every other check, so without it the suite audits the redirect target and reports green. Dark is a `colorScheme` loop over the same page lists: the theme defaults to `system`, so emulating the preference is all it takes, and it caught a contrast failure light never shows.

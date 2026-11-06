@@ -4,14 +4,14 @@ Thanks for stopping by. The flow is short: talk first, code second.
 
 ## How it works
 
-**Small fix** (bug, typo, docs, test): fork, branch off `dev`, open a pull request into `dev`. A maintainer reviews it and adds the `accepted` label.
+**Small fix** (bug, typo, docs, test): fork, branch off `develop`, open a pull request into `develop`. A maintainer reviews it and adds the `accepted` label.
 
 **Bigger change** (feature, integration, architecture):
 
 1. **Open an issue** with a template.
 2. **Wait for the `accepted` label.** It means "go for it". Don't start coding before, it would be a shame to throw your work away.
-3. **Fork and branch off `dev`**, name it as you like (`fix/123-short-name` is nice, not required).
-4. **Open your pull request into `dev`** with `Closes #<issue>` in the body. GitHub links it to the issue and closes the issue on merge.
+3. **Fork and branch off `develop`**, name it as you like (`fix/123-short-name` is nice, not required).
+4. **Open your pull request into `develop`** with `Closes #<issue>` in the body. GitHub links it to the issue and closes the issue on merge.
 
 The maintainer triages every pull request: a type label, an assignee, and `accepted` on the pull request or on its linked issue. You have nothing to do for it. The `PR policy` check reruns by itself when the pull request or its issue changes. `main` only moves through a release, done by the maintainer.
 

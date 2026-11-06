@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    branches: [dev]
+    branches: [develop]
 
 permissions: {}
 
@@ -30,7 +30,7 @@ jobs:
         uses: googleapis/release-please-action@v5
         with:
           token: ${{ steps.bot.outputs.token }}
-          target-branch: dev
+          target-branch: develop
 
       - if: steps.release.outputs.release_created
         uses: actions/checkout@v5

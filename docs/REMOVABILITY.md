@@ -116,10 +116,10 @@ If you hit any of these, the removal is a **2-step process**: first decouple the
 ## Pre-flight before you click "delete"
 
 - Capture baseline test counts (`pnpm test 2>&1 | grep -E "(pass|fail)"`).
-- Create a git worktree (`git worktree add ../dryrun-<x>` or your tooling's equivalent): never run the removal directly on `dev`.
+- Create a git worktree (`git worktree add ../dryrun-<x>` or your tooling's equivalent): never run the removal directly on `develop`.
 - Commit on a throwaway branch after each axis if you want bisect-friendly checkpoints.
 - After the migration is emitted, **read** the SQL before committing, a wrong `DROP COLUMN` on production data is irreversible.
-- Validate end-to-end via `pnpm build` + `pnpm test`, then revert the worktree if this is a dry-run, or merge to `dev` if real.
+- Validate end-to-end via `pnpm build` + `pnpm test`, then revert the worktree if this is a dry-run, or merge to `develop` if real.
 
 ---
 
