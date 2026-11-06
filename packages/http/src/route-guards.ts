@@ -22,5 +22,7 @@ export interface RouteGuards<TFeature extends string = string, TQuota extends st
   requireQuota(key: TQuota, readUsage: (c: Context) => Promise<number>): RouteGuard;
   currentUserId(c: Context): string;
   signedInUserId(c: Context): Option<string>;
+  currentOrgId(c: Context): string;
+  activeOrgId(c: Context): Option<string>;
   clientIp(c: Context): string;
 }

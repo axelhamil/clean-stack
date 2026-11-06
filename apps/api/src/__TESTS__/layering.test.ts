@@ -17,7 +17,17 @@ const ALLOWED_TX_PARAMETERS: Record<string, string> = {};
 
 const ALLOWED_TRANSACTION_OPENERS: Record<string, string> = {};
 
-const COMPOSED_MODULES = ["audit-log", "consents", "policies", "profile", "quotas"];
+const COMPOSED_MODULES = [
+  "api-token",
+  "audit-log",
+  "billing",
+  "consents",
+  "notifications",
+  "policies",
+  "profile",
+  "quotas",
+  "uploads",
+];
 
 const HOST_REACH = [
   /from\s+["'][./]*container["']/,

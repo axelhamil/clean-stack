@@ -28,7 +28,6 @@ import { auth } from "../src/auth";
 import { di } from "../src/container";
 import { StripeReplayService } from "../src/modules/admin/application/services/stripe-replay.service";
 import { StripeEventGateway } from "../src/modules/billing/infrastructure/adapters/stripe-event.gateway";
-import { stripeClient } from "../src/modules/billing/infrastructure/stripe-client";
 import { env } from "../src/shared/env";
 import { sweepStripeEventsRoutes } from "../src/shared/internal-routes/sweep-stripe-events.route";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
@@ -296,7 +295,7 @@ function replayOver(id: string, invoiceStatus = "open"): StripeReplayService {
       events: { retrieve: async () => invoiceFailed(id) },
       subscriptions: { retrieve: () => Promise.reject(new Error("not a subscription event")) },
       invoices: { retrieve: async () => failedInvoice(id, invoiceStatus) },
-      webhooks: stripeClient.webhooks,
+      webhooks: di.StripeClient.webhooks,
     },
     { secretKey: "sk_test_check_admin_ops", webhookSecret: env.STRIPE_WEBHOOK_SECRET },
     new NoOpInstrumentation(),
@@ -318,7 +317,7 @@ async function proveStripeReplay(actorUserId: string): Promise<void> {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "stripe-signature": await stripeClient.webhooks.generateTestHeaderStringAsync({
+        "stripe-signature": await di.StripeClient.webhooks.generateTestHeaderStringAsync({
           payload,
           secret: env.STRIPE_WEBHOOK_SECRET ?? "",
         }),
@@ -409,7 +408,7 @@ async function proveStripeReplay(actorUserId: string): Promise<void> {
 function signedWebhook(event: Stripe.Event | Record<string, unknown>): Promise<Response> {
   const payload = JSON.stringify(event);
 
-  return stripeClient.webhooks
+  return di.StripeClient.webhooks
     .generateTestHeaderStringAsync({ payload, secret: env.STRIPE_WEBHOOK_SECRET ?? "" })
     .then((signature) =>
       auth.handler(

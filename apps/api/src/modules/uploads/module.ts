@@ -1,31 +1,40 @@
+import type { IInstrumentation } from "@packages/ddd-kit";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { defineModule } from "inwire";
-import { env } from "../../shared/env";
+import type { IHealthCheckRegistry } from "../../shared/ports/health.port";
 import type { IStorageService } from "../../shared/ports/storage.port";
+import type { StorageSettings, UploadSettings } from "./application/config/upload-settings";
 import { UploadService } from "./application/services/upload.service";
 import { NoOpStorageService } from "./infrastructure/services/noop-storage.service";
 import { S3StorageService } from "./infrastructure/services/storage.service";
 import { StorageHealthProbe } from "./infrastructure/storage-health-probe";
 
-const storageConfigured = Boolean(env.S3_ENDPOINT && env.S3_ACCESS_KEY && env.S3_SECRET_KEY);
-
-declare module "inwire" {
-  interface AppDeps {
-    IStorageService: IStorageService;
-    UploadService: UploadService;
-    StorageHealthProbe: StorageHealthProbe;
-  }
+export interface UploadsPrerequisites {
+  IInstrumentation: IInstrumentation;
+  IOutboxRepository: IOutboxRepository;
+  IHealthCheckRegistry: IHealthCheckRegistry;
+  uploadSettings: UploadSettings;
+  storageSettings: StorageSettings;
 }
 
-export const uploadsModule = defineModule()((b) =>
+export const uploadsModule = defineModule<UploadsPrerequisites>()((b) =>
   b
     .add(
       "IStorageService",
       (c): IStorageService =>
-        storageConfigured ? new S3StorageService(c.IInstrumentation) : new NoOpStorageService(),
+        c.storageSettings.isSome()
+          ? new S3StorageService(c.storageSettings.unwrap(), c.IInstrumentation)
+          : new NoOpStorageService(),
     )
     .add(
       "UploadService",
-      (c) => new UploadService(c.IStorageService, c.IOutboxRepository, c.IInstrumentation),
+      (c) =>
+        new UploadService(
+          c.IStorageService,
+          c.IOutboxRepository,
+          c.IInstrumentation,
+          c.uploadSettings,
+        ),
     )
     .add(
       "StorageHealthProbe",

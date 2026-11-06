@@ -1,12 +1,20 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
+import type { RouteGuard, RouteGuards } from "@packages/http/route-guards";
+import { openRouteGuards } from "@packages/http/testing/route-guards";
+import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
+import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
+import { createErrorHandler } from "../../../shared/middleware/error.middleware";
+import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type {
   NotificationError,
   NotificationRecord,
   PreferenceRecord,
 } from "../application/ports/notification.port";
 import { listQuerySchema, markReadSchema, preferenceSchema } from "../notifications.schema";
+import { createNotificationsRoutes, type NotificationsRoutesDeps } from "../routes";
 
 // ── Schema tests ───────────────────────────────────────────────────────────
 
@@ -78,70 +86,45 @@ const mockEnqueue = mock(async (_events: unknown, _meta: unknown) => {
 
 const { unitOfWork, outcome } = mockUnitOfWork();
 
-mock.module("../../../container", () => ({
-  di: {
-    INotificationStore: {
-      list: mockList,
-      unreadCount: mockUnreadCount,
-      markRead: mockMarkRead,
-      markAllRead: mockMarkAllRead,
-      listPreferences: mockListPreferences,
-      upsertPreference: mockUpsertPreference,
-    },
-    IOutboxRepository: {
-      enqueue: mockEnqueue,
-    },
-    ITransactionService: unitOfWork,
-    PolicyAcceptanceService: {
-      hasAcceptedCurrent: mock(async () => Result.ok(true)),
-    },
+const deps: Omit<NotificationsRoutesDeps, "routeGuards"> = {
+  INotificationStore: {
+    list: mockList,
+    unreadCount: mockUnreadCount,
+    markRead: mockMarkRead,
+    markAllRead: mockMarkAllRead,
+    listPreferences: mockListPreferences,
+    upsertPreference: mockUpsertPreference,
   },
-}));
-
-let currentSession: Record<string, unknown> = {};
-let allowOrgPermission = true;
-
-const realAuthMiddleware = await import("../../../shared/middleware/auth.middleware");
-mock.module("../../../shared/middleware/auth.middleware", () => ({
-  ...realAuthMiddleware,
-  // biome-ignore lint/suspicious/noExplicitAny: test stub
-  requireAuth: async (c: any, next: () => Promise<void>) => {
-    c.set("user", { id: "user-1" });
-    c.set("session", currentSession);
-    await next();
+  IOutboxRepository: {
+    ...mockPort<NotificationsRoutesDeps["IOutboxRepository"]>(),
+    enqueue: mockEnqueue,
   },
-}));
+  ITransactionService: unitOfWork,
+  NotificationStreamHub: mockPort<NotificationsRoutesDeps["NotificationStreamHub"]>(),
+};
 
-mock.module("../../../shared/middleware/org.middleware", () => ({
-  // biome-ignore lint/suspicious/noExplicitAny: test stub
-  requireOrg: async (c: any, next: () => Promise<void>) => {
-    const orgId = (c.get("session") as Record<string, unknown>)?.activeOrganizationId;
-    if (!orgId) {
-      const { HTTPException } = await import("hono/http-exception");
-      throw new HTTPException(403, { message: "No active organization" });
-    }
-    c.set("orgId", orgId);
-    await next();
-  },
-  requireOrgPermission: () => async (_c: unknown, next: () => Promise<void>) => {
-    if (!allowOrgPermission) {
-      const { HTTPException } = await import("hono/http-exception");
-      throw new HTTPException(403, { message: "Insufficient permission" });
-    }
-    await next();
-  },
-}));
+const refuse =
+  (message: string): RouteGuard =>
+  async () => {
+    throw new HTTPException(403, { message });
+  };
 
-const { notificationsRoutes } = await import("../routes");
-const { Hono } = await import("hono");
-const { createErrorHandler } = await import("../../../shared/middleware/error.middleware");
-const { NoOpInstrumentation } = await import("../../../shared/services/noop-instrumentation");
+const signedIn = openRouteGuards({ userId: "user-1" });
+const inOrg = openRouteGuards({ userId: "user-1", orgId: "org-1" });
+const impersonating = { ...signedIn, denyImpersonated: refuse("impersonating") };
+const withoutOrg = { ...signedIn, requireOrg: refuse("No active organization") };
+const withoutOrgPermission = {
+  ...inOrg,
+  requireOrgPermission: () => refuse("Insufficient permission"),
+};
 
 async function lastRunSettlement() {
   const [settled] = await Promise.allSettled([unitOfWork.run.mock.results.at(-1)?.value]);
 
   return settled?.status;
 }
+
+let guards: RouteGuards = signedIn;
 
 function makeApp() {
   const app = new Hono<{ Variables: { requestId: string } }>();
@@ -150,13 +133,13 @@ function makeApp() {
     await next();
   });
   app.onError(createErrorHandler(new NoOpInstrumentation()));
-  app.route("/notifications", notificationsRoutes);
+  app.route("/notifications", createNotificationsRoutes({ ...deps, routeGuards: guards }));
   return app;
 }
 
 describe("GET /notifications - list", () => {
   it("returns items with Options serialised as null", async () => {
-    currentSession = {};
+    guards = signedIn;
     const app = makeApp();
     const res = await app.request("/notifications");
     expect(res.status).toBe(200);
@@ -171,7 +154,7 @@ describe("GET /notifications - list", () => {
 
 describe("GET /notifications/unread-count", () => {
   it("returns the unread count", async () => {
-    currentSession = {};
+    guards = signedIn;
     const app = makeApp();
     const res = await app.request("/notifications/unread-count");
     expect(res.status).toBe(200);
@@ -183,7 +166,7 @@ describe("GET /notifications/unread-count", () => {
 
 describe("POST /notifications/read - mark-read", () => {
   it("returns ok when the ids are valid", async () => {
-    currentSession = {};
+    guards = signedIn;
     mockMarkRead.mockClear();
     const app = makeApp();
     const res = await app.request("/notifications/read", {
@@ -196,7 +179,7 @@ describe("POST /notifications/read - mark-read", () => {
   });
 
   it("rejects an impersonated session (403)", async () => {
-    currentSession = { impersonatedBy: "admin-99" };
+    guards = impersonating;
     mockMarkRead.mockClear();
     const app = makeApp();
     const res = await app.request("/notifications/read", {
@@ -209,7 +192,7 @@ describe("POST /notifications/read - mark-read", () => {
   });
 
   it("rejects an empty array (400)", async () => {
-    currentSession = {};
+    guards = signedIn;
     const app = makeApp();
     const res = await app.request("/notifications/read", {
       method: "POST",
@@ -222,7 +205,7 @@ describe("POST /notifications/read - mark-read", () => {
 
 describe("POST /notifications/read - domain event", () => {
   it("emits notification.read in the same transaction", async () => {
-    currentSession = {};
+    guards = signedIn;
     mockMarkRead.mockClear();
     mockEnqueue.mockClear();
     const app = makeApp();
@@ -249,7 +232,7 @@ describe("POST /notifications/read - domain event", () => {
   });
 
   it("answers 404 and emits nothing for someone else's notification", async () => {
-    currentSession = {};
+    guards = signedIn;
     mockEnqueue.mockClear();
     mockMarkRead.mockImplementationOnce(async () => Result.ok([]));
     const app = makeApp();
@@ -264,7 +247,7 @@ describe("POST /notifications/read - domain event", () => {
   });
 
   it("refuses the whole batch when a single id is foreign", async () => {
-    currentSession = {};
+    guards = signedIn;
     mockEnqueue.mockClear();
     mockMarkRead.mockImplementationOnce(async () => Result.ok(["notif-1"]));
     const app = makeApp();
@@ -279,7 +262,7 @@ describe("POST /notifications/read - domain event", () => {
   });
 
   it("tolerates a repeated id in the request body", async () => {
-    currentSession = {};
+    guards = signedIn;
     mockEnqueue.mockClear();
     mockMarkRead.mockImplementationOnce(async () => Result.ok(["notif-1"]));
     const app = makeApp();
@@ -294,7 +277,7 @@ describe("POST /notifications/read - domain event", () => {
   });
 
   it("read-all reports a count without copying unbounded ids", async () => {
-    currentSession = {};
+    guards = signedIn;
     mockEnqueue.mockClear();
     mockMarkAllRead.mockImplementationOnce(async () => Result.ok(["a", "b", "c"]));
     const app = makeApp();
@@ -314,7 +297,7 @@ describe("POST /notifications/read - domain event", () => {
 
 describe("POST /notifications/read-all", () => {
   it("rejects an impersonated session (403)", async () => {
-    currentSession = { impersonatedBy: "admin-99" };
+    guards = impersonating;
     mockMarkAllRead.mockClear();
     const app = makeApp();
     const res = await app.request("/notifications/read-all", { method: "POST" });
@@ -323,7 +306,7 @@ describe("POST /notifications/read-all", () => {
   });
 
   it("returns ok for a regular session", async () => {
-    currentSession = {};
+    guards = signedIn;
     const app = makeApp();
     const res = await app.request("/notifications/read-all", { method: "POST" });
     expect(res.status).toBe(200);
@@ -332,7 +315,7 @@ describe("POST /notifications/read-all", () => {
 
 describe("GET /notifications/preferences", () => {
   it("returns the user preferences", async () => {
-    currentSession = {};
+    guards = signedIn;
     const app = makeApp();
     const res = await app.request("/notifications/preferences");
     expect(res.status).toBe(200);
@@ -344,7 +327,7 @@ describe("GET /notifications/preferences", () => {
 
 describe("PUT /notifications/preferences", () => {
   it("saves the preference and returns ok", async () => {
-    currentSession = {};
+    guards = signedIn;
     mockUpsertPreference.mockClear();
     const app = makeApp();
     const res = await app.request("/notifications/preferences", {
@@ -357,7 +340,7 @@ describe("PUT /notifications/preferences", () => {
   });
 
   it("writes the preference and emits the event in the same transaction", async () => {
-    currentSession = {};
+    guards = signedIn;
     mockUpsertPreference.mockClear();
     mockEnqueue.mockClear();
     const app = makeApp();
@@ -372,7 +355,7 @@ describe("PUT /notifications/preferences", () => {
   });
 
   it("rejects an impersonated session (403)", async () => {
-    currentSession = { impersonatedBy: "admin-99" };
+    guards = impersonating;
     const app = makeApp();
     const res = await app.request("/notifications/preferences", {
       method: "PUT",
@@ -385,25 +368,21 @@ describe("PUT /notifications/preferences", () => {
 
 describe("GET /notifications/org-preferences", () => {
   it("requires an active org (403 without one)", async () => {
-    currentSession = {};
-    allowOrgPermission = true;
+    guards = withoutOrg;
     const app = makeApp();
     const res = await app.request("/notifications/org-preferences");
     expect(res.status).toBe(403);
   });
 
   it("rejects a member without the organization:update capability (403)", async () => {
-    currentSession = { activeOrganizationId: "org-1" };
-    allowOrgPermission = false;
+    guards = withoutOrgPermission;
     const app = makeApp();
     const res = await app.request("/notifications/org-preferences");
     expect(res.status).toBe(403);
-    allowOrgPermission = true;
   });
 
   it("returns the org preferences when the capability is present", async () => {
-    currentSession = { activeOrganizationId: "org-1" };
-    allowOrgPermission = true;
+    guards = inOrg;
     const app = makeApp();
     const res = await app.request("/notifications/org-preferences");
     expect(res.status).toBe(200);
@@ -415,7 +394,7 @@ describe("GET /notifications/org-preferences", () => {
 
 describe("PUT /notifications/org-preferences", () => {
   it("saves the org preference and returns ok", async () => {
-    currentSession = { activeOrganizationId: "org-1" };
+    guards = inOrg;
     mockUpsertPreference.mockClear();
     const app = makeApp();
     const res = await app.request("/notifications/org-preferences", {
@@ -433,7 +412,7 @@ describe("PUT /notifications/org-preferences", () => {
   });
 
   it("writes the org preference and emits the event in the same transaction", async () => {
-    currentSession = { activeOrganizationId: "org-1" };
+    guards = inOrg;
     mockUpsertPreference.mockClear();
     mockEnqueue.mockClear();
     const app = makeApp();
@@ -453,7 +432,7 @@ describe("PUT /notifications/org-preferences", () => {
   });
 
   it("rejects an impersonated session (403)", async () => {
-    currentSession = { activeOrganizationId: "org-1", impersonatedBy: "admin-99" };
+    guards = { ...inOrg, denyImpersonated: refuse("impersonating") };
     const app = makeApp();
     const res = await app.request("/notifications/org-preferences", {
       method: "PUT",
@@ -484,7 +463,7 @@ describe("write routes - a failure rolls the unit back by returning it", () => {
   }
 
   it("mark-read answers NOTIFICATION_NOT_FOUND for a foreign id", async () => {
-    currentSession = {};
+    guards = signedIn;
     mockMarkRead.mockImplementationOnce(async () => Result.ok([]));
 
     const res = await jsonRequest("/notifications/read", "POST", { ids: ["notif-foreign"] });
@@ -497,7 +476,7 @@ describe("write routes - a failure rolls the unit back by returning it", () => {
   });
 
   it("mark-read surfaces a store failure", async () => {
-    currentSession = {};
+    guards = signedIn;
     mockMarkRead.mockImplementationOnce(async () => Result.fail(STORE_DOWN));
 
     const res = await jsonRequest("/notifications/read", "POST", { ids: ["notif-1"] });
@@ -508,7 +487,7 @@ describe("write routes - a failure rolls the unit back by returning it", () => {
   });
 
   it("read-all surfaces a store failure", async () => {
-    currentSession = {};
+    guards = signedIn;
     mockMarkAllRead.mockImplementationOnce(async () => Result.fail(STORE_DOWN));
 
     const res = await makeApp().request("/notifications/read-all", { method: "POST" });
@@ -519,7 +498,7 @@ describe("write routes - a failure rolls the unit back by returning it", () => {
   });
 
   it("preferences surfaces a store failure", async () => {
-    currentSession = {};
+    guards = signedIn;
     mockUpsertPreference.mockImplementationOnce(async () => Result.fail(STORE_DOWN));
 
     const res = await jsonRequest("/notifications/preferences", "PUT", {
@@ -534,8 +513,7 @@ describe("write routes - a failure rolls the unit back by returning it", () => {
   });
 
   it("org-preferences surfaces a store failure", async () => {
-    currentSession = { activeOrganizationId: "org-1" };
-    allowOrgPermission = true;
+    guards = inOrg;
     mockUpsertPreference.mockImplementationOnce(async () => Result.fail(STORE_DOWN));
 
     const res = await jsonRequest("/notifications/org-preferences", "PUT", {

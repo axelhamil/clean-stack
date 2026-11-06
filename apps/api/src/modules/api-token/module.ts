@@ -1,26 +1,31 @@
-import { type EventHandler, Option } from "@packages/ddd-kit";
+import type { EventHandler, IInstrumentation, IUnitOfWork } from "@packages/ddd-kit";
+import type { IEmailService } from "@packages/email/email.port";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { defineModule } from "inwire";
-import { env } from "../../shared/env";
 import type { IApiTokenRepository } from "../../shared/ports/api-token.port";
+import type { IUserAccountStore } from "../../shared/ports/user-account.port";
+import type { ApiTokenSettings } from "./application/config/api-token-settings";
 import { revokeTokensOnMembershipLost } from "./application/event-handlers/revoke-on-membership-lost";
 import { ApiTokenService } from "./application/services/api-token.service";
 import { TokenLeakService } from "./application/services/token-leak.service";
 import { DrizzleApiTokenRepository } from "./infrastructure/repositories/drizzle-api-token.repository";
 import { GithubKeyVerifier } from "./infrastructure/services/github-key-verifier";
 
-declare module "inwire" {
-  interface AppDeps {
-    IApiTokenRepository: IApiTokenRepository;
-    ApiTokenService: ApiTokenService;
-    TokenLeakService: TokenLeakService;
-    RevokeTokensOnMembershipLost: EventHandler;
-    GithubKeyVerifier: GithubKeyVerifier;
-  }
+export interface ApiTokenPrerequisites {
+  IInstrumentation: IInstrumentation;
+  IOutboxRepository: IOutboxRepository;
+  ITransactionService: IUnitOfWork;
+  IEmailService: IEmailService;
+  IUserAccountStore: IUserAccountStore;
+  apiTokenSettings: ApiTokenSettings;
 }
 
-export const apiTokenModule = defineModule()((b) =>
+export const apiTokenModule = defineModule<ApiTokenPrerequisites>()((b) =>
   b
-    .add("IApiTokenRepository", (c) => new DrizzleApiTokenRepository(c.IInstrumentation))
+    .add(
+      "IApiTokenRepository",
+      (c): IApiTokenRepository => new DrizzleApiTokenRepository(c.IInstrumentation),
+    )
     .add("GithubKeyVerifier", (c) => new GithubKeyVerifier(c.IInstrumentation))
     .add(
       "ApiTokenService",
@@ -30,12 +35,7 @@ export const apiTokenModule = defineModule()((b) =>
           c.IOutboxRepository,
           c.ITransactionService,
           c.IInstrumentation,
-          {
-            prefix: env.API_TOKEN_PREFIX,
-            pepper: env.API_TOKEN_PEPPER ?? "dev-only-pepper-not-for-production-use",
-            maxExpiryDays: env.API_TOKEN_MAX_EXPIRY_DAYS,
-            pepperVersion: env.API_TOKEN_PEPPER_VERSION,
-          },
+          c.apiTokenSettings,
         ),
     )
     .add(
@@ -48,18 +48,16 @@ export const apiTokenModule = defineModule()((b) =>
           c.IEmailService,
           c.IUserAccountStore,
           c.IInstrumentation,
-          {
-            prefix: env.API_TOKEN_PREFIX,
-            pepper: env.API_TOKEN_PEPPER ?? "dev-only-pepper-not-for-production-use",
-            pepperPrevious: Option.fromNullable(env.API_TOKEN_PEPPER_PREVIOUS),
-          },
+          c.apiTokenSettings,
         ),
     )
-    .add("RevokeTokensOnMembershipLost", (c) =>
-      revokeTokensOnMembershipLost({
-        IApiTokenRepository: c.IApiTokenRepository,
-        IOutboxRepository: c.IOutboxRepository,
-        ITransactionService: c.ITransactionService,
-      }),
+    .add(
+      "RevokeTokensOnMembershipLost",
+      (c): EventHandler =>
+        revokeTokensOnMembershipLost({
+          IApiTokenRepository: c.IApiTokenRepository,
+          IOutboxRepository: c.IOutboxRepository,
+          ITransactionService: c.ITransactionService,
+        }),
     ),
 );

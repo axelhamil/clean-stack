@@ -2,7 +2,7 @@ import { Option } from "@packages/ddd-kit";
 import type { RouteGuards } from "@packages/http/route-guards";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
-import type { SessionUser } from "../auth";
+import type { SessionData, SessionUser } from "../auth";
 import type { Feature, QuotaKey } from "../shared/entitlements";
 import { requireAuth } from "../shared/middleware/auth.middleware";
 import { requireFeature, requirePlan, requireQuota } from "../shared/middleware/billing.middleware";
@@ -43,5 +43,20 @@ export const routeGuards: AppRouteGuards = {
     return user.unwrap().id;
   },
   signedInUserId: (c) => sessionUser(c).map((user) => user.id),
+  currentOrgId: (c) => {
+    const orgId: string | undefined = c.get("orgId");
+    if (!orgId) {
+      throw new HTTPException(500, {
+        message: "currentOrgId: orgId missing, chain requireOrg before",
+      });
+    }
+
+    return orgId;
+  },
+  activeOrgId: (c) => {
+    const session: SessionData | null | undefined = c.get("session");
+
+    return Option.fromNullable(session?.activeOrganizationId);
+  },
   clientIp: resolveClientIp,
 };

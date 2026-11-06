@@ -13,20 +13,20 @@ import { adminOpsRoutes } from "./modules/admin/ops.routes";
 import { adminUserRoutes } from "./modules/admin/routes";
 import { adminStaffRoutes } from "./modules/admin/staff.routes";
 import { adminWorkspaceRoutes } from "./modules/admin/workspace.routes";
-import { apiTokenRoutes } from "./modules/api-token/routes";
+import { createApiTokenRoutes } from "./modules/api-token/routes";
 import { createApiTokenScanningRoutes } from "./modules/api-token/scanning.routes";
 import { createAuditLogRoutes } from "./modules/audit-log/routes";
-import { billingRoutes } from "./modules/billing/routes";
+import { createBillingRoutes } from "./modules/billing/routes";
 import { createConsentRoutes } from "./modules/consents/routes";
 import { healthInternalRoutes } from "./modules/health/internal.routes";
 import { healthRoutes } from "./modules/health/routes";
-import { notificationsRoutes } from "./modules/notifications/routes";
+import { createNotificationsRoutes } from "./modules/notifications/routes";
 import { organizationSettingsRoutes } from "./modules/organization/routes";
 import { createPolicyRoutes } from "./modules/policies/routes";
 import { createProfileRoutes } from "./modules/profile/routes";
 import { rgpdInternalRoutes } from "./modules/rgpd/internal.routes";
 import { rgpdMeRoutes } from "./modules/rgpd/routes";
-import { uploadsRoutes } from "./modules/uploads/routes";
+import { createUploadsRoutes } from "./modules/uploads/routes";
 import { webhooksRoutes } from "./modules/webhooks/routes";
 import { createPublicApiV1 } from "./public-api";
 import { env, FRONT_ORIGINS } from "./shared/env";
@@ -233,19 +233,13 @@ app.use(
   "/api/token-scanning/*",
   requireRateLimit({ limiter: di.IRateLimiter }, GITHUB_SCANNING_POLICY),
 );
-app.route(
-  "/api/token-scanning",
-  createApiTokenScanningRoutes({
-    githubKeyVerifier: di.GithubKeyVerifier,
-    tokenLeakService: di.TokenLeakService,
-  }),
-);
+app.route("/api/token-scanning", createApiTokenScanningRoutes(routeDeps));
 
 const routes = app
   .route("/me", rgpdMeRoutes)
   .route("/me", createProfileRoutes(routeDeps))
   .route("/me/policies", createPolicyRoutes(routeDeps))
-  .route("/uploads", uploadsRoutes)
+  .route("/uploads", createUploadsRoutes(routeDeps))
   .route("/admin", adminStaffRoutes)
   .route("/admin", adminWorkspaceRoutes)
   .route("/admin/approvals", adminApprovalRoutes)
@@ -254,12 +248,12 @@ const routes = app
   .route("/admin/ops", adminOpsRoutes)
   .route("/admin/impersonation", adminImpersonationRoutes)
   .route("/admin/audit-log", createAuditLogRoutes(routeDeps))
-  .route("/settings/tokens", apiTokenRoutes)
+  .route("/settings/tokens", createApiTokenRoutes(routeDeps))
   .route("/settings/webhooks", webhooksRoutes)
   .route("/settings/organization", organizationSettingsRoutes)
   .route("/consents", createConsentRoutes(routeDeps))
-  .route("/billing", billingRoutes)
-  .route("/notifications", notificationsRoutes);
+  .route("/billing", createBillingRoutes(routeDeps))
+  .route("/notifications", createNotificationsRoutes(routeDeps));
 
 app.onError(createErrorHandler(di.IInstrumentation));
 

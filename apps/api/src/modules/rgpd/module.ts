@@ -1,6 +1,7 @@
 import { defineModule } from "inwire";
 import { env } from "../../shared/env";
 import { logger } from "../../shared/logger";
+import type { IStorageService } from "../../shared/ports/storage.port";
 import type { IRgpdRepository } from "./application/ports/rgpd.port";
 import { RgpdService } from "./application/services/rgpd.service";
 import { DrizzleRgpdRepository } from "./infrastructure/repositories/drizzle-rgpd.repository";
@@ -9,6 +10,7 @@ declare module "inwire" {
   interface AppDeps {
     IRgpdRepository: IRgpdRepository;
     RgpdService: RgpdService;
+    IStorageService: IStorageService;
   }
 }
 

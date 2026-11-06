@@ -2,8 +2,11 @@ import { type EventHandler, Option, Result } from "@packages/ddd-kit";
 import { defineModule } from "inwire";
 import { env } from "../../shared/env";
 import { logger } from "../../shared/logger";
+import type { IEntitlementsReader } from "../../shared/ports/entitlements-reader.port";
+import type { IPlanOverrideStore } from "../../shared/ports/plan-override.port";
 import type { IProfileStore } from "../../shared/ports/profile.port";
 import type { IStaffStore } from "../../shared/ports/staff-store.port";
+import type { IStripeEventGateway, IStripeEventStore } from "../../shared/ports/stripe-event.port";
 import { StaffAccessService } from "../../shared/services/staff-access.service";
 import type { ApprovalHandlers } from "./application/approved-action";
 import { closeApprovalsOfDeletedUser } from "./application/event-handlers/close-approvals-of-deleted-user";
@@ -61,6 +64,10 @@ declare module "inwire" {
     CloseApprovalsOfDeletedUser: EventHandler;
     NotifyImpersonatedUser: EventHandler;
     IProfileStore: IProfileStore;
+    EntitlementsService: IEntitlementsReader;
+    IPlanOverrideStore: IPlanOverrideStore;
+    IStripeEventStore: IStripeEventStore;
+    IStripeEventGateway: IStripeEventGateway;
   }
 }
 

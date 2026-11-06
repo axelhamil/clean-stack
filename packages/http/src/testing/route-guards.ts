@@ -4,6 +4,7 @@ import type { RouteGuard, RouteGuards } from "../route-guards";
 
 export interface FakeRequester {
   userId?: string;
+  orgId?: string;
   clientIp?: string;
 }
 
@@ -13,6 +14,7 @@ const open: RouteGuard = async (_c, next) => {
 
 export function openRouteGuards(requester: FakeRequester = {}): RouteGuards {
   const userId = Option.fromNullable(requester.userId);
+  const orgId = Option.fromNullable(requester.orgId);
 
   return {
     requireAuth: open,
@@ -32,6 +34,12 @@ export function openRouteGuards(requester: FakeRequester = {}): RouteGuards {
       return userId.unwrap();
     },
     signedInUserId: () => userId,
+    currentOrgId: () => {
+      if (orgId.isNone()) throw new HTTPException(403, { message: "No active organization" });
+
+      return orgId.unwrap();
+    },
+    activeOrgId: () => orgId,
     clientIp: () => requester.clientIp ?? "198.51.100.7",
   };
 }

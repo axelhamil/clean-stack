@@ -12,7 +12,6 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import { createDbFailure } from "../../../../shared/db-failure";
-import { env } from "../../../../shared/env";
 import type {
   IStorageService,
   ObjectMetadata,
@@ -22,6 +21,7 @@ import type {
   StorageError,
   UploadObjectInput,
 } from "../../../../shared/ports/storage.port";
+import type { S3StorageSettings } from "../../application/config/upload-settings";
 import { keySchema } from "../../application/dto/_key";
 
 const S3_DELETE_BATCH = 1000;
@@ -33,21 +33,18 @@ export class S3StorageService implements IStorageService {
   private readonly bucket: string;
   private readonly publicUrl: string;
 
-  constructor(private readonly instrumentation: IInstrumentation) {
-    if (!env.S3_ENDPOINT || !env.S3_ACCESS_KEY || !env.S3_SECRET_KEY) {
-      throw new Error(
-        'Storage not configured: set S3_ENDPOINT, S3_ACCESS_KEY, S3_SECRET_KEY (and start the `storage` compose profile in dev). To run without storage, remove the uploads module and `app.route("/uploads", …)` wiring.',
-      );
-    }
+  constructor(
+    settings: S3StorageSettings,
+    private readonly instrumentation: IInstrumentation,
+  ) {
+    this.bucket = settings.bucket;
+    this.publicUrl = settings.publicUrl.replace(/\/+$/, "");
 
-    this.bucket = env.S3_BUCKET ?? "clean-stack";
-    this.publicUrl = (env.S3_PUBLIC_URL ?? "").replace(/\/+$/, "");
-
-    if (env.NODE_ENV === "production") {
-      const host = env.S3_ENDPOINT.toLowerCase();
+    if (settings.production) {
+      const host = settings.endpoint.toLowerCase();
       const isLocalhost =
         host.includes("localhost") || host.includes("127.0.0.1") || host.includes("[::1]");
-      const isDefaultCreds = env.S3_ACCESS_KEY === "dev" || env.S3_SECRET_KEY === "dev";
+      const isDefaultCreds = settings.accessKey === "dev" || settings.secretKey === "dev";
       if (isLocalhost || isDefaultCreds) {
         throw new Error(
           "Storage misconfigured in production: S3_ENDPOINT must point to R2 (or another real S3) and credentials must not be the dev defaults",
@@ -56,13 +53,13 @@ export class S3StorageService implements IStorageService {
     }
 
     this.client = new S3Client({
-      endpoint: env.S3_ENDPOINT,
-      region: env.S3_REGION ?? "auto",
+      endpoint: settings.endpoint,
+      region: settings.region,
       credentials: {
-        accessKeyId: env.S3_ACCESS_KEY,
-        secretAccessKey: env.S3_SECRET_KEY,
+        accessKeyId: settings.accessKey,
+        secretAccessKey: settings.secretKey,
       },
-      forcePathStyle: env.S3_FORCE_PATH_STYLE,
+      forcePathStyle: settings.forcePathStyle,
       requestChecksumCalculation: "WHEN_REQUIRED",
       responseChecksumValidation: "WHEN_REQUIRED",
     });
