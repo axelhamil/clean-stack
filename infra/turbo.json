@@ -12,7 +12,13 @@
         "package.json",
         "tsconfig.json",
         "$TURBO_ROOT$/.github/workflows/**",
-        "$TURBO_ROOT$/docker-compose.yaml"
+        "$TURBO_ROOT$/docker-compose.yaml",
+        "$TURBO_ROOT$/apps/api/src/**",
+        "$TURBO_ROOT$/packages/access-control/src/**",
+        "$TURBO_ROOT$/apps/app/src/shared/env.ts",
+        "$TURBO_ROOT$/apps/app/prod.Dockerfile",
+        "$TURBO_ROOT$/apps/admin/src/shared/env.ts",
+        "$TURBO_ROOT$/apps/admin/prod.Dockerfile"
       ]
     },
     "type-check": {
