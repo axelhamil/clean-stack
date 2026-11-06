@@ -1,5 +1,5 @@
 import type { OrgPermissions, StaffPermission } from "@packages/access-control";
-import type { EventType } from "./event-types";
+import { type EventType, isKnownEventType } from "./event-types";
 
 export type Audience =
   | "self"
@@ -171,7 +171,9 @@ const _map = {
 export const NOTIFICATION_MAP: Partial<Record<EventType, NotificationConfig>> = _map;
 
 export function notificationConfigOf(eventType: string): NotificationConfig | undefined {
-  return (NOTIFICATION_MAP as Record<string, NotificationConfig>)[eventType];
+  if (!isKnownEventType(eventType)) return undefined;
+
+  return NOTIFICATION_MAP[eventType];
 }
 
 export function isNotifiable(eventType: string): boolean {
@@ -190,12 +192,8 @@ export function publicNotificationPayload(
   const config = notificationConfigOf(eventType);
   if (!config || typeof payload !== "object" || payload === null) return {};
 
-  const source = payload as Record<string, unknown>;
-  const visible: Record<string, unknown> = {};
-  for (const field of config.payloadFields) {
-    if (field in source) visible[field] = source[field];
-  }
-  return visible;
+  const fields: readonly string[] = config.payloadFields;
+  return Object.fromEntries(Object.entries(payload).filter(([field]) => fields.includes(field)));
 }
 
 export type ForcedLevel = "all" | "some" | "none";

@@ -89,10 +89,7 @@ export function authorizeRole(
 ): boolean {
   if (!role) return false;
 
-  const policy = _roles[role] as {
-    authorize: (p: OrgPermissions, c?: "OR" | "AND") => { success: boolean };
-  };
-  return policy.authorize(permissions, connector).success;
+  return _roles[role].authorize(permissions, connector).success;
 }
 
 export function rolesWith(permissions: OrgPermissions): OrgRole[] {

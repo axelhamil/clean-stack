@@ -32,7 +32,7 @@ class EventsWithoutOutbox extends Error {
   }
 }
 
-type EventsByFlushHandler = Map<FlushHandler | null, IDomainEvent[]>;
+type EventsByFlushHandler = Map<FlushHandler | undefined, IDomainEvent[]>;
 
 type Doom = { kind: "failed"; result: unknown } | { kind: "thrown"; error: unknown };
 
@@ -64,10 +64,14 @@ function doom(outermost: OutermostRun | undefined, cause: Doom): void {
 }
 
 export class TransactionService implements IUnitOfWork {
+  private readonly flushHandler: Option<FlushHandler>;
+
   constructor(
     private readonly instrumentation: UnitOfWorkInstrumentation,
-    private readonly flushHandler: FlushHandler | null = null,
-  ) {}
+    flushHandler?: FlushHandler,
+  ) {
+    this.flushHandler = Option.fromNullable(flushHandler);
+  }
 
   public async run<T>(work: () => Promise<T>): Promise<T> {
     return this.instrumentation.startSpan({ name: "TransactionService > run" }, async () => {
@@ -133,7 +137,8 @@ export class TransactionService implements IUnitOfWork {
     const drained = EventCollector.drain();
     if (drained.length === 0) return;
 
-    pending.set(this.flushHandler, [...(pending.get(this.flushHandler) ?? []), ...drained]);
+    const key = this.flushHandler.toUndefined();
+    pending.set(key, [...(pending.get(key) ?? []), ...drained]);
   }
 }
 

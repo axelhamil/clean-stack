@@ -1,4 +1,4 @@
-import { type EventType, EventTypes } from "./event-types";
+import { type EventType, EventTypes, isKnownEventType } from "./event-types";
 
 export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   [EventTypes.USER_CREATED]: "A new user account was created.",
@@ -133,5 +133,7 @@ export const EVENT_DESCRIPTIONS: Record<EventType, string> = {
 };
 
 export function descriptionFor(eventType: string): string {
-  return EVENT_DESCRIPTIONS[eventType as EventType] ?? "";
+  if (!isKnownEventType(eventType)) return "";
+
+  return EVENT_DESCRIPTIONS[eventType];
 }

@@ -374,6 +374,34 @@ async function main(): Promise<void> {
       (await currentName()) === ORIGINAL_NAME,
   );
 
+  const flushed: string[][] = [];
+  const sharedHandler = async (events: { aggregateId: string }[]) => {
+    flushed.push(events.map((event) => event.aggregateId));
+  };
+  const first = new TransactionService(instrumentation, sharedHandler);
+  const second = new TransactionService(instrumentation, sharedHandler);
+  const collect = (aggregateId: string) =>
+    EventCollector.add({
+      eventType: EventTypes.USER_PROFILE_UPDATED,
+      dateOccurred: new Date(),
+      aggregateId,
+      payload: { userId, changes: {} },
+    });
+  await first.run(async () => {
+    collect("a1");
+    await second.run(async () => {
+      collect("b1");
+      return Result.ok();
+    });
+    collect("a2");
+    return Result.ok();
+  });
+  console.log("[8] shared handler flushed ->", JSON.stringify(flushed));
+  check(
+    "two services sharing a flush handler flush once, nested run events first",
+    JSON.stringify(flushed) === JSON.stringify([["b1", "a1", "a2"]]),
+  );
+
   await cleanup();
 
   if (checks.failures > 0) {

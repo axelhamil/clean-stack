@@ -62,15 +62,15 @@ export async function renderTemplate<K extends EmailTemplateKey>(
   const i18n = await createI18n({ locale, resources });
   const t = i18n.getFixedT(locale, "emails");
 
-  const entry = TEMPLATES[key];
-  const Component = entry.component as unknown as ComponentType<Record<string, unknown>>;
+  const entry: TemplateEntry<K> = TEMPLATES[key];
+  const Component = entry.component;
   // `<Trans>` resolves its interpolation through the i18next instance in
   // context, never through the `t` prop alone; the provider is what keeps that
   // resolution bound to *this* render's instance rather than a process-wide
   // singleton the next recipient would mutate.
   const element = (
     <I18nextProvider i18n={i18n}>
-      <Component {...variables} t={t} />
+      <Component key={key} {...variables} t={t} />
     </I18nextProvider>
   );
   const [html, text] = await Promise.all([render(element), render(element, { plainText: true })]);

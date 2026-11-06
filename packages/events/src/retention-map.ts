@@ -1,4 +1,4 @@
-import { type EventType, EventTypes } from "./event-types";
+import { type EventType, EventTypes, isKnownEventType } from "./event-types";
 
 export type RetentionPolicy = "operational" | "compliance" | "none";
 
@@ -113,5 +113,7 @@ export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
 };
 
 export function retentionFor(eventType: string): RetentionPolicy {
-  return (RETENTION_MAP as Record<string, RetentionPolicy | undefined>)[eventType] ?? "none";
+  if (!isKnownEventType(eventType)) return "none";
+
+  return RETENTION_MAP[eventType];
 }

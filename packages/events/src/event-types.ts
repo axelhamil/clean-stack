@@ -115,7 +115,7 @@ export type EventType = (typeof EventTypes)[keyof typeof EventTypes];
 export const ALL_EVENT_TYPES: readonly EventType[] = Object.values(EventTypes);
 
 export function isKnownEventType(value: string): value is EventType {
-  return ALL_EVENT_TYPES.includes(value as EventType);
+  return ALL_EVENT_TYPES.some((type) => type === value);
 }
 
 export const SUBSCRIBABLE_EVENT_TYPES: readonly EventType[] = ALL_EVENT_TYPES.filter(isPublicEvent);
@@ -137,7 +137,7 @@ export function matchesSubscription(
 
 export function isSubscribableSelector(value: string): boolean {
   if (value === "*") return true;
-  if (!value.endsWith(".*")) return SUBSCRIBABLE_EVENT_TYPES.includes(value as EventType);
+  if (!value.endsWith(".*")) return SUBSCRIBABLE_EVENT_TYPES.some((type) => type === value);
 
   const group = value.slice(0, -2);
   return SUBSCRIBABLE_EVENT_TYPES.some((t) => eventGroupOf(t) === group);

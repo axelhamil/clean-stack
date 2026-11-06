@@ -1,4 +1,4 @@
-import { eq, isNull, lte, type SQL, sql } from "drizzle-orm";
+import { and, eq, isNull, lte, or, type SQL, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 export interface LeaseColumns {
@@ -21,8 +21,8 @@ export function deadShareOf(limit: number): number {
   return Math.ceil(limit / DEAD_SHARE_OF_CLAIM);
 }
 
-export function isDue(nextAttemptAt: AnyPgColumn): SQL {
-  return sql`(${isNull(nextAttemptAt)} or ${lte(nextAttemptAt, dbNow)})`;
+export function isDue(nextAttemptAt: AnyPgColumn): SQL | undefined {
+  return or(isNull(nextAttemptAt), lte(nextAttemptAt, dbNow));
 }
 
 export function isDeadDue(nextAttemptAt: AnyPgColumn): SQL {
@@ -37,8 +37,8 @@ export function secondsFromClock(seconds: number): SQL {
   return sql`clock_timestamp() + make_interval(secs => ${seconds})`;
 }
 
-export function leasedBy(columns: LeaseColumns, lease: LeaseKey): SQL {
-  return sql`(${eq(columns.id, lease.id)} and ${eq(columns.attempts, lease.attempts)})`;
+export function leasedBy(columns: LeaseColumns, lease: LeaseKey): SQL | undefined {
+  return and(eq(columns.id, lease.id), eq(columns.attempts, lease.attempts));
 }
 
 export function claimedSet(
