@@ -214,6 +214,7 @@ app.route(
   createPublicApiV1({
     repo: di.IApiTokenRepository,
     outbox: di.IOutboxRepository,
+    uow: di.ITransactionService,
     prefix: env.API_TOKEN_PREFIX,
     pepper: apiTokenPepper,
     pepperVersion: env.API_TOKEN_PEPPER_VERSION,

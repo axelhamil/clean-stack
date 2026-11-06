@@ -6,6 +6,7 @@ import { mockUnitOfWork, type UnitOfWorkMock } from "@packages/test/bun/unit-of-
 import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
 import type { EmailError, IEmailService } from "../../../shared/ports/email.port";
 import type { IInstrumentation } from "../../../shared/ports/instrumentation.port";
+import type { ILogger } from "../../../shared/ports/logger.port";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import type {
   IStaffStore,
@@ -145,6 +146,13 @@ function buildService(deps: {
     deps.staff ?? makeStaff(Option.none(), []),
     { PLATFORM_ADMIN_IDS: deps.listed ?? [] },
     deps.totp ?? acceptingTotp(),
+    {
+      appUrl: "https://app.example.com",
+      gracePeriodDays: 7,
+      exportRateLimitHours: 24,
+      sweepDeadlineMs: 90_000,
+    },
+    mockPort<ILogger>(),
   );
 }
 

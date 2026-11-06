@@ -1,3 +1,4 @@
+import type { IUnitOfWork } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import type { MiddlewareHandler } from "hono";
 import { createMiddleware } from "hono/factory";
@@ -20,6 +21,7 @@ export interface ApiTokenVariables {
 export interface ApiTokenDeps {
   repo: IApiTokenRepository;
   outbox: IOutboxRepository;
+  uow: IUnitOfWork;
   prefix: string;
   pepper: string;
   pepperVersion: number;
@@ -97,17 +99,17 @@ export function requireApiToken(
       throw new HTTPException(401, { message: "Unauthorized" });
     }
 
-    const user = userRow as unknown as SessionUser;
-
     // apiTokenId must be set before the per-token rate-limit policy runs.
     c.set("apiTokenId", record.id);
-    c.set("user", user);
+    c.set("user", userRow);
     c.set("tokenScopes", recordScopes);
     c.set("orgId", record.organizationId.toNull());
 
     const bucketFloor = new Date(Date.now() - deps.bucketMin * 60_000);
-    const touchResult = await deps.repo.touchLastUsed(record.id, bucketFloor);
-    if (touchResult.isSuccess && touchResult.getValue()) {
+    await deps.uow.run(async () => {
+      const touched = await deps.repo.touchLastUsed(record.id, bucketFloor);
+      if (touched.isFailure || !touched.getValue()) return touched;
+
       await emitEvent(
         deps.outbox,
         EventTypes.API_TOKEN_USED,
@@ -122,7 +124,9 @@ export function requireApiToken(
         },
         { organizationId: record.organizationId.toUndefined() },
       );
-    }
+
+      return touched;
+    });
 
     await next();
   });

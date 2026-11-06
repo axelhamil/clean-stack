@@ -1,8 +1,11 @@
 import { describe, expect, it, mock } from "bun:test";
-import { Option, Result } from "@packages/ddd-kit";
+import { Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
+import { mockPort } from "@packages/test/bun";
+import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { Hono } from "hono";
 import { generateToken, hmacToken } from "../crypto/api-token";
 import type { ApiTokenRecord } from "../ports/api-token.port";
+import type { IOutboxRepository } from "../ports/outbox.port";
 
 const PREFIX = "clean_";
 const PEPPER = "a".repeat(32);
@@ -85,6 +88,7 @@ function makeDeps(repoOverride?: ReturnType<typeof makeRepo>["repo"]) {
   return {
     repo: repo as never,
     outbox: outbox as never,
+    uow: mockUnitOfWork().unitOfWork,
     prefix: PREFIX,
     pepper: PEPPER,
     pepperVersion: PEPPER_VERSION,
@@ -321,5 +325,30 @@ describe("requireApiToken", () => {
     });
     expect(res.status).toBe(401);
     expect(repo.rehash).not.toHaveBeenCalled();
+  });
+
+  it("records the token use and its event in one transaction", async () => {
+    const { raw } = generateToken(PREFIX);
+    const record = makeRecord({ tokenHmac: hmacToken(raw, PEPPER) });
+    const { repo } = makeRepo(async () => Result.ok(Option.some(record)));
+    const transactions: unknown[] = [];
+    repo.touchLastUsed.mockImplementation(async () => {
+      transactions.push(UnitOfWorkContext.transaction());
+      return Result.ok(true);
+    });
+    const tokenOutbox = mockPort<IOutboxRepository>();
+    tokenOutbox.enqueue.mockImplementation(async () => {
+      transactions.push(UnitOfWorkContext.transaction());
+    });
+    const app = new Hono()
+      .use(requireApiToken({ ...makeDeps(repo), outbox: tokenOutbox }, { scopes: [] }))
+      .get("/x", (c) => c.text("ok"));
+
+    const res = await app.request("/x", { headers: { authorization: `Bearer ${raw}` } });
+
+    expect(res.status).toBe(200);
+    expect(transactions).toHaveLength(2);
+    expect(transactions[0]).toBeDefined();
+    expect(new Set(transactions).size).toBe(1);
   });
 });

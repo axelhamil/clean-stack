@@ -141,6 +141,13 @@ function buildService(): RgpdService {
     new DrizzleStaffStore(instrumentation, uow),
     { PLATFORM_ADMIN_IDS: [] },
     new DrizzleTotpVerifier(instrumentation, authSecretKey(env)),
+    {
+      appUrl: env.APP_URL,
+      gracePeriodDays: env.RGPD_GRACE_PERIOD_DAYS,
+      exportRateLimitHours: env.RGPD_EXPORT_RATE_LIMIT_HOURS,
+      sweepDeadlineMs: env.SWEEP_DEADLINE_MS,
+    },
+    logger,
   );
 }
 
@@ -222,6 +229,7 @@ async function requestWithToken(raw: string): Promise<number> {
         {
           repo: new DrizzleApiTokenRepository(instrumentation),
           outbox: new DrizzleOutboxRepository(instrumentation),
+          uow: new TransactionService(instrumentation),
           prefix: TOKEN_PREFIX,
           pepper: TOKEN_PEPPER,
           pepperVersion: 1,

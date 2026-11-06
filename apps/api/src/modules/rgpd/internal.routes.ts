@@ -34,7 +34,7 @@ export const rgpdInternalRoutes = new Hono()
       },
       async () => {
         const result = await di.RgpdService.processPendingDeletions({
-          batchSize: body.batchSize ?? env.RGPD_SWEEP_BATCH_SIZE ?? 50,
+          batchSize: body.batchSize ?? env.RGPD_SWEEP_BATCH_SIZE,
           dryRun: body.dryRun,
           deadlineMs: env.SWEEP_DEADLINE_MS,
         });
