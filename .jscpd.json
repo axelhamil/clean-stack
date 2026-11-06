@@ -11,8 +11,7 @@
     "**/__TESTS__/**",
     "**/*.test.ts",
     "**/*.spec.ts",
-    "**/routeTree.gen.ts",
-    "**/.claude/worktrees/**"
+    "**/routeTree.gen.ts"
   ],
   "format": ["typescript", "javascript", "tsx", "jsx"],
   "minLines": 10,
