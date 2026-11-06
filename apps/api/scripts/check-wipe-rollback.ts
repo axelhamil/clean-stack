@@ -230,6 +230,8 @@ async function requestWithToken(raw: string): Promise<number> {
           repo: new DrizzleApiTokenRepository(instrumentation),
           outbox: new DrizzleOutboxRepository(instrumentation),
           uow: new TransactionService(instrumentation),
+          instrumentation,
+          logger,
           prefix: TOKEN_PREFIX,
           pepper: TOKEN_PEPPER,
           pepperVersion: 1,

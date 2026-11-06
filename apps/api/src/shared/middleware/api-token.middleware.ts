@@ -9,7 +9,10 @@ import type { ApiScope } from "../../modules/api-token/application/dto/create-to
 import { hmacToken, parseToken } from "../crypto/api-token";
 import { emitEvent } from "../event-emitter";
 import type { IApiTokenRepository } from "../ports/api-token.port";
+import type { IInstrumentation } from "../ports/instrumentation.port";
+import type { ILogger } from "../ports/logger.port";
 import type { IOutboxRepository } from "../ports/outbox.port";
+import { getRequestId } from "../request-context";
 
 export interface ApiTokenVariables {
   user: SessionUser;
@@ -22,6 +25,8 @@ export interface ApiTokenDeps {
   repo: IApiTokenRepository;
   outbox: IOutboxRepository;
   uow: IUnitOfWork;
+  instrumentation: IInstrumentation;
+  logger: ILogger;
   prefix: string;
   pepper: string;
   pepperVersion: number;
@@ -106,27 +111,36 @@ export function requireApiToken(
     c.set("orgId", record.organizationId.toNull());
 
     const bucketFloor = new Date(Date.now() - deps.bucketMin * 60_000);
-    await deps.uow.run(async () => {
-      const touched = await deps.repo.touchLastUsed(record.id, bucketFloor);
-      if (touched.isFailure || !touched.getValue()) return touched;
+    try {
+      await deps.uow.run(async () => {
+        const touched = await deps.repo.touchLastUsed(record.id, bucketFloor);
+        if (touched.isFailure || !touched.getValue()) return touched;
 
-      await emitEvent(
-        deps.outbox,
-        EventTypes.API_TOKEN_USED,
-        "api_token",
-        record.id,
-        {
-          userId: record.userId,
-          actorUserId: record.userId,
-          organizationId: record.organizationId.toNull(),
-          tokenId: record.id,
-          scopes: record.scopes,
-        },
-        { organizationId: record.organizationId.toUndefined() },
+        await emitEvent(
+          deps.outbox,
+          EventTypes.API_TOKEN_USED,
+          "api_token",
+          record.id,
+          {
+            userId: record.userId,
+            actorUserId: record.userId,
+            organizationId: record.organizationId.toNull(),
+            tokenId: record.id,
+            scopes: record.scopes,
+          },
+          { organizationId: record.organizationId.toUndefined() },
+        );
+
+        return touched;
+      });
+    } catch (err) {
+      const requestId = getRequestId();
+      deps.instrumentation.capture(err, { requestId, metadata: { tokenId: record.id } });
+      deps.logger.warn(
+        { err, requestId, tokenId: record.id },
+        "api token usage record failed: request served without it",
       );
-
-      return touched;
-    });
+    }
 
     await next();
   });

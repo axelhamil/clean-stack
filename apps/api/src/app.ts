@@ -40,6 +40,7 @@ import { sweepNotificationsRoutes } from "./shared/internal-routes/sweep-notific
 import { sweepOutboxRoutes } from "./shared/internal-routes/sweep-outbox.route";
 import { sweepStripeEventsRoutes } from "./shared/internal-routes/sweep-stripe-events.route";
 import { sweepWebhookDeliveryRoutes } from "./shared/internal-routes/sweep-webhook-delivery.route";
+import { logger } from "./shared/logger";
 import { type AuthVariables, sessionMiddleware } from "./shared/middleware/auth.middleware";
 import { requireCsrf } from "./shared/middleware/csrf.middleware";
 import { createErrorHandler } from "./shared/middleware/error.middleware";
@@ -215,6 +216,8 @@ app.route(
     repo: di.IApiTokenRepository,
     outbox: di.IOutboxRepository,
     uow: di.ITransactionService,
+    instrumentation: di.IInstrumentation,
+    logger,
     prefix: env.API_TOKEN_PREFIX,
     pepper: apiTokenPepper,
     pepperVersion: env.API_TOKEN_PEPPER_VERSION,

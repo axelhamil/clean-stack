@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { Hono } from "hono";
 import * as realAuthQueries from "../../auth-queries";
@@ -7,6 +8,7 @@ import { generateToken, hmacToken } from "../../shared/crypto/api-token";
 import { createErrorHandler } from "../../shared/middleware/error.middleware";
 import { API_TOKEN_IP_POLICY } from "../../shared/middleware/rate-limit.policies";
 import type { ApiTokenRecord, IApiTokenRepository } from "../../shared/ports/api-token.port";
+import type { ILogger } from "../../shared/ports/logger.port";
 import type {
   IRateLimiter,
   RateLimitDecision,
@@ -136,6 +138,8 @@ const publicApiV1 = createPublicApiV1({
   repo: makeRepo(),
   outbox: mockOutbox,
   uow: mockUnitOfWork().unitOfWork,
+  instrumentation: new NoOpInstrumentation(),
+  logger: mockPort<ILogger>(),
   prefix: PREFIX,
   pepper: PEPPER,
   pepperVersion: 1,
@@ -257,6 +261,8 @@ describe("public API rate limit order", () => {
         repo: makeRepo(),
         outbox: mockOutbox,
         uow: mockUnitOfWork().unitOfWork,
+        instrumentation: new NoOpInstrumentation(),
+        logger: mockPort<ILogger>(),
         prefix: PREFIX,
         pepper: PEPPER,
         pepperVersion: 1,

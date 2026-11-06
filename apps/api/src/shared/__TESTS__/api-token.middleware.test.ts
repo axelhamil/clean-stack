@@ -5,7 +5,10 @@ import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { Hono } from "hono";
 import { generateToken, hmacToken } from "../crypto/api-token";
 import type { ApiTokenRecord } from "../ports/api-token.port";
+import type { IInstrumentation } from "../ports/instrumentation.port";
+import type { ILogger } from "../ports/logger.port";
 import type { IOutboxRepository } from "../ports/outbox.port";
+import { NoOpInstrumentation } from "../services/noop-instrumentation";
 
 const PREFIX = "clean_";
 const PEPPER = "a".repeat(32);
@@ -89,6 +92,8 @@ function makeDeps(repoOverride?: ReturnType<typeof makeRepo>["repo"]) {
     repo: repo as never,
     outbox: outbox as never,
     uow: mockUnitOfWork().unitOfWork,
+    instrumentation: new NoOpInstrumentation(),
+    logger: mockPort<ILogger>(),
     prefix: PREFIX,
     pepper: PEPPER,
     pepperVersion: PEPPER_VERSION,
@@ -350,5 +355,34 @@ describe("requireApiToken", () => {
     expect(transactions).toHaveLength(2);
     expect(transactions[0]).toBeDefined();
     expect(new Set(transactions).size).toBe(1);
+  });
+
+  it("keeps serving a valid token when its usage record cannot be written", async () => {
+    const { raw } = generateToken(PREFIX);
+    const record = makeRecord({ tokenHmac: hmacToken(raw, PEPPER) });
+    const { repo } = makeRepo(async () => Result.ok(Option.some(record)));
+    const failingOutbox = mockPort<IOutboxRepository>();
+    const outage = new Error("outbox unavailable");
+    failingOutbox.enqueue.mockRejectedValue(outage);
+    const uow = mockUnitOfWork();
+    const instrumentation = mockPort<IInstrumentation>();
+    const app = new Hono()
+      .use(
+        requireApiToken(
+          { ...makeDeps(repo), outbox: failingOutbox, uow: uow.unitOfWork, instrumentation },
+          { scopes: [] },
+        ),
+      )
+      .get("/x", (c) => c.text("ok"));
+
+    const statuses = [];
+    for (let i = 0; i < 2; i++) {
+      const res = await app.request("/x", { headers: { authorization: `Bearer ${raw}` } });
+      statuses.push(res.status);
+    }
+
+    expect(statuses).toEqual([200, 200]);
+    expect(uow.outcome()).toBe("rolled_back");
+    expect(instrumentation.capture).toHaveBeenCalledWith(outage, expect.anything());
   });
 });
