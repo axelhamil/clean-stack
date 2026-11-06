@@ -128,7 +128,10 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
     );
   }
 
-  async findById(id: string, organizationId: string): Promise<Option<WebhookEndpointRecord>> {
+  async findById(
+    id: string,
+    organizationId: string,
+  ): Promise<Result<Option<WebhookEndpointRecord>, WebhookRepoError>> {
     const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookEndpointRepository > findById" },
@@ -143,10 +146,36 @@ export class DrizzleWebhookEndpointRepository implements IWebhookEndpointReposit
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-          return Option.fromNullable(row).map(toRecord);
+          return Result.ok(Option.fromNullable(row).map(toRecord));
         } catch (e) {
           this.instrumentation.capture(e);
-          throw e;
+          return fail(e, "webhook endpoint lookup failed");
+        }
+      },
+    );
+  }
+
+  async findEnabledById(
+    id: string,
+  ): Promise<Result<Option<WebhookEndpointRecord>, WebhookRepoError>> {
+    const exec = resolveExecutor();
+    return this.instrumentation.startSpan(
+      { name: "DrizzleWebhookEndpointRepository > findEnabledById" },
+      async () => {
+        try {
+          const query = exec
+            .select()
+            .from(we)
+            .where(and(eq(we.id, id), eq(we.enabled, true)))
+            .limit(1);
+          const [row] = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+          return Result.ok(Option.fromNullable(row).map(toRecord));
+        } catch (e) {
+          this.instrumentation.capture(e);
+          return fail(e, "webhook endpoint lookup failed");
         }
       },
     );

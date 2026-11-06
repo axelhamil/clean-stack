@@ -1,26 +1,14 @@
 // `/internal/flush-notification-emails`, gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
-import {
-  alias,
-  and,
-  authSchema,
-  count,
-  db,
-  eq,
-  inArray,
-  isNull,
-  lte,
-  notificationSchema,
-  resolveExecutor,
-  sql,
-  tryLockForTransaction,
-} from "@packages/drizzle";
-import { NOTIFICATION_MAP } from "@packages/events";
+import { type Option, Result } from "@packages/ddd-kit";
 import { toLocale } from "@packages/i18n";
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import type { PinoLogger } from "hono-pino";
 import { z } from "zod";
 import { di } from "../../container";
+import type { EmailError } from "../ports/email.port";
+import type { DueNotification, NotificationDigestError } from "../ports/notification-digest.port";
 import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
 import { type SweepBeat, withSweepHeartbeat } from "./sweep-heartbeat";
@@ -35,21 +23,13 @@ const bodySchema = z
   })
   .default({});
 
-export type PendingRow = {
-  id: string;
-  userId: string;
-  category: string;
-  eventType: string;
-  email: string;
-  locale: string | null;
-  payload: unknown;
-};
+export type PendingRow = Omit<DueNotification, "emailStillWanted">;
 
 export type DigestGroup = {
   userId: string;
   email: string;
   category: string;
-  locale: string | null;
+  locale: Option<string>;
   notificationIds: string[];
   items: { eventType: string; payload: unknown }[];
 };
@@ -87,43 +67,6 @@ export async function digestIdempotencyKey(ids: string[]): Promise<string> {
 const DEFAULT_BATCH_SIZE = 500;
 const FLUSH_LABEL = "flush-notification-emails";
 
-// Forced notifications (security, payment failures, …) join no preference row
-// at the fan-out either, the flush must honour the exact same exemption, or a
-// user who disabled email for `security` would silently start losing forced
-// digests it was never allowed to defer in the first place.
-const FORCED_EVENT_TYPES = Object.entries(NOTIFICATION_MAP)
-  .filter(([, config]) => config?.forced === true)
-  .map(([eventType]) => eventType);
-
-const p = notificationSchema.notificationPreference;
-const upMail = alias(p, "up_mail");
-const opMail = alias(p, "op_mail");
-
-/**
- * Same precedence the fan-out resolves at insertion (`notification-fanout-
- * subscriber.ts`): org-locked wins, then the user's own choice, then the
- * org's unlocked default, then `TRUE`. Re-evaluated here, at send time,
- * against the *current* row, a preference flipped after the notification
- * was queued must be able to cancel a digest already scheduled.
- */
-const forcedCheck =
-  FORCED_EVENT_TYPES.length > 0
-    ? sql`${notificationSchema.notification.eventType} IN (${sql.join(
-        FORCED_EVENT_TYPES.map((t) => sql`${t}`),
-        sql`, `,
-      )})`
-    : sql`FALSE`;
-
-const emailStillWanted = sql<boolean>`(
-  ${forcedCheck}
-  OR COALESCE(
-    CASE WHEN ${opMail.locked} THEN ${opMail.enabled} END,
-    ${upMail.enabled},
-    ${opMail.enabled},
-    TRUE
-  )
-)`;
-
 interface FlushRun {
   batchSize: number;
   dryRun: boolean;
@@ -138,6 +81,8 @@ interface FlushResponse {
   flushed: number;
   notifications: number;
 }
+
+type FlushError = NotificationDigestError | EmailError;
 
 interface FlushOutcome {
   skipped: boolean;
@@ -158,17 +103,11 @@ export async function flushDueNotifications({
   spans,
 }: FlushRun): Promise<FlushResponse> {
   const now = new Date();
-  const n = notificationSchema.notification;
-  const u = authSchema.user;
-  const isDue = and(lte(n.emailPendingAt, now), isNull(n.emailSentAt));
 
   if (dryRun) {
-    const query = db.select({ eligible: count() }).from(n).where(isDue);
-    const rows = await spans.db(
-      () => query.toSQL().sql,
-      () => query.execute(),
-    );
-    const eligible = rows[0]?.eligible ?? 0;
+    const counted = await di.INotificationDigestStore.countDue(now);
+    if (counted.isFailure) throw failedFlush(counted.getError());
+    const eligible = counted.getValue();
     logger.info({ eligible }, "flush-notification-emails dry-run");
     return { dryRun: true, eligible, flushed: 0, notifications: 0 };
   }
@@ -179,16 +118,11 @@ export async function flushDueNotifications({
   // transaction scoped: it lives exactly as long as the claims it protects and
   // cannot expire under a long run, which a time-boxed lease could.
   const flush = () =>
-    di.ITransactionService.run(async (): Promise<FlushOutcome> => {
-      if (!(await tryLockForTransaction(FLUSH_LABEL))) {
-        return { skipped: true, flushed: 0, notifications: 0 };
-      }
-
-      const exec = resolveExecutor();
-
-      await exec.execute(sql`SET LOCAL statement_timeout = '30s'`);
-      await exec.execute(sql`SET LOCAL lock_timeout = '500ms'`);
-      await exec.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '10s'`);
+    di.ITransactionService.run(async (): Promise<Result<FlushOutcome, FlushError>> => {
+      const store = di.INotificationDigestStore;
+      const locked = await store.beginFlush(FLUSH_LABEL);
+      if (locked.isFailure) return Result.fail(locked.getError());
+      if (!locked.getValue()) return Result.ok({ skipped: true, flushed: 0, notifications: 0 });
 
       // `batchSize` bounds each round-trip to Postgres, not the run: the
       // lock already rules out a *concurrent* run splitting a window, but
@@ -213,40 +147,9 @@ export async function flushDueNotifications({
       let dropped = 0;
 
       for (;;) {
-        const candidates = await exec
-          .select({
-            id: n.id,
-            userId: n.userId,
-            category: n.category,
-            eventType: n.eventType,
-            email: u.email,
-            locale: u.locale,
-            payload: n.payload,
-            emailStillWanted,
-          })
-          .from(n)
-          .innerJoin(u, eq(n.userId, u.id))
-          .leftJoin(
-            upMail,
-            and(
-              eq(upMail.scope, "user"),
-              eq(upMail.channel, "email"),
-              eq(upMail.category, n.category),
-              eq(upMail.scopeId, n.userId),
-            ),
-          )
-          .leftJoin(
-            opMail,
-            and(
-              eq(opMail.scope, "org"),
-              eq(opMail.channel, "email"),
-              eq(opMail.category, n.category),
-              eq(opMail.scopeId, n.organizationId),
-            ),
-          )
-          .where(isDue)
-          .limit(batchSize)
-          .for("update", { of: n, skipLocked: true });
+        const claimed = await store.claimDue(now, batchSize);
+        if (claimed.isFailure) return Result.fail(claimed.getError());
+        const candidates = claimed.getValue();
 
         if (candidates.length === 0) break;
 
@@ -258,21 +161,18 @@ export async function flushDueNotifications({
         // notification itself, and its in-app read state, are untouched.
         const droppedIds = candidates.filter((r) => !r.emailStillWanted).map((r) => r.id);
         if (droppedIds.length > 0) {
-          await exec.update(n).set({ emailPendingAt: null }).where(inArray(n.id, droppedIds));
+          const cleared = await store.dropUnwanted(droppedIds);
+          if (cleared.isFailure) return Result.fail(cleared.getError());
           dropped += droppedIds.length;
         }
 
-        const allowed = candidates.filter((r) => r.emailStillWanted) as PendingRow[];
+        const allowed: PendingRow[] = candidates.filter((r) => r.emailStillWanted);
         if (allowed.length > 0) {
-          await exec
-            .update(n)
-            .set({ emailSentAt: now })
-            .where(
-              inArray(
-                n.id,
-                allowed.map((r) => r.id),
-              ),
-            );
+          const marked = await store.markSent(
+            allowed.map((r) => r.id),
+            now,
+          );
+          if (marked.isFailure) return Result.fail(marked.getError());
           rows.push(...allowed);
         }
 
@@ -283,7 +183,7 @@ export async function flushDueNotifications({
         logger.info({ dropped }, "flush-notification-emails dropped rows whose preference changed");
       }
 
-      if (rows.length === 0) return { skipped: false, flushed: 0, notifications: 0 };
+      if (rows.length === 0) return Result.ok({ skipped: false, flushed: 0, notifications: 0 });
 
       const digests = buildDigests(rows);
 
@@ -295,7 +195,7 @@ export async function flushDueNotifications({
             itemCount: String(d.items.length),
             itemsSummary: d.items.map((i) => i.eventType).join(", "),
           },
-          locale: toLocale(d.locale),
+          locale: toLocale(d.locale.toNull()),
           idempotencyKey: await digestIdempotencyKey(d.notificationIds),
         })),
       );
@@ -303,7 +203,7 @@ export async function flushDueNotifications({
 
       if (enqueued.isFailure) {
         logger.error({ err: enqueued.getError() }, "flush-notification-emails enqueue failed");
-        throw new Error(enqueued.getError().message);
+        return Result.fail(enqueued.getError());
       }
 
       const notificationIds = rows.map((r) => r.id);
@@ -312,16 +212,18 @@ export async function flushDueNotifications({
         { flushed: digests.length, notifications: notificationIds.length },
         "flush-notification-emails done",
       );
-      return {
+      return Result.ok({
         skipped: false,
         flushed: digests.length,
         notifications: notificationIds.length,
-      };
+      });
     });
 
   // One outer span over the whole paged transaction: its statements are many and
   // alike, and per-statement spans would be noise (rule #8, multi-query methods).
-  const outcome = await spans.span({ name: `flush > ${FLUSH_LABEL}`, op: "function" }, flush);
+  const flushed = await spans.span({ name: `flush > ${FLUSH_LABEL}`, op: "function" }, flush);
+  if (flushed.isFailure) throw failedFlush(flushed.getError());
+  const outcome = flushed.getValue();
 
   if (outcome.skipped) {
     logger.info("flush-notification-emails skipped, a concurrent run holds the lock");
@@ -334,6 +236,10 @@ export async function flushDueNotifications({
     flushed: outcome.flushed,
     notifications: outcome.notifications,
   };
+}
+
+function failedFlush(error: FlushError): HTTPException {
+  return new HTTPException(502, { message: `${error.code}: ${error.message}` });
 }
 
 export const flushNotificationEmailsRoutes = new Hono<HonoEnv>()

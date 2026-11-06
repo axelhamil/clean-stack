@@ -15,12 +15,30 @@ import type {
   IWebhookDeliveryRepository,
   WebhookDeliveryRecord,
 } from "../application/ports/webhook-delivery.port";
-import type { IWebhookEndpointRepository } from "../application/ports/webhook-endpoint.port";
+import type {
+  IWebhookEndpointRepository,
+  WebhookEndpointRecord,
+  WebhookRepoError,
+} from "../application/ports/webhook-endpoint.port";
 
 // ---------------------------------------------------------------------------
 // Drizzle mock: scoped to this file's module registry, invisible to other files.
 // ---------------------------------------------------------------------------
-let dbTransactionResult: unknown = [];
+type EndpointRow = {
+  id: string;
+  url: string;
+  organizationId: string;
+  secretCipher: string;
+  enabled: boolean;
+  previousSecretCipher: string | null;
+  previousSecretExpiresAt: Date | null;
+  consecutiveFailures: number;
+  firstFailedAt: Date | null;
+  disabledAt: Date | null;
+};
+
+let dbTransactionResult: EndpointRow[] = [];
+let endpointLookupFails = false;
 
 function makeQueryChain(result: () => unknown) {
   const leaf = {
@@ -148,12 +166,34 @@ function makeFakeEndpoints(opts?: { bumpFailureResult?: BumpFailureResult }) {
     create: async () => Result.ok({} as never),
     update: async () => Result.ok(Option.none()),
     delete: async () => Result.ok(false),
-    findById: async () => Option.none(),
+    findById: async () => Result.ok(Option.none()),
+    findEnabledById: async (
+      id: string,
+    ): Promise<Result<Option<WebhookEndpointRecord>, WebhookRepoError>> => {
+      if (endpointLookupFails) {
+        return Result.fail({ code: "WEBHOOK_PERSISTENCE_PROVIDER_FAILURE", message: "db down" });
+      }
+      const row = dbTransactionResult.find((r) => r.id === id && r.enabled);
+      return Result.ok(Option.fromNullable(row).map(toEndpointRecord));
+    },
     listByOrg: async () => Result.ok([]),
   };
 }
 
-const FAKE_ENDPOINT = {
+function toEndpointRecord(row: EndpointRow): WebhookEndpointRecord {
+  return {
+    ...row,
+    eventTypes: [],
+    createdAt: new Date("2024-01-01T00:00:00Z"),
+    updatedAt: new Date("2024-01-01T00:00:00Z"),
+    previousSecretCipher: Option.fromNullable(row.previousSecretCipher),
+    previousSecretExpiresAt: Option.fromNullable(row.previousSecretExpiresAt),
+    firstFailedAt: Option.fromNullable(row.firstFailedAt),
+    disabledAt: Option.fromNullable(row.disabledAt),
+  };
+}
+
+const FAKE_ENDPOINT: EndpointRow = {
   id: "ep-1",
   url: "https://example.com/hook",
   organizationId: "org-1",
@@ -217,6 +257,7 @@ const eventTypes = () => enqueuedEvents(outbox).map(({ eventType }) => eventType
 describe("WebhookDeliveryWorker", () => {
   beforeEach(() => {
     dbTransactionResult = [FAKE_ENDPOINT];
+    endpointLookupFails = false;
     deliveries = mockPort<IWebhookDeliveryRepository>();
     outbox = mockPort<IOutboxRepository>();
     uow = mockUnitOfWork();
@@ -376,6 +417,17 @@ describe("WebhookDeliveryWorker", () => {
 
     expect(captureSpy).toHaveBeenCalled();
     expect(failures().map((f) => f.status)).toEqual(["failed"]);
+  });
+
+  it("keeps a delivery retryable when the endpoint lookup fails", async () => {
+    endpointLookupFails = true;
+    claims([makeDelivery()]);
+
+    await runDrain(makeWorker());
+
+    expect(failures()).toEqual([
+      expect.objectContaining({ status: "failed", lastError: "endpoint lookup db error" }),
+    ]);
   });
 
   it("dead-letters for good when the endpoint is missing", async () => {

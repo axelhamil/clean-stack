@@ -1,4 +1,4 @@
-import { AppErrorException, Option } from "@packages/ddd-kit";
+import { type AppError, AppErrorException, Option, Result } from "@packages/ddd-kit";
 import { EventTypes, publicNotificationPayload } from "@packages/events";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -12,12 +12,15 @@ import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.mi
 import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
 import { MAX_STREAMS_PER_USER } from "../../shared/services/notification-stream-hub";
 import { zV } from "../../shared/validator";
+import type { NotificationError } from "./application/ports/notification.port";
 import {
   listQuerySchema,
   markReadSchema,
   orgPreferenceSchema,
   preferenceSchema,
 } from "./notifications.schema";
+
+type MarkReadError = NotificationError | AppError<"NOTIFICATION_NOT_FOUND">;
 
 export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
   .get("/", requireAuth, zV("query", listQuerySchema), async (c) => {
@@ -56,29 +59,37 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
       const { ids } = c.req.valid("json");
       const userId = c.get("user").id;
 
-      await di.ITransactionService.run(async () => {
-        const result = await di.INotificationStore.markRead(userId, ids, new Date());
-        if (result.isFailure) throw new AppErrorException(result.getError());
-        const marked = result.getValue();
+      const done = await di.ITransactionService.run(
+        async (): Promise<Result<void, MarkReadError>> => {
+          const result = await di.INotificationStore.markRead(userId, ids, new Date());
+          if (result.isFailure) return Result.fail(result.getError());
+          const marked = result.getValue();
 
-        // An id the caller does not own, or that no longer exists, matches
-        // nothing. Answering `200 {ok:true}` claims an action that never
-        // happened, and the client decrements its badge by the ids it sent. A
-        // 403 would leak the row's existence, so the whole batch is NOT_FOUND
-        // and the transaction rolls back: all of it applied, or none of it.
-        if (marked.length !== new Set(ids).size) {
-          throw new HTTPException(404, { message: "NOTIFICATION_NOT_FOUND" });
-        }
+          // An id the caller does not own, or that no longer exists, matches
+          // nothing. Answering `200 {ok:true}` claims an action that never
+          // happened, and the client decrements its badge by the ids it sent. A
+          // 403 would leak the row's existence, so the whole batch is NOT_FOUND
+          // and the transaction rolls back: all of it applied, or none of it.
+          if (marked.length !== new Set(ids).size) {
+            return Result.fail({
+              code: "NOTIFICATION_NOT_FOUND",
+              message: "One or more notifications were not found.",
+            });
+          }
 
-        await emitEvent(
-          di.IOutboxRepository,
-          EventTypes.NOTIFICATION_READ,
-          "notification",
-          userId,
-          { userId, scope: "selection", count: marked.length, notificationIds: marked },
-          {},
-        );
-      });
+          await emitEvent(
+            di.IOutboxRepository,
+            EventTypes.NOTIFICATION_READ,
+            "notification",
+            userId,
+            { userId, scope: "selection", count: marked.length, notificationIds: marked },
+            {},
+          );
+
+          return Result.ok();
+        },
+      );
+      if (done.isFailure) throw new AppErrorException(done.getError());
 
       return c.json({ ok: true as const });
     },
@@ -86,22 +97,27 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
   .post("/read-all", requireAuth, requireCurrentPolicies, denyImpersonated, async (c) => {
     const userId = c.get("user").id;
 
-    await di.ITransactionService.run(async () => {
-      const result = await di.INotificationStore.markAllRead(userId, new Date());
-      if (result.isFailure) throw new AppErrorException(result.getError());
-      const marked = result.getValue();
-      // Nothing was unread: no state changed, so there is nothing to observe.
-      if (marked.length === 0) return;
+    const done = await di.ITransactionService.run(
+      async (): Promise<Result<void, NotificationError>> => {
+        const result = await di.INotificationStore.markAllRead(userId, new Date());
+        if (result.isFailure) return Result.fail(result.getError());
+        const marked = result.getValue();
+        // Nothing was unread: no state changed, so there is nothing to observe.
+        if (marked.length === 0) return Result.ok();
 
-      await emitEvent(
-        di.IOutboxRepository,
-        EventTypes.NOTIFICATION_READ,
-        "notification",
-        userId,
-        { userId, scope: "all", count: marked.length, notificationIds: [] },
-        {},
-      );
-    });
+        await emitEvent(
+          di.IOutboxRepository,
+          EventTypes.NOTIFICATION_READ,
+          "notification",
+          userId,
+          { userId, scope: "all", count: marked.length, notificationIds: [] },
+          {},
+        );
+
+        return Result.ok();
+      },
+    );
+    if (done.isFailure) throw new AppErrorException(done.getError());
 
     return c.json({ ok: true as const });
   })
@@ -121,33 +137,38 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
       const body = c.req.valid("json");
       const userId = c.get("user").id;
 
-      await di.ITransactionService.run(async () => {
-        const result = await di.INotificationStore.upsertPreference({
-          scope: "user",
-          scopeId: userId,
-          category: body.category,
-          channel: body.channel,
-          enabled: body.enabled,
-          frequency: body.frequency,
-          locked: false,
-        });
-        if (result.isFailure) throw new AppErrorException(result.getError());
-
-        await emitEvent(
-          di.IOutboxRepository,
-          EventTypes.NOTIFICATION_PREFERENCE_UPDATED,
-          "notification_preference",
-          userId,
-          {
-            userId,
+      const done = await di.ITransactionService.run(
+        async (): Promise<Result<void, NotificationError>> => {
+          const result = await di.INotificationStore.upsertPreference({
+            scope: "user",
+            scopeId: userId,
             category: body.category,
             channel: body.channel,
             enabled: body.enabled,
             frequency: body.frequency,
-          },
-          {},
-        );
-      });
+            locked: false,
+          });
+          if (result.isFailure) return Result.fail(result.getError());
+
+          await emitEvent(
+            di.IOutboxRepository,
+            EventTypes.NOTIFICATION_PREFERENCE_UPDATED,
+            "notification_preference",
+            userId,
+            {
+              userId,
+              category: body.category,
+              channel: body.channel,
+              enabled: body.enabled,
+              frequency: body.frequency,
+            },
+            {},
+          );
+
+          return Result.ok();
+        },
+      );
+      if (done.isFailure) throw new AppErrorException(done.getError());
 
       return c.json({ ok: true as const });
     },
@@ -177,35 +198,40 @@ export const notificationsRoutes = new Hono<{ Variables: AuthVariables }>()
       const userId = c.get("user").id;
       const orgId = c.get("orgId");
 
-      await di.ITransactionService.run(async () => {
-        const result = await di.INotificationStore.upsertPreference({
-          scope: "org",
-          scopeId: orgId,
-          category: body.category,
-          channel: body.channel,
-          enabled: body.enabled,
-          frequency: body.frequency,
-          locked: body.locked,
-        });
-        if (result.isFailure) throw new AppErrorException(result.getError());
-
-        await emitEvent(
-          di.IOutboxRepository,
-          EventTypes.NOTIFICATION_ORG_PREFERENCE_UPDATED,
-          "notification_preference",
-          orgId,
-          {
-            organizationId: orgId,
-            actorUserId: userId,
+      const done = await di.ITransactionService.run(
+        async (): Promise<Result<void, NotificationError>> => {
+          const result = await di.INotificationStore.upsertPreference({
+            scope: "org",
+            scopeId: orgId,
             category: body.category,
             channel: body.channel,
             enabled: body.enabled,
             frequency: body.frequency,
             locked: body.locked,
-          },
-          { organizationId: orgId },
-        );
-      });
+          });
+          if (result.isFailure) return Result.fail(result.getError());
+
+          await emitEvent(
+            di.IOutboxRepository,
+            EventTypes.NOTIFICATION_ORG_PREFERENCE_UPDATED,
+            "notification_preference",
+            orgId,
+            {
+              organizationId: orgId,
+              actorUserId: userId,
+              category: body.category,
+              channel: body.channel,
+              enabled: body.enabled,
+              frequency: body.frequency,
+              locked: body.locked,
+            },
+            { organizationId: orgId },
+          );
+
+          return Result.ok();
+        },
+      );
+      if (done.isFailure) throw new AppErrorException(done.getError());
 
       return c.json({ ok: true as const });
     },

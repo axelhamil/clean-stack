@@ -187,8 +187,9 @@ the grace period exists to avoid.
 **The boot-time ordering check only covers the API process.** `INTERNAL_FETCH_TIMEOUT_MS`
 is validated in `apps/api/src/shared/env.ts` but read nowhere in the API, its only
 consumer is the cron runner `apps/api/src/cron/internal-job.ts`, a standalone script that runs as its own
-process (a Coolify scheduled task, a K8s CronJob) with its own environment and parses `process.env`
-directly, unchecked against the other two bounds. Raising `SERVER_IDLE_TIMEOUT_SECONDS`
+process (a Coolify scheduled task, a K8s CronJob) with its own environment, validated at start by its own
+schema (`apps/api/src/cron/env.ts`, which refuses a missing `API_URL`, a short `INTERNAL_SIGNING_KEY`
+or a timeout under 1 000 ms) but unchecked against the other two bounds. Raising `SERVER_IDLE_TIMEOUT_SECONDS`
 on the API without also raising `INTERNAL_FETCH_TIMEOUT_MS` where the cron runs leaves
 the cron aborting a legitimate long sweep and reporting it `UNREACHABLE`: always raise
 both together.
@@ -278,7 +279,7 @@ caller imports; same canonical-message function the API uses to verify.
 | `bun apps/api/src/cron/sweep.ts` | the retention sweeps, in order | daily |
 | `bun apps/api/src/cron/flush-notification-emails.ts` | `/internal/flush-notification-emails` | every minute |
 
-All three go through `cron/internal-job.ts`: it signs each call, logs one line per route, treats a `skipped` answer (another run in progress) as success and exits non-zero on an unreachable API, a non-2xx, an unparseable body or a batch error (`rgpd-sweep` with a non-empty `failed`). Any scheduler that can run a command in the api image needs nothing else; one that cannot (a separate GH Actions repo, Inngest) calls `signedInternalFetch` itself.
+All three go through `cron/internal-job.ts`: it signs each call, logs one structured line per route, treats a `skipped` answer (another run in progress) as success and exits non-zero on an unreachable API, a non-2xx, an unparseable body or a batch error (`rgpd-sweep` with a non-empty `failed`). Any scheduler that can run a command in the api image needs nothing else; one that cannot (a separate GH Actions repo, Inngest) calls `signedInternalFetch` itself.
 
 For ad-hoc curl in dev, mint a signature with a tiny script, don't try to
 build the canonical message by hand from the shell, it's how you ship a

@@ -1,14 +1,14 @@
-import {
-  DEFAULT_INTERNAL_FETCH_TIMEOUT_MS,
-  signedInternalFetch,
-} from "../shared/internal-routes/internal-fetch";
+import { signedInternalFetch } from "../shared/internal-routes/internal-fetch";
 import {
   classifySweepResult,
   type SweepResponseShape,
 } from "../shared/internal-routes/sweep-result";
+import type { CronEnv } from "./env";
 import { HttpHeartbeat } from "./http-heartbeat";
+import { cronLogger } from "./logger";
 
 interface InternalJob {
+  env: CronEnv;
   label: string;
   paths: readonly string[];
   heartbeatUrl?: string;
@@ -18,30 +18,15 @@ function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-function timeoutFrom(raw: string | undefined, log: (message: string) => void): number {
-  const parsed = raw ? Number(raw) : Number.NaN;
-  const valid = Number.isFinite(parsed) && parsed >= 1000;
-
-  if (raw !== undefined && !valid) {
-    log(
-      `INTERNAL_FETCH_TIMEOUT_MS=${raw} is invalid (must be a number >= 1000), falling back to ${DEFAULT_INTERNAL_FETCH_TIMEOUT_MS}ms`,
-    );
-  }
-
-  return valid ? parsed : DEFAULT_INTERNAL_FETCH_TIMEOUT_MS;
-}
-
-export async function runInternalJob({ label, paths, heartbeatUrl }: InternalJob): Promise<never> {
-  const baseUrl = process.env.API_URL;
-  const signingKey = process.env.INTERNAL_SIGNING_KEY;
-
-  if (!baseUrl) throw new Error("API_URL is required");
-  if (!signingKey || signingKey.length < 32) {
-    throw new Error("INTERNAL_SIGNING_KEY is required (min 32 chars)");
-  }
-
-  const warn = (message: string) => console.warn(`[${label}] ${message}`);
-  const timeoutMs = timeoutFrom(process.env.INTERNAL_FETCH_TIMEOUT_MS, warn);
+export async function runInternalJob({
+  env,
+  label,
+  paths,
+  heartbeatUrl,
+}: InternalJob): Promise<never> {
+  const log = cronLogger.child({ job: label });
+  const warn = (message: string) => log.warn(message);
+  const timeoutMs = env.INTERNAL_FETCH_TIMEOUT_MS;
   const heartbeat = new HttpHeartbeat(heartbeatUrl, warn);
 
   let anyFailure = false;
@@ -53,16 +38,17 @@ export async function runInternalJob({ label, paths, heartbeatUrl }: InternalJob
     let res: Response;
     try {
       res = await signedInternalFetch({
-        baseUrl,
+        baseUrl: env.API_URL,
         method: "POST",
         path,
         body: { dryRun: false },
-        signingKey,
+        signingKey: env.INTERNAL_SIGNING_KEY,
         timeoutMs,
       });
     } catch (err) {
-      console.error(
-        `[${label}] UNREACHABLE ${path} after ${Date.now() - started}ms (budget ${timeoutMs}ms): ${messageOf(err)}`,
+      log.error(
+        { path, elapsedMs: Date.now() - started, budgetMs: timeoutMs, reason: messageOf(err) },
+        "UNREACHABLE",
       );
       await heartbeat.finish(1);
       process.exit(1);
@@ -72,27 +58,34 @@ export async function runInternalJob({ label, paths, heartbeatUrl }: InternalJob
     try {
       body = await res.text();
     } catch (err) {
-      console.error(
-        `[${label}] TRUNCATED BODY ${path} after ${Date.now() - started}ms: ${messageOf(err)}`,
+      log.error(
+        { path, elapsedMs: Date.now() - started, reason: messageOf(err) },
+        "TRUNCATED BODY",
       );
       anyFailure = true;
       continue;
     }
 
     if (!res.ok) {
-      console.error(
-        `[${label}] FAIL ${path} → ${res.status} in ${Date.now() - started}ms: ${body.slice(0, 500)}`,
+      log.error(
+        {
+          path,
+          status: res.status,
+          elapsedMs: Date.now() - started,
+          body: body.slice(0, 500),
+        },
+        "FAIL",
       );
       anyFailure = true;
       continue;
     }
 
-    const elapsed = Date.now() - started;
+    const elapsedMs = Date.now() - started;
     let parsed: SweepResponseShape;
     try {
       parsed = JSON.parse(body);
     } catch {
-      console.error(`[${label}] UNPARSEABLE ${path} in ${elapsed}ms: ${body.slice(0, 500)}`);
+      log.error({ path, elapsedMs, body: body.slice(0, 500) }, "UNPARSEABLE");
       anyFailure = true;
       continue;
     }
@@ -101,20 +94,17 @@ export async function runInternalJob({ label, paths, heartbeatUrl }: InternalJob
 
     switch (classification.kind) {
       case "skipped":
-        warn(`SKIPPED ${path} in ${elapsed}ms, another run is in progress`);
+        log.warn({ path, elapsedMs }, "SKIPPED, another run is in progress");
         break;
-      case "batch-error": {
-        const where =
-          classification.passes.length > 0 ? ` on ${classification.passes.join(", ")}` : "";
-        console.error(`[${label}] BATCH ERROR ${path} in ${elapsed}ms${where}: ${body}`);
+      case "batch-error":
+        log.error({ path, elapsedMs, passes: classification.passes, body }, "BATCH ERROR");
         anyFailure = true;
         break;
-      }
       case "truncated":
-        warn(`TRUNCATED ${path} in ${elapsed}ms: ${body}`);
+        log.warn({ path, elapsedMs, body }, "TRUNCATED");
         break;
       case "ok":
-        console.log(`[${label}] OK ${path} in ${elapsed}ms: ${body}`);
+        log.info({ path, elapsedMs, body }, "OK");
         break;
     }
   }

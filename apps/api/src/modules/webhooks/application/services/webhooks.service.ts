@@ -4,6 +4,7 @@ import { EventTypes } from "@packages/events";
 import { deriveOrgSubKey, encryptSecret, masterKeyFromHex } from "../../../../shared/aead";
 import { env } from "../../../../shared/env";
 import { emitEvent } from "../../../../shared/event-emitter";
+import { logger } from "../../../../shared/logger";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import { assertPublicUrl } from "../../../../shared/ssrf-guard";
@@ -101,7 +102,16 @@ export class WebhooksService {
           id: endpoint.id,
           organizationId: args.organizationId,
           actorUserId: args.actorUserId,
-        }).catch((err) => this.instrumentation.capture(err));
+        }).then(
+          (tested) => {
+            if (tested.isFailure)
+              logger.warn(
+                { endpointId: endpoint.id, code: tested.getError().code },
+                "webhook endpoint created but its test delivery failed",
+              );
+          },
+          (err) => this.instrumentation.capture(err),
+        );
 
         return Result.ok({ endpoint, plaintextSecret });
       },
@@ -189,7 +199,10 @@ export class WebhooksService {
     );
   }
 
-  async findEndpoint(id: string, organizationId: string): Promise<Option<WebhookEndpointRecord>> {
+  async findEndpoint(
+    id: string,
+    organizationId: string,
+  ): Promise<Result<Option<WebhookEndpointRecord>, WebhookServiceError>> {
     return this.instrumentation.startSpan(
       { name: "WebhooksService > findEndpoint", op: "function" },
       () => this.endpoints.findById(id, organizationId),
@@ -211,11 +224,17 @@ export class WebhooksService {
 
   async findDelivery(
     id: string,
+    endpointId: string,
     organizationId: string,
-  ): Promise<Option<WebhookDeliveryRecord & { attemptHistory: WebhookDeliveryAttemptRecord[] }>> {
+  ): Promise<
+    Result<
+      Option<WebhookDeliveryRecord & { attemptHistory: WebhookDeliveryAttemptRecord[] }>,
+      WebhookServiceError
+    >
+  > {
     return this.instrumentation.startSpan(
       { name: "WebhooksService > findDelivery", op: "function" },
-      () => this.deliveries.findByIdWithAttempts(id, organizationId),
+      () => this.deliveries.findByIdWithAttempts(id, endpointId, organizationId),
     );
   }
 
@@ -265,8 +284,9 @@ export class WebhooksService {
     return this.instrumentation.startSpan(
       { name: "WebhooksService > sendTest", op: "function" },
       async () => {
-        const endpoint = await this.endpoints.findById(args.id, args.organizationId);
-        if (endpoint.isNone()) return Result.ok(Option.none());
+        const found = await this.endpoints.findById(args.id, args.organizationId);
+        if (found.isFailure) return Result.fail(found.getError());
+        if (found.getValue().isNone()) return Result.ok(Option.none());
         return this.uow.run(async () => {
           const outboxEventId = await emitEvent(
             this.outbox,
@@ -318,7 +338,9 @@ export class WebhooksService {
             message: "WEBHOOK_MASTER_KEY env var is not configured (64 hex chars)",
           });
         }
-        const endpoint = await this.endpoints.findById(args.id, args.organizationId);
+        const found = await this.endpoints.findById(args.id, args.organizationId);
+        if (found.isFailure) return Result.fail(found.getError());
+        const endpoint = found.getValue();
         if (endpoint.isNone()) return Result.ok(Option.none());
 
         const subKey = deriveOrgSubKey(masterKeyOpt.unwrap(), args.organizationId);

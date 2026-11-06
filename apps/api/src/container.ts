@@ -27,6 +27,7 @@ import type { IEmailService } from "./shared/ports/email.port";
 import type { IEmailQueue } from "./shared/ports/email-queue.port";
 import type { IInstrumentation } from "./shared/ports/instrumentation.port";
 import type { IIpGeoService } from "./shared/ports/ip-geo.port";
+import type { INotificationDigestStore } from "./shared/ports/notification-digest.port";
 import type { IOutboxRepository } from "./shared/ports/outbox.port";
 import type { IPasswordBreachService } from "./shared/ports/password-breach.port";
 import type { IRateLimiter, IRateLimitUsage } from "./shared/ports/rate-limiter.port";
@@ -38,6 +39,7 @@ import { backupCodeUsedNotifier } from "./shared/services/backup-code-used-notif
 import { DisposableEmailService } from "./shared/services/disposable-email.service";
 import { DrizzleAuditRepository } from "./shared/services/drizzle-audit.service";
 import { DrizzleEmailQueue } from "./shared/services/drizzle-email-queue.service";
+import { DrizzleNotificationDigestStore } from "./shared/services/drizzle-notification-digest.store";
 import { DrizzleOutboxRepository } from "./shared/services/drizzle-outbox.service";
 import { DrizzleSessionGeoStore } from "./shared/services/drizzle-session-geo.store";
 import { DrizzleSweepRunStore } from "./shared/services/drizzle-sweep-run.store";
@@ -69,6 +71,7 @@ declare module "inwire" {
   interface AppDeps {
     ITransactionService: IUnitOfWork & OutermostUnitOfWork;
     IEmailQueue: IEmailQueue;
+    INotificationDigestStore: INotificationDigestStore;
     IEmailService: IEmailService;
     ITotpVerifier: ITotpVerifier;
     IOutboxRepository: IOutboxRepository;
@@ -112,6 +115,10 @@ export const di = container()
       }),
   )
   .add("IEmailQueue", (c): IEmailQueue => new DrizzleEmailQueue(c.IInstrumentation))
+  .add(
+    "INotificationDigestStore",
+    (c): INotificationDigestStore => new DrizzleNotificationDigestStore(c.IInstrumentation),
+  )
   .add(
     "IEmailService",
     (c): IEmailService => new QueuedEmailService(c.IEmailQueue, c.IInstrumentation),

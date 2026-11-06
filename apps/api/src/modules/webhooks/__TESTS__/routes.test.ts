@@ -46,8 +46,12 @@ const crossDelivery = {
   attemptHistory: [],
 };
 
-const mockFindEndpoint = mock(async () => Option.some(stubEndpointA));
-const mockFindDelivery = mock(async () => Option.some(crossDelivery));
+const mockFindEndpoint = mock(async () =>
+  Result.ok<Option<WebhookEndpointRecord>, WebhookRepoError>(Option.some(stubEndpointA)),
+);
+const mockFindDelivery = mock(async (_deliveryId: string, endpointId: string, _orgId: string) =>
+  Result.ok(endpointId === crossDelivery.endpointId ? Option.some(crossDelivery) : Option.none()),
+);
 const mockReplayDelivery = mock(async (..._args: unknown[]) =>
   Result.ok<Option<WebhookDeliveryRecord>, WebhookRepoError>(Option.none()),
 );
@@ -130,6 +134,7 @@ describe("GET /webhooks/:id/deliveries/:deliveryId: endpoint-scope guard", () =>
     expect(res.status).toBe(404);
     const body = (await res.json()) as { error: { message: string } };
     expect(body.error.message).toBe("Webhook delivery not found");
+    expect(mockFindDelivery).toHaveBeenCalledWith(DELIVERY_OF_B, ENDPOINT_A, ORG_ID);
   });
 });
 

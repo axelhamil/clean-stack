@@ -4,6 +4,9 @@ import { env } from "../../shared/env";
 import type { AggregatedReport, HealthStatus } from "../../shared/ports/health.port";
 import { lifecycleState } from "../../shared/shutdown";
 
+const PASS: HealthStatus = "pass";
+const FAIL: HealthStatus = "fail";
+
 const startedAt = Date.now();
 const uptimeMs = () => Date.now() - startedAt;
 
@@ -32,17 +35,17 @@ const stripSensitive = (report: AggregatedReport): AggregatedReport => {
 };
 
 export const healthRoutes = new Hono()
-  .get("/livez", (c) => c.json({ status: "pass" as HealthStatus, uptimeMs: uptimeMs() }, 200))
+  .get("/livez", (c) => c.json({ status: PASS, uptimeMs: uptimeMs() }, 200))
   .get("/readyz", async (c) => {
     if (lifecycleState.isShuttingDown()) {
-      return c.json({ status: "fail" as HealthStatus, output: "shutting down" }, 503);
+      return c.json({ status: FAIL, output: "shutting down" }, 503);
     }
     const report = await di.IHealthCheckRegistry.runAll();
     return c.json(stripSensitive(report), httpStatusFor(report.status));
   })
   .get("/startupz", (c) => {
     if (!lifecycleState.isStarted()) {
-      return c.json({ status: "fail" as HealthStatus, output: "starting" }, 503);
+      return c.json({ status: FAIL, output: "starting" }, 503);
     }
-    return c.json({ status: "pass" as HealthStatus, uptimeMs: uptimeMs() }, 200);
+    return c.json({ status: PASS, uptimeMs: uptimeMs() }, 200);
   });
