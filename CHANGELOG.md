@@ -5,6 +5,22 @@
 * **infra:** back up postgres with pgbackrest and harden the vps host ([8f29788](https://github.com/axelhamil/clean-stack/commit/8f297885b0bf24ba9dd7a0e72f84935b2634ad9f))
 * **infra:** deploy to a vps through coolify instead of railway ([fac42c4](https://github.com/axelhamil/clean-stack/commit/fac42c4accfef9055880b1e0606fa200a4931dad))
 
+## [2.2.3](https://github.com/axelhamil/clean-stack/compare/v2.2.2...v2.2.3) (2026-11-06)
+
+
+### Bug Fixes
+
+* give each package its own vitest module cache ([#155](https://github.com/axelhamil/clean-stack/issues/155)) ([550f697](https://github.com/axelhamil/clean-stack/commit/550f69794426aabde68c2946000e5506aa42a96d))
+
+
+### Refactor
+
+* **api:** compose api-token, notifications, uploads and billing ([#152](https://github.com/axelhamil/clean-stack/issues/152)) ([f208bec](https://github.com/axelhamil/clean-stack/commit/f208bec8f2e46e531606eb02167d7de931b887b4))
+* **api:** compose quotas, policies, consents, profile and audit-log ([#151](https://github.com/axelhamil/clean-stack/issues/151)) ([efd37be](https://github.com/axelhamil/clean-stack/commit/efd37be1b006c65907529f1fbcab73c2d7653d31))
+* **api:** compose webhooks, rgpd and admin ([#156](https://github.com/axelhamil/clean-stack/issues/156)) ([ab0025d](https://github.com/axelhamil/clean-stack/commit/ab0025d44c8c19d7a3e4357f58068c668b80f124)), closes [#150](https://github.com/axelhamil/clean-stack/issues/150)
+* **ddd-kit:** align the kit with typed ids, own clone collections and payload parsing ([#139](https://github.com/axelhamil/clean-stack/issues/139)) ([c3317e7](https://github.com/axelhamil/clean-stack/commit/c3317e744fb29a4b8c0df3449068f33daa248ed8))
+* extract the http, outbox and email kit packages from the api ([#145](https://github.com/axelhamil/clean-stack/issues/145)) ([c0e6d69](https://github.com/axelhamil/clean-stack/commit/c0e6d6962d4a424b477f96433ebd70a019dfd60b))
+
 ## [2.2.2](https://github.com/axelhamil/clean-stack/compare/v2.2.1...v2.2.2) (2026-11-06)
 
 
