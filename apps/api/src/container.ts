@@ -17,6 +17,8 @@ import {
 import { OutboxRelay } from "@packages/outbox/outbox-relay";
 import { container } from "inwire";
 import { Resend } from "resend";
+import { apiSettings } from "./composition/settings";
+import { auditLogSources } from "./composition/sources/audit-log";
 import { adminModule } from "./modules/admin/module";
 import { apiTokenModule } from "./modules/api-token/module";
 import { auditLogModule } from "./modules/audit-log/module";
@@ -264,6 +266,8 @@ export const di = container()
         },
       ),
   )
+  .addModule(apiSettings(env))
+  .addModule(auditLogSources)
   .addModule(adminModule)
   .addModule(apiTokenModule)
   .addModule(healthModule)

@@ -2,6 +2,7 @@ import { type EventHandler, Option, Result } from "@packages/ddd-kit";
 import { defineModule } from "inwire";
 import { env } from "../../shared/env";
 import { logger } from "../../shared/logger";
+import type { IProfileStore } from "../../shared/ports/profile.port";
 import type { IStaffStore } from "../../shared/ports/staff-store.port";
 import { StaffAccessService } from "../../shared/services/staff-access.service";
 import type { ApprovalHandlers } from "./application/approved-action";
@@ -59,6 +60,7 @@ declare module "inwire" {
     InboxService: InboxService;
     CloseApprovalsOfDeletedUser: EventHandler;
     NotifyImpersonatedUser: EventHandler;
+    IProfileStore: IProfileStore;
   }
 }
 

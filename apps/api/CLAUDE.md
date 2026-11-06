@@ -26,6 +26,10 @@ apps/api/src/
     require-scope.ts            `requireScope(scope)` guard used inside `/api/v1/*` route files
   cron/                         Standalone cron entrypoints (`sweep.ts`, `rgpd-sweep.ts`, `flush-notification-emails.ts`) over one runner (`internal-job.ts`), each its own process, see `docs/CRON.md`
   container.ts                  Composition root: `.add()` cross-cutting + `.addModule()` per context + `.build()`
+  composition/                  Host side of the module contract, see "DI" below
+    settings.ts                 `apiSettings(env)`: env mapped once onto each module's typed settings
+    sources/<consumer>.ts       Binds a port a module declares to what the host or another module provides
+    route-guards.ts             `routeGuards`: the `RouteGuards` of `@packages/http` built from `shared/middleware`
   auth.ts                       BetterAuth singleton, deliberate exception to the modules rule (config-as-code, the lib owns the model). Routes auto-mount via the plugin (`/api/auth/*`).
   auth-queries.ts               Typed Drizzle data access for the bridge, plain functions (no port, DI or aggregate: auth is not domain), reading `resolveExecutor()`. Keeps `auth.ts` config + event wiring only, never inline `db.*`.
   app.ts                        `Hono` construction, chained `.route()` mounts, middleware, `export const routes` / `export type AppType`. No server boot.
@@ -53,10 +57,10 @@ modules/<context>/
     repositories/               Drizzle impls of module-private ports: `*.store.ts` (`I<Noun>Store`) for persistence without an aggregate (projections, settings, read models), `*.repository.ts` only where the port models an owned record with a lifecycle
     mappers/                    Domain ↔ DB
     services/                   Port impls when the port is module-owned
-  routes.ts                     Hono sub-app (chained `.route()`), public surface. Extra surfaces sit next to it as `<name>.routes.ts`
+  routes.ts                     `create<Name>Routes(deps)`: guards and services from `deps`, never `di` nor a middleware import. Extra surfaces sit next to it as `<name>.routes.ts`
   <context>.schema.ts           Drizzle table(s) the module owns, when not in `@packages/drizzle`
   internal.routes.ts            Hono sub-app gated by `internalLayers`, cron/job (header comment states the gate)
-  module.ts                     inwire `defineModule()`, augments `inwire.AppDeps`, registers via `.add()`. NEVER re-exports routes (cycle).
+  module.ts                     inwire `defineModule<<Name>Prerequisites>()`, registers via `.add()`. NEVER re-exports routes (cycle).
   __TESTS__/                    All tests at module root, never colocated. Mirrors source filenames.
 ```
 
@@ -101,24 +105,23 @@ The decisor is *who consumes the port*, not where the impl lives.
 
 ## DI (inwire)
 
-Each module declares what it ADDS via `declare module 'inwire'` augmentation; `container.ts` chains `.addModule(...)`. `c.X` resolves regardless of registration order; a missing binding fails `tsc`.
+A module states what it needs in `<Name>Prerequisites` and what it adds through `.add()`; `container.ts` chains `.addModule(...)`, and inwire refuses at compile time a module whose prerequisites are not on the builder yet or whose keys are already there.
 
 ```ts
 // modules/<x>/module.ts
-declare module "inwire" {
-  interface AppDeps { IFooPort: IFooPort; FooService: FooService; }
-}
-export const xModule = defineModule()((b) =>
-  b.add("IFooPort", (): IFooPort => new ConcreteFooAdapter())
-   .add("FooService", (c) => new FooService(c.IFooPort)),
+export interface FooPrerequisites { IInstrumentation: IInstrumentation; IBarLookup: IBarLookup; fooSettings: FooSettings; }
+export const fooModule = defineModule<FooPrerequisites>()((b) =>
+  b.add("IFooStore", (c): IFooStore => new DrizzleFooStore(c.IInstrumentation))
+   .add("FooService", (c) => new FooService(c.IFooStore, c.IBarLookup, c.fooSettings)),
 );
 ```
 
-1. **`declare module 'inwire'` per file that registers**, co-located with `.add()`. `container.ts` declares the cross-cutting bindings it adds directly.
-2. **Never `defineModule<TDeps>()`** with an explicit generic, it is a fallback for forward references only.
-3. **Use `typeof di`** for the runtime shape after `.build()`, not the global `AppDeps` interface.
-4. **All deps via DI** (`di.<Binding>`); never `new` a collaborator outside the container (it bypasses the container and breaks per-test impl swaps). No service locators.
-5. **Transactions are opened by `uow.run` in use cases and route handlers; repositories read the ambient executor.** A route opens `di.ITransactionService.run(...)` only when it composes several store writes itself (`profile`, `notifications` routes). No port, store or service declares a transaction parameter, and only `packages/drizzle` and scripts open a transaction directly; `src/__TESTS__/layering.test.ts` enforces both, each allowance carrying its reason. **Why**: a handle threaded by hand is forgotten at one call site, and that write silently commits outside the unit it belongs to.
+1. **`defineModule<<Name>Prerequisites>()` with its explicit generic, never the global `AppDeps` augmentation.** **Why**: a module typed against `AppDeps` sees every key of every other module, so its real dependencies are invisible and it cannot be type-checked outside the app that augments it, which a module living in its own package must be. Modules still on `AppDeps` are migrating; while one of them reads a key a migrated module provides, it declares that key in its own augmentation, never the provider.
+2. **Every host binding a module receives lives in `composition/`**: env mapped to typed settings in `settings.ts`, a consumer's port bound in `sources/<consumer>.ts` (`.add("IBarLookup", (c) => c.BarDirectory)`), and `app.ts` hands each route factory `di.scope({ routeGuards })`. The module side of that contract is `modules/CLAUDE.md`. **Why**: the wiring of every context reads in one folder, so removing a module or a provider fails `tsc` at exactly the lines that named it.
+3. **`scope`, never `extend`, to hand the container more keys.** `extend` copies the resolved cache, so a binding resolved after it exists twice (a stateful hub would split); `scope` delegates to the parent. `routeGuards` is not in `container.ts` because the middlewares it wraps import `di` (cycle).
+4. **Use `typeof di`** for the runtime shape after `.build()`, not the global `AppDeps` interface.
+5. **All deps via DI**; never `new` a collaborator outside the container (it bypasses the container and breaks per-test impl swaps). No service locators: a route reads `deps`, a test passes a plain `deps` object (`openRouteGuards()` from `@packages/http/testing/route-guards`).
+6. **Transactions are opened by `uow.run` in use cases and route handlers; repositories read the ambient executor.** A route opens `ITransactionService.run(...)` from its `deps` only when it composes several store writes itself (`profile`, `notifications` routes). No port, store or service declares a transaction parameter, and only `packages/drizzle` and scripts open a transaction directly; `src/__TESTS__/layering.test.ts` enforces both, each allowance carrying its reason. **Why**: a handle threaded by hand is forgotten at one call site, and that write silently commits outside the unit it belongs to.
 
 ## Domain events (zero-plumbing rail)
 

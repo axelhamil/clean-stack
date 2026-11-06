@@ -6,7 +6,8 @@
   "exports": {
     "./validator": "./src/validator.ts",
     "./time-id-cursor": "./src/time-id-cursor.ts",
-    "./route-guards": "./src/route-guards.ts"
+    "./route-guards": "./src/route-guards.ts",
+    "./testing/route-guards": "./src/testing/route-guards.ts"
   },
   "scripts": {
     "format": "biome format . --write",
