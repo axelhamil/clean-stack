@@ -1,5 +1,5 @@
 export function isImpersonating(session: { session?: unknown } | null | undefined): boolean {
-  return Boolean(
-    (session?.session as { impersonatedBy?: string | null } | undefined)?.impersonatedBy,
-  );
+  const inner = session?.session;
+  if (typeof inner !== "object" || inner === null || !("impersonatedBy" in inner)) return false;
+  return Boolean(inner.impersonatedBy);
 }

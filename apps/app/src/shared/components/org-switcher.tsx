@@ -12,7 +12,7 @@ import { InitialsAvatar } from "@packages/ui/components/ui/initials-avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@packages/ui/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@packages/ui/components/ui/tooltip";
 import { useTruncationTooltip } from "@packages/ui/components/ui/truncated-text";
-import { TypographySmall } from "@packages/ui/components/ui/typography";
+import { TypographyInline, TypographySmall } from "@packages/ui/components/ui/typography";
 import { toastError } from "@packages/web-kit/api/errors/toast";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -56,7 +56,9 @@ export function OrgSwitcher() {
               <TypographySmall ref={name.ref} className="min-w-0 max-w-32 truncate">
                 {activeOrgLabel}
               </TypographySmall>
-              <ChevronsUpDown className="size-3.5 text-muted-foreground" />
+              <TypographyInline tone="muted" className="flex">
+                <ChevronsUpDown className="size-3.5" />
+              </TypographyInline>
             </Button>
           </PopoverTrigger>
         </TooltipTrigger>
@@ -77,7 +79,11 @@ export function OrgSwitcher() {
                 >
                   <InitialsAvatar size="xs" initials={initialsOf(org.name)} />
                   <span className="min-w-0 flex-1 break-words">{org.name}</span>
-                  {org.id === activeOrg?.id && <Check className="size-4 text-muted-foreground" />}
+                  {org.id === activeOrg?.id && (
+                    <TypographyInline tone="muted" className="flex">
+                      <Check className="size-4" />
+                    </TypographyInline>
+                  )}
                 </CommandItem>
               ))}
             </CommandGroup>

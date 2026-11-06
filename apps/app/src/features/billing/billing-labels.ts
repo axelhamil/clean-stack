@@ -33,7 +33,7 @@ const SUBSCRIPTION_STATUSES = [
 export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number];
 
 export function isSubscriptionStatus(value: string): value is SubscriptionStatus {
-  return (SUBSCRIPTION_STATUSES as readonly string[]).includes(value);
+  return SUBSCRIPTION_STATUSES.some((candidate) => candidate === value);
 }
 
 export const STATUS_KEYS = {

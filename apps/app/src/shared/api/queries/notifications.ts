@@ -26,7 +26,7 @@ export const notificationsListQueryKey = ["notifications", "list"] as const;
 export const notificationsInfiniteQueryOptions = () =>
   infiniteQueryOptions({
     queryKey: notificationsListQueryKey,
-    queryFn: async ({ pageParam, signal }) => {
+    queryFn: async ({ pageParam, signal }): Promise<NotificationsResponse> => {
       const res = await $list(
         { query: pageParam ? { cursor: pageParam } : {} },
         { init: { signal } },
@@ -34,31 +34,32 @@ export const notificationsInfiniteQueryOptions = () =>
       if (!res.ok) {
         await throwApiError(res, "loadNotifications");
       }
-      return (await res.json()) as NotificationsResponse;
+      return res.json();
     },
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    initialPageParam: undefined,
+    getNextPageParam: (lastPage: NotificationsResponse): string | undefined =>
+      lastPage.nextCursor ?? undefined,
   });
 
 export const unreadCountQueryOptions = queryOptions({
   queryKey: ["notifications", "unread-count"] as const,
-  queryFn: async ({ signal }) => {
+  queryFn: async ({ signal }): Promise<UnreadCountResponse> => {
     const res = await $unreadCount({}, { init: { signal } });
     if (!res.ok) {
       await throwApiError(res, "loadUnreadCount");
     }
-    return (await res.json()) as UnreadCountResponse;
+    return res.json();
   },
 });
 
 export const notificationPreferencesQueryOptions = queryOptions({
   queryKey: ["notifications", "preferences"] as const,
-  queryFn: async ({ signal }) => {
+  queryFn: async ({ signal }): Promise<NotificationPreferencesResponse> => {
     const res = await $preferences({}, { init: { signal } });
     if (!res.ok) {
       await throwApiError(res, "loadNotificationPreferences");
     }
-    return (await res.json()) as NotificationPreferencesResponse;
+    return res.json();
   },
 });
 
@@ -67,11 +68,11 @@ export const notificationPreferencesQueryOptions = queryOptions({
 export const orgNotificationPreferencesQueryOptions = (organizationId: string | null) =>
   queryOptions({
     queryKey: ["notifications", "org-preferences", organizationId] as const,
-    queryFn: async ({ signal }) => {
+    queryFn: async ({ signal }): Promise<NotificationPreferencesResponse> => {
       const res = await $orgPreferences({}, { init: { signal } });
       if (!res.ok) {
         await throwApiError(res, "loadOrgNotificationPreferences");
       }
-      return (await res.json()) as NotificationPreferencesResponse;
+      return res.json();
     },
   });

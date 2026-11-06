@@ -1,14 +1,9 @@
-import type { ApiError } from "@packages/web-kit/api/errors/api-error";
+import { apiErrorFields } from "@packages/web-kit/api/errors/api-error";
 import { formatApiError } from "@packages/web-kit/api/errors/messages";
 import type { TFunction } from "i18next";
 import { toast } from "sonner";
 
 type FieldErrorReporter = (message: string) => void;
-
-function errorCode(err: unknown): string | undefined {
-  if (typeof err === "object" && err !== null) return (err as ApiError).code;
-  return undefined;
-}
 
 export function buildDeletionOnError(
   onClose: () => void,
@@ -18,7 +13,7 @@ export function buildDeletionOnError(
   t: TFunction<"settings">,
 ) {
   return (err: unknown) => {
-    const code = errorCode(err);
+    const { code } = apiErrorFields(err);
     if (code === fieldErrorCode) {
       reportFieldError(t("deletion.invalidCredential"));
       return;

@@ -92,10 +92,10 @@ const $disconnectScim = api.settings.organization["scim-connection"].$delete;
 
 export const issueScimTokenMutationOptions = mutationOptions({
   mutationKey: ["settings", "sso", "scim-connection", "token"] as const,
-  mutationFn: async () => {
+  mutationFn: async (): Promise<InferResponseType<typeof $issueScimToken, 200>> => {
     const res = await $issueScimToken();
     if (!res.ok) await throwApiError(res, "generateScimToken");
-    return (await res.json()) as InferResponseType<typeof $issueScimToken, 200>;
+    return res.json();
   },
 });
 
@@ -111,9 +111,11 @@ const $setSsoEnforcement = api.settings.organization["sso-enforcement"].$post;
 
 export const setSsoEnforcementMutationOptions = mutationOptions({
   mutationKey: ["settings", "sso", "enforcement"] as const,
-  mutationFn: async (enforced: boolean) => {
+  mutationFn: async (
+    enforced: boolean,
+  ): Promise<InferResponseType<typeof $setSsoEnforcement, 200>> => {
     const res = await $setSsoEnforcement({ json: { enforced } });
     if (!res.ok) await throwApiError(res, "updateSsoEnforcement");
-    return (await res.json()) as InferResponseType<typeof $setSsoEnforcement, 200>;
+    return res.json();
   },
 });

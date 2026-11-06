@@ -1,10 +1,7 @@
 import { descriptionFor, eventGroupOf, SUBSCRIBABLE_EVENT_TYPES } from "@packages/events";
 import { Checkbox } from "@packages/ui/components/ui/checkbox";
-import {
-  TypographyInline,
-  TypographyMuted,
-  TypographySmall,
-} from "@packages/ui/components/ui/typography";
+import { Label } from "@packages/ui/components/ui/label";
+import { TypographyInline, TypographyMuted } from "@packages/ui/components/ui/typography";
 import { useTranslation } from "react-i18next";
 
 export interface EventGroup {
@@ -50,15 +47,14 @@ export function EventTypePicker({ value, onChange }: EventTypePickerProps) {
 
   return (
     <div className="flex max-h-96 flex-col gap-4 overflow-y-auto">
-      {/* biome-ignore lint/a11y/noLabelWithoutControl: Checkbox renders native checkbox input internally */}
-      <label className="flex items-center gap-2">
+      <Label>
         <Checkbox
           className="shrink-0"
           checked={allSelected}
           onCheckedChange={(c) => toggle("*", c === true)}
         />
-        <TypographySmall>{t("webhooks.eventTypePicker.allEvents")}</TypographySmall>
-      </label>
+        {t("webhooks.eventTypePicker.allEvents")}
+      </Label>
       {allSelected && (
         <TypographyMuted>{t("webhooks.eventTypePicker.allEventsNote")}</TypographyMuted>
       )}
@@ -67,23 +63,19 @@ export function EventTypePicker({ value, onChange }: EventTypePickerProps) {
 
         return (
           <fieldset key={g.group} className="flex flex-col gap-2" disabled={allSelected}>
-            {/* biome-ignore lint/a11y/noLabelWithoutControl: Checkbox renders native checkbox input internally */}
-            <label className="flex items-center gap-2">
+            <Label>
               <Checkbox
                 checked={groupSelected}
                 onCheckedChange={(c) => toggle(g.wildcard, c === true)}
               />
-              <TypographySmall>
-                {t("webhooks.eventTypePicker.groupWildcard", { group: g.group })}
-              </TypographySmall>
-            </label>
+              {t("webhooks.eventTypePicker.groupWildcard", { group: g.group })}
+            </Label>
             {groupSelected && !allSelected && (
               <TypographyMuted>{t("webhooks.eventTypePicker.groupNote")}</TypographyMuted>
             )}
             <div className="ml-6 flex flex-col gap-1">
               {g.events.map((type) => (
-                // biome-ignore lint/a11y/noLabelWithoutControl: Checkbox renders native checkbox input internally
-                <label key={type} className="flex items-start gap-2">
+                <Label key={type} className="items-start">
                   <Checkbox
                     className="mt-0.5 shrink-0"
                     checked={groupSelected || allSelected || selected.has(type)}
@@ -98,7 +90,7 @@ export function EventTypePicker({ value, onChange }: EventTypePickerProps) {
                       {descriptionFor(type)}
                     </TypographyInline>
                   </span>
-                </label>
+                </Label>
               ))}
             </div>
           </fieldset>

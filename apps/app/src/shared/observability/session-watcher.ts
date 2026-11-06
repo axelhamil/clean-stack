@@ -1,7 +1,8 @@
 import type { QueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 import { setUser } from "./sentry";
 
-type SessionLike = { user?: { id?: string } } | null | undefined;
+const sessionUserSchema = z.object({ user: z.object({ id: z.string() }) });
 
 export function watchSession(queryClient: QueryClient): () => void {
   let lastUserId: string | null | undefined;
@@ -13,7 +14,8 @@ export function watchSession(queryClient: QueryClient): () => void {
     if (queryKey.length !== 1 || queryKey[0] !== "session") return;
     if (state.data === undefined) return;
 
-    const userId = (state.data as SessionLike)?.user?.id ?? null;
+    const parsed = sessionUserSchema.safeParse(state.data);
+    const userId = parsed.success ? parsed.data.user.id : null;
     if (userId === lastUserId) return;
     lastUserId = userId;
 

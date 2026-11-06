@@ -29,4 +29,15 @@ describe("applyZodErrorMap", () => {
   it("keeps the two locales' copy distinct so the assertions above are not a tautology", () => {
     expect(frCatalog.errors.validation.required).not.toBe(enCatalog.errors.validation.required);
   });
+
+  it("resolves a custom check's i18nKey and ignores a key the catalog lacks", () => {
+    applyZodErrorMap(catalogT(enCatalog.errors));
+    const known = z.string().refine(() => false, { params: { i18nKey: "validation.httpsUrl" } });
+    const unknown = z.string().refine(() => false, { params: { i18nKey: "validation.nope" } });
+
+    expect(known.safeParse("x").error?.issues[0]?.message).toBe(
+      enCatalog.errors.validation.httpsUrl,
+    );
+    expect(unknown.safeParse("x").error?.issues[0]?.message).not.toBe("validation.nope");
+  });
 });

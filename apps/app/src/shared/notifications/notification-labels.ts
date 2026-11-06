@@ -30,7 +30,7 @@ type CategoryKey = (typeof CATEGORY_KEYS)[NotificationCategory] | typeof UNKNOWN
 // PUT bodies). A guard, not a cast, is what proves the value belongs to the
 // union here.
 function isNotificationCategory(value: string): value is NotificationCategory {
-  return (NOTIFICATION_CATEGORIES as readonly string[]).includes(value);
+  return NOTIFICATION_CATEGORIES.some((candidate) => candidate === value);
 }
 
 /**

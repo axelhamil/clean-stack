@@ -22,10 +22,10 @@ export const webhookEndpointsQueryOptions = (organizationId: string | null) =>
   queryOptions({
     queryKey: ["settings", "webhooks", organizationId, "endpoints"] as const,
     enabled: organizationId !== null,
-    queryFn: async ({ signal }) => {
+    queryFn: async ({ signal }): Promise<WebhookEndpointsResponse> => {
       const res = await $listEndpoints({}, { init: { signal } });
       if (!res.ok) await throwApiError(res, "loadWebhookEndpoints");
-      return (await res.json()) as WebhookEndpointsResponse;
+      return res.json();
     },
   });
 
@@ -37,7 +37,7 @@ export const webhookDeliveriesInfiniteQueryOptions = (
   infiniteQueryOptions({
     queryKey: ["settings", "webhooks", organizationId, endpointId, "deliveries", filters] as const,
     enabled: organizationId !== null && endpointId !== "",
-    queryFn: async ({ pageParam, signal }) => {
+    queryFn: async ({ pageParam, signal }): Promise<DeliveriesPage> => {
       const res = await $listDeliveries(
         {
           param: { id: endpointId },
@@ -50,10 +50,10 @@ export const webhookDeliveriesInfiniteQueryOptions = (
         { init: { signal } },
       );
       if (!res.ok) await throwApiError(res, "loadWebhookDeliveries");
-      return (await res.json()) as DeliveriesPage;
+      return res.json();
     },
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    initialPageParam: undefined,
+    getNextPageParam: (last: DeliveriesPage): string | undefined => last.nextCursor ?? undefined,
   });
 
 export const webhookDeliveryDetailQueryOptions = (
@@ -71,12 +71,12 @@ export const webhookDeliveryDetailQueryOptions = (
       deliveryId,
     ] as const,
     enabled: organizationId !== null && deliveryId !== "",
-    queryFn: async ({ signal }) => {
+    queryFn: async ({ signal }): Promise<DeliveryDetail> => {
       const res = await $deliveryDetail(
         { param: { id: endpointId, deliveryId } },
         { init: { signal } },
       );
       if (!res.ok) await throwApiError(res, "loadWebhookDeliveryDetail");
-      return (await res.json()) as DeliveryDetail;
+      return res.json();
     },
   });

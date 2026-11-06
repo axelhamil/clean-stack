@@ -62,7 +62,7 @@ export type PlanInterval = "day" | "week" | "month" | "year";
 const PLAN_INTERVALS: readonly PlanInterval[] = ["day", "week", "month", "year"];
 
 export function isPlanInterval(value: string): value is PlanInterval {
-  return (PLAN_INTERVALS as readonly string[]).includes(value);
+  return PLAN_INTERVALS.some((candidate) => candidate === value);
 }
 
 export const INTERVAL_KEYS = {

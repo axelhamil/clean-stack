@@ -199,7 +199,7 @@ function WebhooksPage() {
       <VerifySnippet />
 
       <Dialog open={dialogOpen} onOpenChange={(open) => !open && closeDialog()}>
-        <DialogContent closeLabel={t("common:actions.close")} className="sm:max-w-2xl">
+        <DialogContent closeLabel={t("common:actions.close")} size="lg">
           <DialogHeader>
             <DialogTitle>
               {editing

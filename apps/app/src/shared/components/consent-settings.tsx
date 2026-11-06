@@ -1,4 +1,8 @@
-import { CONSENT_CATEGORIES, OPTIONAL_CATEGORIES } from "@packages/cookie-consent";
+import {
+  CONSENT_CATEGORIES,
+  type ConsentCategory,
+  OPTIONAL_CATEGORIES,
+} from "@packages/cookie-consent";
 import { Button } from "@packages/ui/components/ui/button";
 import { Hint } from "@packages/ui/components/ui/hint";
 import { Label } from "@packages/ui/components/ui/label";
@@ -7,7 +11,7 @@ import { TypographyH2, TypographyMuted } from "@packages/ui/components/ui/typogr
 import { toastError } from "@packages/web-kit/api/errors/toast";
 import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { recordConsentMutationOptions } from "../api/mutations/record-consent";
@@ -30,23 +34,16 @@ export function ConsentSettings({ onSaved, withTitle = true }: ConsentSettingsPr
   const { data } = useQuery(consentQueryOptions);
   const guard = useImpersonationGuard();
 
-  const [enabled, setEnabled] = useState<Record<OptionalKey, boolean>>({
-    functional: false,
-    analytics: false,
-    marketing: false,
-  });
+  const [draft, setDraft] = useState<Partial<Record<OptionalKey, boolean>>>({});
 
-  useEffect(() => {
-    const current = data?.categories;
-    setEnabled({
-      functional: current?.includes("functional") ?? false,
-      analytics: current?.includes("analytics") ?? false,
-      marketing: current?.includes("marketing") ?? false,
-    });
-  }, [data]);
+  const isEnabled = (cat: ConsentCategory): boolean => {
+    if (cat === "necessary") return true;
+    return draft[cat] ?? data?.categories?.includes(cat) ?? false;
+  };
 
   const settle = async (message: string) => {
     await queryClient.refetchQueries({ queryKey: consentQueryOptions.queryKey });
+    setDraft({});
     toast.success(message);
     onSaved?.();
   };
@@ -66,7 +63,7 @@ export function ConsentSettings({ onSaved, withTitle = true }: ConsentSettingsPr
   const isPending = record.isPending || withdraw.isPending;
 
   const handleSave = () => {
-    const categories = OPTIONAL_CATEGORIES.filter((cat) => enabled[cat]);
+    const categories = OPTIONAL_CATEGORIES.filter(isEnabled);
     record.mutate({ categories });
   };
 
@@ -82,7 +79,6 @@ export function ConsentSettings({ onSaved, withTitle = true }: ConsentSettingsPr
         {CONSENT_CATEGORIES.map((cat) => {
           const label = t(`cookieConsent.categories.${cat}.label` as const);
           const isNecessary = cat === "necessary";
-          const checked = isNecessary || enabled[cat as OptionalKey];
           return (
             <div key={cat} className="flex items-start justify-between gap-4">
               <div className="flex flex-col gap-1">
@@ -97,9 +93,9 @@ export function ConsentSettings({ onSaved, withTitle = true }: ConsentSettingsPr
               >
                 <Switch
                   id={`consent-${cat}`}
-                  checked={checked}
+                  checked={isEnabled(cat)}
                   onCheckedChange={(val) => {
-                    if (!isNecessary) setEnabled((prev) => ({ ...prev, [cat]: val }));
+                    if (cat !== "necessary") setDraft((prev) => ({ ...prev, [cat]: val }));
                   }}
                   disabled={isNecessary || isPending || guard.blocked}
                   {...guard.describeProps(isNecessary || isPending)}

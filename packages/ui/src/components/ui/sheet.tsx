@@ -44,12 +44,14 @@ function SheetContent({
   className,
   children,
   side = "right",
+  size = "default",
   showCloseButton = true,
   closeLabel,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> &
   CloseButtonLabel & {
     side?: "top" | "right" | "bottom" | "left";
+    size?: "default" | "lg";
   }) {
   return (
     <SheetPortal>
@@ -66,6 +68,7 @@ function SheetContent({
             "inset-x-0 top-0 h-auto max-h-[calc(100dvh-2rem)] overflow-y-auto border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
           side === "bottom" &&
             "inset-x-0 bottom-0 h-auto max-h-[calc(100dvh-2rem)] overflow-y-auto border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+          size === "lg" && "w-full sm:max-w-xl",
           className,
         )}
         {...props}
@@ -92,6 +95,16 @@ function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sheet-header"
       className={cn("flex flex-col gap-1.5 p-4", className)}
+      {...props}
+    />
+  );
+}
+
+function SheetBody({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="sheet-body"
+      className={cn("flex min-w-0 flex-col gap-4 px-4 pb-4", className)}
       {...props}
     />
   );
@@ -132,6 +145,7 @@ function SheetDescription({
 
 export {
   Sheet,
+  SheetBody,
   SheetClose,
   SheetContent,
   SheetDescription,

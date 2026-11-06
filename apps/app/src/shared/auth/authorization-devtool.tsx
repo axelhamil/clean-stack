@@ -7,7 +7,12 @@
  *
  * Tree-shaken in production via `import.meta.env.DEV`.
  */
-import { authorizeRole, isPersonalOrg, STATEMENTS } from "@packages/access-control";
+import {
+  authorizeRole,
+  isPersonalOrg,
+  type OrgPermissions,
+  STATEMENTS,
+} from "@packages/access-control";
 import { Badge } from "@packages/ui/components/ui/badge";
 import { Button } from "@packages/ui/components/ui/button";
 import {
@@ -29,6 +34,28 @@ import { useAuthorization } from "./use-authorization";
 const PERSONAL_BLOCKED: Record<string, ReadonlySet<string>> = {
   organization: new Set(["delete", "leave"]),
 };
+
+type Resource = keyof typeof STATEMENTS;
+
+interface CapabilityCell {
+  action: string;
+  permissions: OrgPermissions;
+}
+
+function isResource(key: string): key is Resource {
+  return Object.hasOwn(STATEMENTS, key);
+}
+
+function capabilityCells<R extends Resource>(resource: R): CapabilityCell[] {
+  const actions: readonly (typeof STATEMENTS)[R][number][] = STATEMENTS[resource];
+  return actions.map((action) => {
+    const permissions: { [K in R]?: readonly (typeof STATEMENTS)[K][number][] } = {};
+    permissions[resource] = [action];
+    return { action, permissions };
+  });
+}
+
+const RESOURCES = Object.keys(STATEMENTS).filter(isResource);
 
 export function AuthorizationDevTool() {
   const [open, setOpen] = useState(false);
@@ -63,14 +90,12 @@ export function AuthorizationDevTool() {
           </CardHeader>
           <CardContent className="flex flex-col gap-3 text-xs">
             {!hasMembership && <TypographyMuted>No active membership.</TypographyMuted>}
-            {Object.entries(STATEMENTS).map(([resource, actions]) => (
+            {RESOURCES.map((resource) => (
               <div key={resource} className="flex flex-col gap-1">
                 <div className="font-mono font-medium">{resource}</div>
                 <div className="flex flex-wrap gap-1">
-                  {(actions as readonly string[]).map((action) => {
-                    const roleGrants = authorizeRole(role, {
-                      [resource]: [action],
-                    } as never);
+                  {capabilityCells(resource).map(({ action, permissions }) => {
+                    const roleGrants = authorizeRole(role, permissions);
                     const personalBlocks =
                       isPersonal && PERSONAL_BLOCKED[resource]?.has(action) === true;
                     const granted = roleGrants && !personalBlocks;

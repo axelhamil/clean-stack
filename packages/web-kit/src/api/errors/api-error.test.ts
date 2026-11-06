@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { throwApiError } from "./api-error";
+import { apiErrorFields, throwApiError } from "./api-error";
 
 function makeResponse(
   status: number,
@@ -59,6 +59,13 @@ describe("throwApiError", () => {
     expect(err.metadata?.foo).toBe("bar");
   });
 
+  it("keeps the server message when another envelope field has the wrong type", async () => {
+    const res = makeResponse(500, { error: { code: 42, message: "server says no" } });
+    const err = await throwApiError(res, "loadPolicies").catch((e) => e);
+    expect(err.message).toBe("server says no");
+    expect(err.code).toBeUndefined();
+  });
+
   it("throws even when no JSON body", async () => {
     const res = new Response(null, {
       status: 429,
@@ -93,5 +100,21 @@ describe("throwApiError", () => {
     const err = await throwApiError(res, "loadPolicies").catch((e) => e);
     expect(err.status).toBe(429);
     expect(err.metadata?.retryAfter).toBeUndefined();
+  });
+});
+
+describe("apiErrorFields", () => {
+  it("drops a field of the wrong type and keeps the others", () => {
+    expect(apiErrorFields({ code: 42, status: 403, message: "nope" })).toEqual({
+      code: undefined,
+      status: 403,
+      message: "nope",
+      metadata: undefined,
+    });
+  });
+
+  it("reads the fields off a thrown error", () => {
+    const err = Object.assign(new Error("boom"), { code: "X_INVALID", status: 400 });
+    expect(apiErrorFields(err)).toMatchObject({ code: "X_INVALID", status: 400, message: "boom" });
   });
 });

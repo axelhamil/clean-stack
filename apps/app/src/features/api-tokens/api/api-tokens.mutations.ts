@@ -11,18 +11,18 @@ export type CreateTokenResponse = InferResponseType<typeof $create, 201>;
 
 export const createTokenMutationOptions = mutationOptions({
   mutationKey: ["settings", "api-tokens", "create"] as const,
-  mutationFn: async (input: CreateTokenBody) => {
+  mutationFn: async (input: CreateTokenBody): Promise<CreateTokenResponse> => {
     const res = await $create({ json: input });
     if (!res.ok) await throwApiError(res, "createApiToken");
-    return (await res.json()) as CreateTokenResponse;
+    return res.json();
   },
 });
 
 export const deleteTokenMutationOptions = mutationOptions({
   mutationKey: ["settings", "api-tokens", "delete"] as const,
-  mutationFn: async (id: string) => {
+  mutationFn: async (id: string): Promise<InferResponseType<typeof $delete, 200>> => {
     const res = await $delete({ param: { id } });
     if (!res.ok) await throwApiError(res, "revokeApiToken");
-    return (await res.json()) as InferResponseType<typeof $delete, 200>;
+    return res.json();
   },
 });

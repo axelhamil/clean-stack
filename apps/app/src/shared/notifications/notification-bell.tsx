@@ -10,7 +10,7 @@ import { toastError } from "@packages/web-kit/api/errors/toast";
 import { errorFallback } from "@packages/web-kit/i18n/get-errors-t";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   markAllReadMutationOptions,
@@ -33,20 +33,14 @@ import { NotificationItem } from "./notification-item";
 import { badgeLabel, unreadLabel } from "./notification-labels";
 import { useNotificationStream } from "./use-notification-stream";
 
-const POLL_INTERVAL_MS = 30_000;
-
 export function NotificationBell() {
   const { t } = useTranslation("common");
   const queryClient = useQueryClient();
   const guard = useImpersonationGuard();
   const [open, setOpen] = useState(false);
-  const { connected } = useNotificationStream();
+  useNotificationStream();
 
-  const { data: unread } = useQuery({
-    ...unreadCountQueryOptions,
-    refetchInterval: connected ? false : POLL_INTERVAL_MS,
-    refetchIntervalInBackground: false,
-  });
+  const { data: unread } = useQuery(unreadCountQueryOptions);
 
   const {
     data: list,
@@ -56,8 +50,7 @@ export function NotificationBell() {
   } = useInfiniteQuery({ ...notificationsInfiniteQueryOptions(), enabled: open });
 
   const count = unread?.count ?? 0;
-  const items = useMemo(() => list?.pages.flatMap((page) => page.items) ?? [], [list]);
-  const groups = useMemo(() => groupNotifications(items), [items]);
+  const groups = groupNotifications(list?.pages.flatMap((page) => page.items) ?? []);
 
   useEffect(
     () =>
@@ -99,7 +92,7 @@ export function NotificationBell() {
         </IconButton>
       </PopoverTrigger>
 
-      <PopoverContent align="end" className="w-96 max-w-[calc(100vw-2rem)] p-0">
+      <PopoverContent align="end" size="panel">
         <div className="flex items-center justify-between gap-2 p-3">
           <TypographySmall>{t("notifications.title")}</TypographySmall>
           <GuardHint guard={guard} otherwiseDisabled={nothingToMarkRead}>

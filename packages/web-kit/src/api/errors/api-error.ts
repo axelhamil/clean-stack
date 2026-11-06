@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { type ErrorFallbackKey, errorFallback } from "../../i18n/get-errors-t";
 
 export interface ApiError extends Error {
@@ -8,6 +9,15 @@ export interface ApiError extends Error {
 
 type ApiErrorFields = Partial<Pick<ApiError, "code" | "message" | "metadata" | "status">>;
 
+const metadataSchema = z.record(z.string(), z.unknown());
+
+const apiErrorFieldsSchema = z.object({
+  code: z.string().optional().catch(undefined),
+  message: z.string().optional().catch(undefined),
+  metadata: metadataSchema.optional().catch(undefined),
+  status: z.number().optional().catch(undefined),
+});
+
 /**
  * Reads the `ApiError` fields off anything a query or mutation can reject
  * with. A rejection is `unknown` (a thrown string, `null`, a BetterAuth error
@@ -16,7 +26,8 @@ type ApiErrorFields = Partial<Pick<ApiError, "code" | "message" | "metadata" | "
  */
 export function apiErrorFields(error: unknown): ApiErrorFields {
   if (typeof error !== "object" || error === null) return {};
-  return error as ApiErrorFields;
+  const parsed = apiErrorFieldsSchema.safeParse(error);
+  return parsed.success ? parsed.data : {};
 }
 
 interface AuthClientErrorInput {
@@ -33,15 +44,24 @@ interface AuthClientErrorInput {
  * the code and the catalog lookup always falls through to the caller's fallback.
  */
 export function toAuthClientError(error: AuthClientErrorInput, fallbackMessage: string): ApiError {
-  const err = new Error(error.message ?? fallbackMessage) as ApiError;
-  err.code = error.code;
-  err.status = error.status;
-  return err;
+  return Object.assign(new Error(error.message ?? fallbackMessage), {
+    code: error.code,
+    status: error.status,
+  });
 }
 
-interface ErrorEnvelope {
-  error?: { code?: string; message?: string; metadata?: Record<string, unknown> };
-}
+const errorEnvelopeSchema = z.object({
+  error: z
+    .object({
+      code: z.string().optional().catch(undefined),
+      message: z.string().optional().catch(undefined),
+      metadata: metadataSchema.optional().catch(undefined),
+    })
+    .optional()
+    .catch(undefined),
+});
+
+type ErrorEnvelope = z.infer<typeof errorEnvelopeSchema>;
 
 /**
  * Narrowed to what this function actually reads. Hono RPC's `ClientResponse`
@@ -82,15 +102,20 @@ export async function throwApiError(
 ): Promise<never> {
   let payload: ErrorEnvelope = {};
   try {
-    payload = (await res.json()) as ErrorEnvelope;
+    const parsed = errorEnvelopeSchema.safeParse(await res.json());
+    if (parsed.success) payload = parsed.data;
   } catch {
     // A failure without a JSON body keeps the caller's fallback message.
   }
 
-  const err = new Error(payload.error?.message ?? errorFallback(fallbackKey)) as ApiError;
-  err.code = payload.error?.code;
-  err.metadata = payload.error?.metadata;
-  err.status = res.status;
+  const err: ApiError = Object.assign(
+    new Error(payload.error?.message ?? errorFallback(fallbackKey)),
+    {
+      code: payload.error?.code,
+      metadata: payload.error?.metadata,
+      status: res.status,
+    },
+  );
 
   const header = res.status === 429 ? res.headers.get("Retry-After") : null;
   if (header !== null && err.metadata?.retryAfter === undefined) {

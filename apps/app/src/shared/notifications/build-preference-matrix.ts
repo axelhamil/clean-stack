@@ -1,6 +1,5 @@
 import {
   NOTIFICATION_CATEGORIES,
-  NOTIFICATION_CHANNELS,
   type NotificationCategory,
   type NotificationChannel,
   type NotificationFrequency,
@@ -27,14 +26,12 @@ const DEFAULT_CELL: PreferenceCell = {
 
 export function buildPreferenceMatrix(preferences: NotificationPreference[]): PreferenceRow[] {
   return NOTIFICATION_CATEGORIES.map((category) => {
-    const row = { category } as PreferenceRow;
-
-    for (const channel of NOTIFICATION_CHANNELS) {
+    const cellFor = (channel: NotificationChannel): PreferenceCell => {
       const found = preferences.find(
         (preference) => preference.category === category && preference.channel === channel,
       );
 
-      row[channel] = found
+      return found
         ? {
             enabled: found.enabled,
             frequency: found.frequency,
@@ -42,8 +39,8 @@ export function buildPreferenceMatrix(preferences: NotificationPreference[]): Pr
             explicit: true,
           }
         : DEFAULT_CELL;
-    }
+    };
 
-    return row;
+    return { category, in_app: cellFor("in_app"), email: cellFor("email") };
   });
 }

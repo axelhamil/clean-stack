@@ -1,14 +1,6 @@
 import { ErrorFallback } from "@packages/ui/components/ui/error-fallback";
-import { useTranslation } from "react-i18next";
+import { useErrorFallbackLabels } from "@packages/web-kit/i18n/use-error-fallback-labels";
 
 export function AppErrorFallback() {
-  const { t } = useTranslation();
-
-  return (
-    <ErrorFallback
-      title={t("errorBoundary.title")}
-      description={t("errorBoundary.body")}
-      reloadLabel={t("actions.reload")}
-    />
-  );
+  return <ErrorFallback {...useErrorFallbackLabels()} />;
 }

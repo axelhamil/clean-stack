@@ -147,7 +147,11 @@ function OrgDetailPage() {
   );
 }
 
-function EffectivePlan({ plan }: { plan: string }) {
+interface EffectivePlanProps {
+  plan: string;
+}
+
+function EffectivePlan({ plan }: EffectivePlanProps) {
   const { t } = useTranslation("admin");
   const labelKey = planLabelKey(plan);
 

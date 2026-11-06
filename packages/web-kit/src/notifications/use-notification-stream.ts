@@ -82,7 +82,7 @@ export interface NotificationStreamOptions {
   connect: (signal: AbortSignal) => Promise<NotificationStreamResponse>;
   onNotification: () => void;
   onDisconnect?: (attempt: number, error: unknown) => void;
-  onReconnect?: () => void;
+  onConnect?: () => void;
 }
 
 export async function runNotificationStream(
@@ -91,7 +91,6 @@ export async function runNotificationStream(
   setConnected: (connected: boolean) => void,
 ): Promise<void> {
   let attempt = 0;
-  let hasConnected = false;
 
   while (!signal.aborted) {
     try {
@@ -100,8 +99,7 @@ export async function runNotificationStream(
 
       attempt = 0;
       setConnected(true);
-      if (hasConnected) options().onReconnect?.();
-      hasConnected = true;
+      options().onConnect?.();
       await consume(res.body, () => options().onNotification());
     } catch (err) {
       if (!signal.aborted) options().onDisconnect?.(attempt, err);

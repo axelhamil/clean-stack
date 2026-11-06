@@ -3,7 +3,7 @@ export type SsoProviderType = "oidc" | "saml";
 const SSO_PROVIDER_TYPES: readonly SsoProviderType[] = ["oidc", "saml"];
 
 export function isSsoProviderType(value: string): value is SsoProviderType {
-  return (SSO_PROVIDER_TYPES as readonly string[]).includes(value);
+  return SSO_PROVIDER_TYPES.some((candidate) => candidate === value);
 }
 
 // `SsoProviderSummary.type` (api/sso.queries.ts) arrives widened to `string`

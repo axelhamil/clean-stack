@@ -10,6 +10,7 @@ import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { Panel } from "@packages/ui/components/ui/panel";
 import {
   Sheet,
+  SheetBody,
   SheetContent,
   SheetDescription,
   SheetHeader,
@@ -99,7 +100,7 @@ export function DeliverySheet({
 
   return (
     <Sheet open={delivery !== null} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent closeLabel={t("common:actions.close")} className="w-full sm:max-w-xl">
+      <SheetContent closeLabel={t("common:actions.close")} size="lg">
         {delivery && (
           <>
             <SheetHeader>
@@ -117,7 +118,7 @@ export function DeliverySheet({
                 })}
               </SheetDescription>
             </SheetHeader>
-            <div className="flex min-w-0 flex-col items-start gap-4 px-4 pb-4">
+            <SheetBody className="items-start">
               {canReplay && (
                 <GuardHint guard={guard}>
                   <Button
@@ -182,7 +183,7 @@ export function DeliverySheet({
                   </section>
                 </>
               )}
-            </div>
+            </SheetBody>
           </>
         )}
       </SheetContent>
