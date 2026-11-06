@@ -65,7 +65,6 @@ import {
   subscriptionEventType,
 } from "./modules/billing/application/subscription-events";
 import { paymentFailureOf } from "./modules/billing/infrastructure/adapters/stripe-payment-failure";
-import { stripeClient } from "./modules/billing/infrastructure/stripe-client";
 import { redirectQuery } from "./shared/auth/email-redirect";
 import { IMPERSONATION_TTL_SECONDS } from "./shared/auth/impersonation-ttl";
 import { organizationSeatGate } from "./shared/auth/organization-seats";
@@ -791,7 +790,7 @@ const authOptions = {
 
   plugins: [
     stripe({
-      stripeClient,
+      stripeClient: di.StripeClient,
       stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET ?? "",
       createCustomerOnSignUp: true,
       subscription: {

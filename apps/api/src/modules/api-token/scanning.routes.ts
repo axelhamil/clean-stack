@@ -3,17 +3,18 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { TokenLeakService } from "./application/services/token-leak.service";
+import type { GithubKeyVerifier } from "./infrastructure/services/github-key-verifier";
 
-export interface ScanningDeps {
-  githubKeyVerifier: { verify(keyId: string, sig: string, body: string): Promise<boolean> };
-  tokenLeakService: Pick<TokenLeakService, "handleReport">;
+export interface ApiTokenScanningRoutesDeps {
+  GithubKeyVerifier: Pick<GithubKeyVerifier, "verify">;
+  TokenLeakService: Pick<TokenLeakService, "handleReport">;
 }
 
 const scanPayloadSchema = z.array(
   z.object({ token: z.string(), type: z.string(), url: z.string().optional() }),
 );
 
-export function createApiTokenScanningRoutes(deps: ScanningDeps): Hono {
+export function createApiTokenScanningRoutes(deps: ApiTokenScanningRoutesDeps): Hono {
   return new Hono().post("/github", async (c) => {
     const rawBody = await c.req.text();
 
@@ -24,7 +25,7 @@ export function createApiTokenScanningRoutes(deps: ScanningDeps): Hono {
       throw new HTTPException(403, { message: "MISSING_SIGNATURE_HEADERS" });
     }
 
-    const valid = await deps.githubKeyVerifier.verify(keyId, sigB64, rawBody);
+    const valid = await deps.GithubKeyVerifier.verify(keyId, sigB64, rawBody);
     if (!valid) throw new HTTPException(403, { message: "INVALID_SIGNATURE" });
 
     let json: unknown;
@@ -37,7 +38,7 @@ export function createApiTokenScanningRoutes(deps: ScanningDeps): Hono {
     const payload = scanPayloadSchema.safeParse(json);
     if (!payload.success) throw new HTTPException(400, { message: "INVALID_BODY" });
 
-    const verdicts = await deps.tokenLeakService.handleReport(payload.data);
+    const verdicts = await deps.TokenLeakService.handleReport(payload.data);
     if (verdicts.isFailure) throw new AppErrorException(verdicts.getError());
 
     return c.json(verdicts.getValue());

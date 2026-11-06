@@ -1,12 +1,14 @@
 import { z } from "zod";
-import { env } from "../../../../shared/env";
+import type { UploadSettings } from "../config/upload-settings";
 import { keySchema } from "./_key";
 
-export const presignDownloadBodySchema = z.object({
-  key: keySchema,
-  expiresInSeconds: z
-    .number()
-    .int()
-    .positive()
-    .default(env.STORAGE_PRESIGN_TTL_MIN_SECONDS * 10),
-});
+export function presignDownloadBodySchema(settings: UploadSettings) {
+  return z.object({
+    key: keySchema,
+    expiresInSeconds: z
+      .number()
+      .int()
+      .positive()
+      .default(settings.presignTtlMinSeconds * 10),
+  });
+}

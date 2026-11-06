@@ -1,11 +1,15 @@
-import { describe, expect, it, mock } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import type { RouteGuard, RouteGuards } from "@packages/http/route-guards";
+import { openRouteGuards } from "@packages/http/testing/route-guards";
+import { mockPort } from "@packages/test/bun";
+import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
-import type {
-  ApiTokenError,
-  ApiTokenRecord,
-  TokenOwner,
-} from "../../../shared/ports/api-token.port";
+import { createErrorHandler } from "../../../shared/middleware/error.middleware";
+import type { ApiTokenRecord } from "../../../shared/ports/api-token.port";
+import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
+import { type ApiTokenRoutesDeps, createApiTokenRoutes } from "../routes";
 
 const RECORD: ApiTokenRecord = {
   id: "tok-1",
@@ -25,57 +29,23 @@ const RECORD: ApiTokenRecord = {
 
 const RAW = "clean_raw_token_value_never_persisted";
 
-const mockCreate = mock(async () =>
-  Result.ok<{ record: ApiTokenRecord; raw: string }, ApiTokenError>({ record: RECORD, raw: RAW }),
-);
-const mockList = mock(async (_owner: TokenOwner) =>
-  Result.ok<ApiTokenRecord[], ApiTokenError>([RECORD]),
-);
-const mockRevoke = mock(
-  async (
-    _id: string,
-    _owner: TokenOwner,
-    _actorUserId: string,
-  ): Promise<Result<void, ApiTokenError>> => Result.ok(),
-);
+const tokens = mockPort<ApiTokenRoutesDeps["ApiTokenService"]>();
+const mockCreate = tokens.create;
+const mockList = tokens.list;
+const mockRevoke = tokens.revoke;
 
-mock.module("../../../container", () => ({
-  di: {
-    ApiTokenService: { create: mockCreate, list: mockList, revoke: mockRevoke },
-    PolicyAcceptanceService: {
-      hasAcceptedCurrent: mock(async () => Result.ok(true)),
-    },
-  },
-}));
+beforeEach(() => {
+  mockCreate.mockReset();
+  mockCreate.mockResolvedValue(Result.ok({ record: RECORD, raw: RAW }));
+  mockList.mockReset();
+  mockList.mockResolvedValue(Result.ok([RECORD]));
+  mockRevoke.mockReset();
+  mockRevoke.mockResolvedValue(Result.ok());
+});
 
-let currentSession: Record<string, unknown> = { activeOrganizationId: null };
-
-const realAuthMiddleware = await import("../../../shared/middleware/auth.middleware");
-mock.module("../../../shared/middleware/auth.middleware", () => ({
-  ...realAuthMiddleware,
-  // biome-ignore lint/suspicious/noExplicitAny: test stub
-  requireAuth: async (c: any, next: () => Promise<void>) => {
-    c.set("user", { id: "user-1" });
-    c.set("session", currentSession);
-    await next();
-  },
-}));
-
-mock.module("../../../shared/middleware/org.middleware", () => ({
-  // biome-ignore lint/suspicious/noExplicitAny: test stub
-  requireOrg: async (c: any, next: () => Promise<void>) => {
-    c.set("orgId", c.get("session")?.activeOrganizationId ?? null);
-    await next();
-  },
-  requireOrgPermission: () => async (_c: unknown, next: () => Promise<void>) => {
-    await next();
-  },
-}));
-
-const { apiTokenRoutes } = await import("../routes");
-const { Hono } = await import("hono");
-const { createErrorHandler } = await import("../../../shared/middleware/error.middleware");
-const { NoOpInstrumentation } = await import("../../../shared/services/noop-instrumentation");
+const refuseImpersonation: RouteGuard = async () => {
+  throw new HTTPException(403, { message: "impersonating" });
+};
 
 const tokenJson = z.looseObject({
   id: z.string(),
@@ -86,20 +56,24 @@ const createdBody = z.object({ token: z.string(), record: tokenJson });
 const listBody = z.object({ items: z.array(tokenJson) });
 const errorBody = z.object({ error: z.object({ code: z.string() }) });
 
-function makeApp() {
+function makeApp(guards: RouteGuards = openRouteGuards({ userId: "user-1" })) {
   const app = new Hono<{ Variables: { requestId: string } }>();
   app.use("*", async (c, next) => {
     c.set("requestId", "req-test");
     await next();
   });
   app.onError(createErrorHandler(new NoOpInstrumentation()));
-  app.route("/settings/tokens", apiTokenRoutes);
+  app.route(
+    "/settings/tokens",
+    createApiTokenRoutes({ routeGuards: guards, ApiTokenService: tokens }),
+  );
   return app;
 }
 
+const inActiveOrg = openRouteGuards({ userId: "user-1", orgId: "org-active" });
+
 describe("POST /settings/tokens: create", () => {
   it("returns 201 with raw token and safe record (no tokenHmac, no pepperVersion)", async () => {
-    currentSession = { activeOrganizationId: null };
     const app = makeApp();
     const res = await app.request("/settings/tokens", {
       method: "POST",
@@ -120,9 +94,7 @@ describe("POST /settings/tokens: create", () => {
   });
 
   it("answers not found when the token targets an organization other than the active one", async () => {
-    currentSession = { activeOrganizationId: "org-active" };
-    mockCreate.mockClear();
-    const app = makeApp();
+    const app = makeApp(inActiveOrg);
     const res = await app.request("/settings/tokens", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -139,9 +111,10 @@ describe("POST /settings/tokens: create", () => {
   });
 
   it("returns 403 when the session is impersonated", async () => {
-    currentSession = { activeOrganizationId: null, impersonatedBy: "admin-99" };
-    mockCreate.mockClear();
-    const app = makeApp();
+    const app = makeApp({
+      ...openRouteGuards({ userId: "user-1" }),
+      denyImpersonated: refuseImpersonation,
+    });
     const res = await app.request("/settings/tokens", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -159,7 +132,6 @@ describe("POST /settings/tokens: create", () => {
 
 describe("GET /settings/tokens: list", () => {
   it("never exposes tokenHmac or the raw token value", async () => {
-    currentSession = { activeOrganizationId: null };
     const app = makeApp();
     const res = await app.request("/settings/tokens", { method: "GET" });
     expect(res.status).toBe(200);
@@ -175,8 +147,7 @@ describe("GET /settings/tokens: list", () => {
 
 describe("DELETE /settings/tokens/:id: wrong owner returns 404", () => {
   it("returns 404 when the service reports API_TOKEN_NOT_FOUND", async () => {
-    currentSession = { activeOrganizationId: null };
-    mockRevoke.mockImplementationOnce(async () =>
+    mockRevoke.mockResolvedValueOnce(
       Result.fail({ code: "API_TOKEN_NOT_FOUND", message: "Token not found." }),
     );
     const app = makeApp();
@@ -187,9 +158,7 @@ describe("DELETE /settings/tokens/:id: wrong owner returns 404", () => {
 
 describe("session → visibility scope", () => {
   it("lists the active organization's tokens together with the caller's personal ones", async () => {
-    currentSession = { activeOrganizationId: "org-active" };
-    mockList.mockClear();
-    const app = makeApp();
+    const app = makeApp(inActiveOrg);
 
     const res = await app.request("/settings/tokens", { method: "GET" });
 
@@ -202,8 +171,6 @@ describe("session → visibility scope", () => {
   });
 
   it("falls back to personal-only when the session carries no active organization", async () => {
-    currentSession = { activeOrganizationId: null };
-    mockList.mockClear();
     const app = makeApp();
 
     await app.request("/settings/tokens", { method: "GET" });
@@ -212,9 +179,7 @@ describe("session → visibility scope", () => {
   });
 
   it("revokes under the same widened scope, so a personal token stays revocable", async () => {
-    currentSession = { activeOrganizationId: "org-active" };
-    mockRevoke.mockClear();
-    const app = makeApp();
+    const app = makeApp(inActiveOrg);
 
     const res = await app.request("/settings/tokens/tok-1", { method: "DELETE" });
 

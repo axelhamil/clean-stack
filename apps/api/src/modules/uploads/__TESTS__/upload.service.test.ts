@@ -53,11 +53,18 @@ function makeStorage(overrides: Partial<IStorageService> = {}): IStorageService 
   } as unknown as IStorageService;
 }
 
+const UPLOAD_SETTINGS = {
+  maxUploadBytes: 50 * 1024 * 1024,
+  presignTtlMinSeconds: 60,
+  presignTtlMaxSeconds: 3600,
+};
+
 function makeService(storageOverrides: Partial<IStorageService> = {}): UploadService {
   return new UploadService(
     makeStorage(storageOverrides),
     mockPort<IOutboxRepository>(),
     new NoOpInstrumentation(),
+    UPLOAD_SETTINGS,
   );
 }
 
@@ -116,6 +123,7 @@ describe("UploadService", () => {
         makeStorage(),
         mockPort<IOutboxRepository>(),
         instrumentation,
+        UPLOAD_SETTINGS,
       );
 
       await service.createUploadUrl({
@@ -175,6 +183,7 @@ describe("UploadService", () => {
         storage,
         mockPort<IOutboxRepository>(),
         new NoOpInstrumentation(),
+        UPLOAD_SETTINGS,
       );
       const validKey = `${OWNER_ID}/${SCOPE}/uuid-${FILENAME}`;
 
@@ -200,6 +209,7 @@ describe("UploadService", () => {
         storage,
         mockPort<IOutboxRepository>(),
         new NoOpInstrumentation(),
+        UPLOAD_SETTINGS,
       );
       const validKey = `${OWNER_ID}/${SCOPE}/uuid-${FILENAME}`;
 
@@ -243,6 +253,7 @@ describe("UploadService", () => {
         makeStorage(),
         mockPort<IOutboxRepository>(),
         instrumentation,
+        UPLOAD_SETTINGS,
       );
       const validKey = `${OWNER_ID}/${SCOPE}/uuid-${FILENAME}`;
 
@@ -267,6 +278,7 @@ describe("UploadService", () => {
         storage,
         mockPort<IOutboxRepository>(),
         new NoOpInstrumentation(),
+        UPLOAD_SETTINGS,
       );
       const validKey = `${OWNER_ID}/${SCOPE}/uuid-${FILENAME}`;
 
@@ -310,6 +322,7 @@ describe("UploadService", () => {
         storage,
         mockPort<IOutboxRepository>(),
         new NoOpInstrumentation(),
+        UPLOAD_SETTINGS,
       );
 
       const result = await service.deleteUpload({
@@ -327,6 +340,7 @@ describe("UploadService", () => {
         storage,
         mockPort<IOutboxRepository>(),
         new NoOpInstrumentation(),
+        UPLOAD_SETTINGS,
       );
 
       const result = await service.deleteUpload({
@@ -356,6 +370,7 @@ describe("UploadService", () => {
         makeStorage(),
         mockPort<IOutboxRepository>(),
         instrumentation,
+        UPLOAD_SETTINGS,
       );
       const validKey = `${OWNER_ID}/${SCOPE}/uuid-${FILENAME}`;
 
@@ -423,6 +438,7 @@ describe("UploadService", () => {
         makeStorage(),
         mockPort<IOutboxRepository>(),
         instrumentation,
+        UPLOAD_SETTINGS,
       );
       const validKey = `${OWNER_ID}/${SCOPE}/uuid-${FILENAME}`;
 

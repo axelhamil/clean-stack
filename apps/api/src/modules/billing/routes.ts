@@ -1,35 +1,44 @@
 import { AppErrorException } from "@packages/ddd-kit";
+import type { RouteEnv, RouteGuards } from "@packages/http/route-guards";
 import { Hono } from "hono";
-import { di } from "../../container";
-import type { AuthVariables } from "../../shared/middleware/auth.middleware";
-import { requireAuth } from "../../shared/middleware/auth.middleware";
-import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
-import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.middleware";
-import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
+import type { BillingCatalogService } from "./application/services/billing-catalog.service";
+import type { BillingPortalService } from "./application/services/billing-portal.service";
+import type { EntitlementsService } from "./application/services/entitlements.service";
 
-export const billingRoutes = new Hono<{ Variables: AuthVariables }>()
-  .get("/plans", async (c) => {
-    const catalog = await di.BillingCatalogService.getCatalog();
+export interface BillingRoutesDeps {
+  routeGuards: RouteGuards;
+  BillingCatalogService: Pick<BillingCatalogService, "getCatalog">;
+  EntitlementsService: Pick<EntitlementsService, "getEntitlements">;
+  BillingPortalService: Pick<BillingPortalService, "openPortal">;
+}
 
-    return c.json({ plans: catalog });
-  })
-  .get("/subscription", requireAuth, requireOrg, async (c) => {
-    const view = await di.EntitlementsService.getEntitlements(c.get("orgId"));
+export function createBillingRoutes(deps: BillingRoutesDeps) {
+  const { routeGuards: g } = deps;
 
-    return c.json(view);
-  })
-  .post(
-    "/portal",
-    requireAuth,
-    requireCurrentPolicies,
-    denyImpersonated,
-    requireOrg,
-    requireOrgPermission({ billing: ["manage"] }),
-    async (c) => {
-      const returnUrl = `${c.req.header("origin") ?? ""}/settings/billing`;
-      const result = await di.BillingPortalService.openPortal(c.get("orgId"), returnUrl);
-      if (result.isFailure) throw new AppErrorException(result.getError());
+  return new Hono<RouteEnv>()
+    .get("/plans", async (c) => {
+      const catalog = await deps.BillingCatalogService.getCatalog();
 
-      return c.json({ url: result.getValue() });
-    },
-  );
+      return c.json({ plans: catalog });
+    })
+    .get("/subscription", g.requireAuth, g.requireOrg, async (c) => {
+      const view = await deps.EntitlementsService.getEntitlements(g.currentOrgId(c));
+
+      return c.json(view);
+    })
+    .post(
+      "/portal",
+      g.requireAuth,
+      g.requireCurrentPolicies,
+      g.denyImpersonated,
+      g.requireOrg,
+      g.requireOrgPermission({ billing: ["manage"] }),
+      async (c) => {
+        const returnUrl = `${c.req.header("origin") ?? ""}/settings/billing`;
+        const result = await deps.BillingPortalService.openPortal(g.currentOrgId(c), returnUrl);
+        if (result.isFailure) throw new AppErrorException(result.getError());
+
+        return c.json({ url: result.getValue() });
+      },
+    );
+}

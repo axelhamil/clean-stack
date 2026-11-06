@@ -2,8 +2,8 @@ import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { emitEvent } from "@packages/outbox/event-emitter";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
-import { env } from "../../../../shared/env";
 import type { IStorageService, StorageError } from "../../../../shared/ports/storage.port";
+import type { UploadSettings } from "../config/upload-settings";
 
 async function hashKey(key: string): Promise<string> {
   const buf = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(key));
@@ -72,6 +72,7 @@ export class UploadService {
     private readonly storage: IStorageService,
     private readonly outbox: IOutboxRepository,
     private readonly instrumentation: IInstrumentation,
+    private readonly settings: UploadSettings,
   ) {}
 
   async createUploadUrl(
@@ -80,7 +81,7 @@ export class UploadService {
     return this.instrumentation.startSpan(
       { name: "UploadService > createUploadUrl", op: "function" },
       async () => {
-        const ttl = clampTtl(input.expiresInSeconds);
+        const ttl = this.clampTtl(input.expiresInSeconds);
         const key = `${input.ownerId}/${input.scope}/${crypto.randomUUID()}-${input.filename}`;
 
         const presigned = await this.storage.presignUpload({
@@ -193,7 +194,7 @@ export class UploadService {
 
         const presigned = await this.storage.presignDownload({
           key: input.key,
-          expiresInSeconds: clampTtl(input.expiresInSeconds),
+          expiresInSeconds: this.clampTtl(input.expiresInSeconds),
         });
         if (presigned.isFailure) return Result.fail(presigned.getError());
 
@@ -201,11 +202,11 @@ export class UploadService {
       },
     );
   }
-}
 
-function clampTtl(seconds: number): number {
-  return Math.min(
-    Math.max(seconds, env.STORAGE_PRESIGN_TTL_MIN_SECONDS),
-    env.STORAGE_PRESIGN_TTL_MAX_SECONDS,
-  );
+  private clampTtl(seconds: number): number {
+    return Math.min(
+      Math.max(seconds, this.settings.presignTtlMinSeconds),
+      this.settings.presignTtlMaxSeconds,
+    );
+  }
 }

@@ -1,7 +1,9 @@
+import type { IInstrumentation } from "@packages/ddd-kit";
 import { defineModule } from "inwire";
-import { env } from "../../shared/env";
+import type Stripe from "stripe";
 import type { IPlanOverrideStore } from "../../shared/ports/plan-override.port";
 import type { IStripeEventGateway, IStripeEventStore } from "../../shared/ports/stripe-event.port";
+import type { BillingSettings } from "./application/config/billing-settings";
 import type { IBillingPortalGateway } from "./application/ports/billing-portal.port";
 import type { IStripeCatalogSource } from "./application/ports/stripe-catalog.port";
 import type { ISubscriptionReadStore } from "./application/ports/subscription-read.port";
@@ -17,30 +19,24 @@ import { DrizzlePlanOverrideStore } from "./infrastructure/repositories/drizzle-
 import { DrizzleStripeEventStore } from "./infrastructure/repositories/drizzle-stripe-event.store";
 import { DrizzleSubscriptionReadStore } from "./infrastructure/repositories/drizzle-subscription-read.store";
 import { DrizzleSubscriptionSyncStore } from "./infrastructure/repositories/drizzle-subscription-sync.store";
-import { stripeClient } from "./infrastructure/stripe-client";
+import { createStripeClient } from "./infrastructure/stripe-client";
 
-declare module "inwire" {
-  interface AppDeps {
-    IStripeCatalogSource: IStripeCatalogSource;
-    IBillingPortalGateway: IBillingPortalGateway;
-    IStripeEventStore: IStripeEventStore;
-    IPlanOverrideStore: IPlanOverrideStore;
-    IStripeEventGateway: IStripeEventGateway;
-    ISubscriptionReadStore: ISubscriptionReadStore;
-    ISubscriptionSyncStore: ISubscriptionSyncStore;
-    StripeSyncVerifier: StripeSyncVerifier;
-    BillingCatalogService: BillingCatalogService;
-    BillingPortalService: BillingPortalService;
-    EntitlementsService: EntitlementsService;
-  }
+export interface BillingPrerequisites {
+  IInstrumentation: IInstrumentation;
+  billingSettings: BillingSettings;
 }
 
-export const billingModule = defineModule()((b) =>
+export const billingModule = defineModule<BillingPrerequisites>()((b) =>
   b
-    .add("IStripeCatalogSource", (c) => new StripeCatalogSource(stripeClient, c.IInstrumentation))
+    .add("StripeClient", (c): Stripe => createStripeClient(c.billingSettings))
+    .add(
+      "IStripeCatalogSource",
+      (c): IStripeCatalogSource => new StripeCatalogSource(c.StripeClient, c.IInstrumentation),
+    )
     .add(
       "IBillingPortalGateway",
-      (c) => new StripeBillingPortalGateway(stripeClient, c.IInstrumentation),
+      (c): IBillingPortalGateway =>
+        new StripeBillingPortalGateway(c.StripeClient, c.IInstrumentation),
     )
     .add(
       "IPlanOverrideStore",
@@ -54,12 +50,18 @@ export const billingModule = defineModule()((b) =>
       "IStripeEventGateway",
       (c): IStripeEventGateway =>
         new StripeEventGateway(
-          stripeClient,
-          { secretKey: env.STRIPE_SECRET_KEY, webhookSecret: env.STRIPE_WEBHOOK_SECRET },
+          c.StripeClient,
+          {
+            secretKey: c.billingSettings.stripeSecretKey.toUndefined(),
+            webhookSecret: c.billingSettings.stripeWebhookSecret.toUndefined(),
+          },
           c.IInstrumentation,
         ),
     )
-    .add("ISubscriptionReadStore", (c) => new DrizzleSubscriptionReadStore(c.IInstrumentation))
+    .add(
+      "ISubscriptionReadStore",
+      (c): ISubscriptionReadStore => new DrizzleSubscriptionReadStore(c.IInstrumentation),
+    )
     .add(
       "ISubscriptionSyncStore",
       (c): ISubscriptionSyncStore => new DrizzleSubscriptionSyncStore(c.IInstrumentation),

@@ -1,80 +1,92 @@
 import { AppErrorException } from "@packages/ddd-kit";
+import type { RouteEnv, RouteGuards } from "@packages/http/route-guards";
 import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
-import { di } from "../../container";
-import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
-import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
-import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
+import type { UploadSettings } from "./application/config/upload-settings";
 import { confirmUploadBodySchema } from "./application/dto/confirm-upload.dto";
 import { deleteUploadBodySchema } from "./application/dto/delete-upload.dto";
 import { presignDownloadBodySchema } from "./application/dto/presign-download.dto";
 import { presignUploadBodySchema } from "./application/dto/presign-upload.dto";
+import type { UploadService } from "./application/services/upload.service";
 
-export const uploadsRoutes = new Hono<{ Variables: AuthVariables }>()
-  .post(
-    "/presign",
-    requireAuth,
-    requireCurrentPolicies,
-    denyImpersonated,
-    zV("json", presignUploadBodySchema),
-    async (c) => {
-      const result = await di.UploadService.createUploadUrl({
-        ownerId: c.get("user").id,
-        ...c.req.valid("json"),
-      });
+export interface UploadsRoutesDeps {
+  routeGuards: RouteGuards;
+  uploadSettings: UploadSettings;
+  UploadService: Pick<
+    UploadService,
+    "createUploadUrl" | "confirmUpload" | "createDownloadUrl" | "deleteUpload"
+  >;
+}
 
-      if (result.isFailure) throw new AppErrorException(result.getError());
+export function createUploadsRoutes(deps: UploadsRoutesDeps) {
+  const { routeGuards: g } = deps;
 
-      return c.json(result.getValue());
-    },
-  )
-  .post(
-    "/confirm",
-    requireAuth,
-    requireCurrentPolicies,
-    denyImpersonated,
-    zV("json", confirmUploadBodySchema),
-    async (c) => {
-      const result = await di.UploadService.confirmUpload({
-        ownerId: c.get("user").id,
-        ...c.req.valid("json"),
-      });
+  return new Hono<RouteEnv>()
+    .post(
+      "/presign",
+      g.requireAuth,
+      g.requireCurrentPolicies,
+      g.denyImpersonated,
+      zV("json", presignUploadBodySchema(deps.uploadSettings)),
+      async (c) => {
+        const result = await deps.UploadService.createUploadUrl({
+          ownerId: g.currentUserId(c),
+          ...c.req.valid("json"),
+        });
 
-      if (result.isFailure) throw new AppErrorException(result.getError());
+        if (result.isFailure) throw new AppErrorException(result.getError());
 
-      return c.json(result.getValue());
-    },
-  )
-  .post(
-    "/download",
-    requireAuth,
-    requireCurrentPolicies,
-    zV("json", presignDownloadBodySchema),
-    async (c) => {
-      const result = await di.UploadService.createDownloadUrl({
-        ownerId: c.get("user").id,
-        ...c.req.valid("json"),
-      });
+        return c.json(result.getValue());
+      },
+    )
+    .post(
+      "/confirm",
+      g.requireAuth,
+      g.requireCurrentPolicies,
+      g.denyImpersonated,
+      zV("json", confirmUploadBodySchema),
+      async (c) => {
+        const result = await deps.UploadService.confirmUpload({
+          ownerId: g.currentUserId(c),
+          ...c.req.valid("json"),
+        });
 
-      if (result.isFailure) throw new AppErrorException(result.getError());
+        if (result.isFailure) throw new AppErrorException(result.getError());
 
-      return c.json(result.getValue());
-    },
-  )
-  .delete(
-    "/",
-    requireAuth,
-    requireCurrentPolicies,
-    denyImpersonated,
-    zV("json", deleteUploadBodySchema),
-    async (c) => {
-      const result = await di.UploadService.deleteUpload({
-        ownerId: c.get("user").id,
-        ...c.req.valid("json"),
-      });
+        return c.json(result.getValue());
+      },
+    )
+    .post(
+      "/download",
+      g.requireAuth,
+      g.requireCurrentPolicies,
+      zV("json", presignDownloadBodySchema(deps.uploadSettings)),
+      async (c) => {
+        const result = await deps.UploadService.createDownloadUrl({
+          ownerId: g.currentUserId(c),
+          ...c.req.valid("json"),
+        });
 
-      if (result.isFailure) throw new AppErrorException(result.getError());
+        if (result.isFailure) throw new AppErrorException(result.getError());
 
-      return c.json(result.getValue());
-    },
-  );
+        return c.json(result.getValue());
+      },
+    )
+    .delete(
+      "/",
+      g.requireAuth,
+      g.requireCurrentPolicies,
+      g.denyImpersonated,
+      zV("json", deleteUploadBodySchema),
+      async (c) => {
+        const result = await deps.UploadService.deleteUpload({
+          ownerId: g.currentUserId(c),
+          ...c.req.valid("json"),
+        });
+
+        if (result.isFailure) throw new AppErrorException(result.getError());
+
+        return c.json(result.getValue());
+      },
+    );
+}

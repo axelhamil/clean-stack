@@ -19,8 +19,8 @@ const app = new Hono()
   .route(
     "/api/token-scanning",
     createApiTokenScanningRoutes({
-      githubKeyVerifier: { verify },
-      tokenLeakService: { handleReport },
+      GithubKeyVerifier: { verify },
+      TokenLeakService: { handleReport },
     }),
   )
   .onError(createErrorHandler(new NoOpInstrumentation()));

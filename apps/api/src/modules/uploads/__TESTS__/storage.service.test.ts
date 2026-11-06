@@ -50,6 +50,17 @@ mock.module("@aws-sdk/s3-request-presigner", () => ({
 const { S3StorageService } = await import("../infrastructure/services/storage.service");
 const { NoOpInstrumentation } = await import("../../../shared/services/noop-instrumentation");
 
+const S3_SETTINGS = {
+  endpoint: "http://localhost:8333",
+  accessKey: "dev",
+  secretKey: "dev",
+  bucket: "clean-stack",
+  publicUrl: "",
+  region: "auto",
+  forcePathStyle: true,
+  production: false,
+};
+
 describe("S3StorageService (custom logic only)", () => {
   let service: InstanceType<typeof S3StorageService>;
 
@@ -57,7 +68,7 @@ describe("S3StorageService (custom logic only)", () => {
     nextSendOutcome = () => Promise.resolve({});
     listPages = [];
     lastSendCount = 0;
-    service = new S3StorageService(new NoOpInstrumentation());
+    service = new S3StorageService(S3_SETTINGS, new NoOpInstrumentation());
   });
 
   it("should map NotFound to STORAGE_NOT_FOUND but other errors to STORAGE_PROVIDER_FAILURE (error discriminator)", async () => {
@@ -122,7 +133,7 @@ describe("S3StorageService (custom logic only)", () => {
       },
     }));
     // Re-instantiate service so it picks up new mock
-    const svc = new S3StorageService(new NoOpInstrumentation());
+    const svc = new S3StorageService(S3_SETTINGS, new NoOpInstrumentation());
     const result = await svc.presignUpload({
       key: "user-1/file.png",
       contentType: "image/png",
@@ -157,7 +168,7 @@ describe("S3StorageService (custom logic only)", () => {
         throw new Error("presign download error");
       },
     }));
-    const svc = new S3StorageService(new NoOpInstrumentation());
+    const svc = new S3StorageService(S3_SETTINGS, new NoOpInstrumentation());
     const result = await svc.presignDownload({
       key: "user-1/file.png",
       expiresInSeconds: 60,
@@ -216,7 +227,7 @@ describe("S3StorageService (custom logic only)", () => {
   // publicUrlFor
   // -------------------------------------------------------------------------
   it("publicUrlFor returns concatenated public URL + key", () => {
-    // publicUrl is built from env.S3_PUBLIC_URL which is undefined in test → empty string
+    // publicUrl is empty in these settings
     // So publicUrlFor("key") = "/key"
     const url = service.publicUrlFor("user-1/avatar.png");
     expect(url).toContain("user-1/avatar.png");
