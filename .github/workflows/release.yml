@@ -2,54 +2,43 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    branches: [dev]
 
-permissions:
-  contents: write
-  issues: write
-  pull-requests: write
+permissions: {}
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  HUSKY: 0
 
 jobs:
   release:
     name: Release
+    if: vars.BOT_CLIENT_ID != ''
     runs-on: ubuntu-latest
-    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
+      - id: bot
+        uses: actions/create-github-app-token@v3
         with:
+          client-id: ${{ vars.BOT_CLIENT_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+
+      - id: release
+        uses: googleapis/release-please-action@v5
+        with:
+          token: ${{ steps.bot.outputs.token }}
+          target-branch: dev
+
+      - if: steps.release.outputs.release_created
+        uses: actions/checkout@v5
+        with:
+          token: ${{ steps.bot.outputs.token }}
           fetch-depth: 0
           persist-credentials: true
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: .nvmrc
-          package-manager-cache: false
-
-      - uses: pnpm/action-setup@v4
-
-      - name: Resolve pnpm store
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
-
-      - uses: actions/cache@v4
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: pnpm-${{ runner.os }}-
-
-      - name: Install
-        run: pnpm install --frozen-lockfile --prefer-offline --reporter=silent
-
-      - name: Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm semantic-release
+      - name: Move main to the release
+        if: steps.release.outputs.release_created
+        run: git push origin HEAD:refs/heads/main

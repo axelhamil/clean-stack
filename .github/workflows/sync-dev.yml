@@ -1,0 +1,44 @@
+name: Sync dev
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: sync-dev
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  sync:
+    name: Sync dev
+    if: vars.BOT_CLIENT_ID != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - id: bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.BOT_CLIENT_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v5
+        with:
+          ref: dev
+          token: ${{ steps.bot.outputs.token }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Merge main into dev
+        env:
+          BOT_SLUG: ${{ steps.bot.outputs.app-slug }}
+        run: |
+          git config user.name "$BOT_SLUG[bot]"
+          git config user.email "$BOT_SLUG[bot]@users.noreply.github.com"
+          git fetch origin main
+          git merge --no-edit origin/main
+          git push origin dev

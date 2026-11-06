@@ -22,7 +22,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 | 4 | **C.1 remainder** | Delivered | S5b behavioural signals and S6 captcha hook | Deferred for calibration, not abandoned: needs real traffic |
 | 5 | **Phase K** | Delivered | Standalone back office: its own app and host, staff permissions, step-up, four-eyes, platform operations | Today the operator works inside the customer app with one all-or-nothing gate, which does not survive a second staff member |
 | 6 | **Phase L** | Delivered | Reference deploy on a VPS with Coolify instead of Railway: desired state in code, deploy by digest after a green CI, health gates, rollback; Postgres backups with PITR and a hardened host | Railway outages took the reference deploy down; a VPS the cloner owns is cheaper, portable and already runs a sister project |
-| 7 | **Release-please** | Planned | Replace semantic-release with release-please, nixos-forge model: the release PR lives on `dev`, merging it tags and moves `main` to the tag | One merge ships a release, it is reviewed like any PR, and no `dev` to `main` PR is left to forget |
+| 7 | **Release-please** | Delivered | Replace semantic-release with release-please, nixos-forge model: the release PR lives on `dev`, merging it tags and moves `main` to the tag; hotfixes go straight to `main` | One merge ships a release, it is reviewed like any PR, and no `dev` to `main` PR is left to forget |
 | 8 | **CI parity** | Delivered | CI replays the pre-push chain (lint, types, unit tests, build, duplication, unused code) on every PR and push to `dev` and `main` | A fork that skips the local hook must not get a green PR |
 
 **Cross-cutting, at first consumer**: one-click unsubscribe (RFC 8058: Gmail and Yahoo require it for bulk senders) and SPF, DKIM and DMARC `p=reject` (DNS, doc only).
@@ -35,15 +35,15 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 
 ## Release-please
 
-- **Status**: planned.
+- **Status**: delivered.
 - **Why**: semantic-release commits the changelog and the version straight to `main` and needs a separate `dev` to `main` PR to ship. Release-please keeps a release PR open on `dev`: the version, the changelog and the tag are reviewed like any change, and merging that one PR is the release.
 - **Model**: nixos-forge, two lanes and one `CHANGELOG.md`.
-  - Release: release-please on `dev` (`target-branch: dev`) keeps one release PR open; merging it creates the tag, then the workflow pushes the release commit to `main` with the bot token, so the production deploy triggers.
-  - Hotfix: a `hotfix/*` branch cut from `main` and merged into `main`; a second release-please run on `main` opens a patch release PR; merging it tags, adds its own section to `CHANGELOG.md`, publishes its GitHub release and deploys, without shipping what waits on `dev`.
-  - Sync: a `sync-dev` workflow merges every push to `main` back into `dev` with the same bot, so the hotfix, the changelog and the manifest reach `dev` and the next push to `main` stays a fast-forward.
-- **Scope**: `release-please-config.json` and `.release-please-manifest.json` seeded from the last tag, `bump-minor-pre-major`, changelog sections matching today's `releaseRules` (`docs(readme)` keeps its patch); `.github/workflows/release.yml` runs `googleapis/release-please-action` on a push to `dev` with a GitHub App token (`BOT_CLIENT_ID`, `BOT_PRIVATE_KEY`) so the release PR triggers CI, then moves `main` when a release is created; the `main` ruleset lets only that bot move it; `.releaserc.json` and the semantic-release dependencies removed; `CLAUDE.md` release flow, `CONTRIBUTING.md` and the `PR policy` base rule updated. A version, a `version` field or a tag is never set by hand.
-- **Risk to prove first**: release-please walks the history back to the last tag. After a sync, `feat` commits made on `dev` before the hotfix tag may be read as already released and miss the next changelog. A sandbox repo proves it (a `feat` on `dev`, a hotfix on `main`, the sync, then the release PR); if it bites, `last-release-sha` pins the last commit `dev` released.
-- **Done when**: a push to `dev` keeps one release PR up to date and merging it tags, publishes and moves `main`; a hotfix on `main` ships its own patch release without `dev`; after the sync, the next `dev` release lists every commit once, hotfix excluded.
+  - Release: release-please on `dev` (`target-branch: dev`) keeps one release PR open; merging it creates the tag and the GitHub release, then the workflow pushes the release commit to `main` with the bot token, so the production deploy triggers.
+  - Hotfix: a `hotfix/*` branch cut from `main` and merged into `main` deploys production without shipping what waits on `dev`; it gets no tag of its own and lands in the next release's changelog.
+  - Sync: `sync-dev.yml` merges every push to `main` back into `dev` with the same bot, so the next push to `main` stays a fast-forward.
+- **Risk, measured**: a release tagged on `main` (the planned patch release of the hotfix lane) becomes `dev`'s last release once synced, and release-please then drops every older `dev` commit: on a sandbox repo, a pending `feat` vanished and 2.3.0 shipped as 2.2.2. `last-release-sha` does not prevent it, because a found release wins. Hence no release-please run on `main`.
+- **Scope**: `release-please-config.json` and `.release-please-manifest.json` seeded from `v2.2.0`, changelog sections matching the former `releaseRules` (`docs(readme)` lost its patch: release-please filters by type, never by scope); `.github/workflows/release.yml` and `sync-dev.yml` on the `axelhamil-bot` GitHub App token (`BOT_CLIENT_ID`, `BOT_PRIVATE_KEY`); PRs merge by squash with the PR title as the commit (a merge commit body repeats the PR title and doubled every changelog entry on the sandbox); the `main` ruleset requires a PR and lets the bot bypass it, the `dev` ruleset lets the bot push the sync; `.releaserc.json` and the semantic-release dependencies removed; `CLAUDE.md` release flow, `CONTRIBUTING.md` and the `PR policy` base rule updated.
+- **Done when**: a push to `dev` keeps one release PR up to date and merging it tags, publishes and moves `main`; a hotfix on `main` deploys without `dev`; after the sync, the next `dev` release lists every commit once.
 
 ---
 

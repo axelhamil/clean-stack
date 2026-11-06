@@ -145,7 +145,7 @@ The app provides a public `/pricing` page (plan grid fed from the live Stripe ca
 - **End-to-end type safety over the API** (Hono RPC): no client to write and no schema to keep in sync; a change in the API surfaces as a red squiggle in the app on save
 - **Dependency injection with no boilerplate**: `inwire`, a type-inference container, wires everything with no hand-written interfaces and no registration order to maintain; the compiler catches a missing or mistyped dependency, and swapping a provider is a one-line binding change. CQRS keeps writes (use cases) and reads (direct queries) clearly separated
 - **One command to clone and run**, Docker for either native hot-reload or a fully containerized dev loop with file-sync, and Turborepo caching
-- **A zero-warning pipeline**: lint, format, dead-code and duplication checks, type-check, Conventional Commits, and automated releases (semantic-release) enforced by git hooks, with no `--no-verify` escape hatch
+- **A zero-warning pipeline**: lint, format, dead-code and duplication checks, type-check, Conventional Commits, and automated releases (release-please) enforced by git hooks, with no `--no-verify` escape hatch
 
 ## Machine-to-machine access, Personal Access Tokens
 

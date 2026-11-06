@@ -13,7 +13,7 @@ Thanks for stopping by. The flow is short: talk first, code second.
 3. **Fork and branch off `dev`**, name it as you like (`fix/123-short-name` is nice, not required).
 4. **Open your pull request into `dev`** with `Closes #<issue>` in the body. GitHub links it to the issue and closes the issue on merge.
 
-The maintainer triages every pull request: a type label, an assignee, and `accepted` on the pull request or on its linked issue. You have nothing to do for it. The `PR policy` check reruns by itself when the pull request or its issue changes. `main` only receives the release from `dev`, done by the maintainer.
+The maintainer triages every pull request: a type label, an assignee, and `accepted` on the pull request or on its linked issue. You have nothing to do for it. The `PR policy` check reruns by itself when the pull request or its issue changes. `main` only moves through a release, done by the maintainer.
 
 Maintainers and agents follow a stricter flow: every pull request closes a triaged issue (see "Work tracking" in [`CLAUDE.md`](CLAUDE.md)).
 

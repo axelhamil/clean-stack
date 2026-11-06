@@ -34,7 +34,7 @@ Library API, config or state of the art unclear → **check the docs first**; ou
 
 ## Tooling
 
-pnpm workspaces + Turborepo + Biome + Husky + lint-staged + commitlint + semantic-release + knip + jscpd. Runtime and package-manager versions are pinned in `mise.toml`. Stack per app: see its guide.
+pnpm workspaces + Turborepo + Biome + Husky + lint-staged + commitlint + release-please + knip + jscpd. Runtime and package-manager versions are pinned in `mise.toml`. Stack per app: see its guide.
 
 ## Cross-cutting rules (always apply)
 
@@ -67,15 +67,16 @@ Every change, by anyone, follows the same flow. **Why**: the issue history is th
 2. Branch off `dev` as `<conventional-commit-type>/<issue>-<slug>`, for example `fix/123-email-retry`.
 3. Open the PR into `dev` with `Closes #N`, the same type label and an assignee.
 
-The `linked-issue` check enforces it on every PR: every open issue the PR closes must be triaged, and there must be at least one. Bots and the `dev` to `main` release are exempt. An external contributor (not owner, member or collaborator) may skip the issue when `accepted` is set on the PR itself; the type label and the assignee stay required. The `dev` ruleset lets admins bypass the required checks: that is for emergencies only, never a normal path.
+The `linked-issue` check enforces it on every PR: every open issue the PR closes must be triaged, and there must be at least one. Bots, the release PRs among them, are exempt. An external contributor (not owner, member or collaborator) may skip the issue when `accepted` is set on the PR itself; the type label and the assignee stay required. The `dev` ruleset lets admins bypass the required checks: that is for emergencies only, never a normal path.
 
 ## Release flow
 
-Two-branch model. **`main` = released; `dev` = integration.** Every merge to `main` triggers semantic-release.
+Two-branch model. **`main` = released; `dev` = integration.** release-please (`release-please-config.json`, `.github/workflows/release.yml`) runs on every push to `dev` with the bot GitHub App token (`vars.BOT_CLIENT_ID`, `secrets.BOT_PRIVATE_KEY`). **Why the App token**: a PR or a push made with the default workflow token triggers no workflow, so the release PR would never run CI and the moved `main` would never deploy.
 
-- **Conventional Commits required** (commitlint enforces a lower-case subject). Release impact (`.releaserc.json`): `feat` → minor; `fix`/`perf`/`refactor`/`revert`/`build` and `docs(readme)` → patch; `docs`/`style`/`test`/`chore`/`ci` → no release; `BREAKING CHANGE:` footer (or `!`) → major; a wrapped prose line starting with `BREAKING` does not cut a major. Pick the type for the *release impact you want*, not the file touched.
-- Daily work on `dev` (or feature branches PR'd into `dev`). Pushing to `dev` does **not** release.
-- Shipping = open a PR `dev` → `main` and merge it. semantic-release analyzes the commits since the last tag → one bundled bump + changelog.
-- **`dev` → `main` MUST be a merge commit** (not squash, not rebase): squash collapses every conventional commit into one and semantic-release would see a single entry. GitHub allows merge commits only.
-- `main` is protected (require PR, no force push, conversation resolution). A CI fix during release goes on `dev`, then re-merge.
-- **Don't release on every commit**: wait for a meaningful batch. Don't push directly to `main`.
+- **Conventional Commits required** (commitlint enforces a lower-case subject). Release impact: `feat` → minor; `fix`/`perf`/`refactor`/`revert`/`build` → patch; `docs`/`style`/`test`/`chore`/`ci` alone → no release (hidden sections of the config); `BREAKING CHANGE:` footer (or `!`) → major. Pick the type for the *release impact you want*, not the file touched.
+- **Release**: release-please keeps one release PR open on `dev` (version, `CHANGELOG.md`, `package.json`). Merging it tags, publishes the GitHub release, then the workflow pushes that commit to `main` as a fast-forward, which deploys production. There is no `dev` → `main` PR.
+- **Hotfix**: branch `hotfix/<issue>-<slug>` off `main`, PR into `main`; merging it deploys production without shipping what waits on `dev`. `sync-dev.yml` then merges `main` back into `dev`, so the fix lands in the next release's changelog and that release stays a fast-forward of `main`. A hotfix gets no tag of its own. **Why**: release-please keeps one release line per branch; a release tagged on `main` and merged back into `dev` becomes `dev`'s last release and silently drops every older `dev` commit from the next changelog and version bump (measured on a sandbox repo, `last-release-sha` does not prevent it).
+- **PRs merge by squash** (the only method the repo allows): title = PR title, body = PR description, so the PR title is the conventional commit release-please reads, once. **Why**: release-please also parses the body of a merge commit, which GitHub fills with the PR title, so a merge commit lists every PR twice in the changelog (measured on the sandbox repo). The PR title follows Conventional Commits like a commit subject.
+- A version, a `version` field, a tag or a changelog entry is never written by hand: the release PR owns them.
+- `main` only moves through the bot or a hotfix PR (the `main` ruleset and the `base-branch` check of `PR policy`); never push to it.
+- **Don't release on every commit**: merge the release PR when the batch is meaningful.

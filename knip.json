@@ -78,8 +78,7 @@
     "@packages/test",
     "@packages/typescript-config",
     "lint-staged",
-    "tailwindcss",
-    "conventional-changelog-conventionalcommits"
+    "tailwindcss"
   ],
   "ignoreExportsUsedInFile": true,
   "rules": {

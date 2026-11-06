@@ -187,7 +187,7 @@ Primitives for business domain only (never DDD for billing / auth / gating: see 
 
 - **pnpm 12** + **Turborepo** TUI. `globalDependencies` bust caches on `biome.json` / `pnpm-workspace.yaml` / `.env*`.
 - **Biome** (lint + format) · **knip** (unused exports) · **jscpd** (duplication) · **Husky + commitlint** (Conventional Commits) · **lint-staged** (Biome on staged files) · **pre-push**: `pnpm ci:check`.
-- **semantic-release**: `dev`→`main` merge commit: `feat`→minor, `fix`/`perf`/`refactor`/`build`→patch, `BREAKING CHANGE:`→major.
+- **release-please** (`release-please-config.json`, `.github/workflows/release.yml`): one release PR kept open on `dev`, merging it tags, publishes the GitHub release and moves `main` to the tag; a `hotfix/*` PR into `main` deploys at once, and `sync-dev.yml` merges `main` back into `dev` so the fix ships in the next release. Both run with the `axelhamil-bot` GitHub App token so the release PR triggers CI.
 - **Testing**: `bun test` (api) + `vitest` (packages, app). BDD style, mock at port level.
 
 ---
