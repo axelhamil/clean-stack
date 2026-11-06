@@ -5,6 +5,18 @@
 * **infra:** back up postgres with pgbackrest and harden the vps host ([8f29788](https://github.com/axelhamil/clean-stack/commit/8f297885b0bf24ba9dd7a0e72f84935b2634ad9f))
 * **infra:** deploy to a vps through coolify instead of railway ([fac42c4](https://github.com/axelhamil/clean-stack/commit/fac42c4accfef9055880b1e0606fa200a4931dad))
 
+## [2.2.2](https://github.com/axelhamil/clean-stack/compare/v2.2.1...v2.2.2) (2026-11-06)
+
+
+### Bug Fixes
+
+* **api:** admin reads in the ambient transaction, api-token and billing rule fixes ([#131](https://github.com/axelhamil/clean-stack/issues/131)) ([0c5022d](https://github.com/axelhamil/clean-stack/commit/0c5022dd357aad6636eb9bf95075984c86d04dec))
+* **api:** keep writes, events and errors inside their transaction ([#129](https://github.com/axelhamil/clean-stack/issues/129)) ([f0af8b7](https://github.com/axelhamil/clean-stack/commit/f0af8b707f62ed5e24d17862a94a4d5f96be6797))
+* **api:** token use event in its transaction and rgpd application free of env and logger ([#135](https://github.com/axelhamil/clean-stack/issues/135)) ([2b76cd8](https://github.com/axelhamil/clean-stack/commit/2b76cd87bcab3e15e2424a09598a862badecefcd))
+* **drizzle:** typed lease predicates and shared package rule fixes ([#128](https://github.com/axelhamil/clean-stack/issues/128)) ([5d3dad8](https://github.com/axelhamil/clean-stack/commit/5d3dad8fc6a4eda0626d4313c00f769c0aadf3a4)), closes [#125](https://github.com/axelhamil/clean-stack/issues/125)
+* **front:** typed responses, no polling fallback and one shared error fallback ([#133](https://github.com/axelhamil/clean-stack/issues/133)) ([cb5250b](https://github.com/axelhamil/clean-stack/commit/cb5250b551e40a7f67bd3c075f5ab06d0a8d19ac))
+* **rgpd:** revoke api tokens and announce memberships on account wipe ([#127](https://github.com/axelhamil/clean-stack/issues/127)) ([b38f7c4](https://github.com/axelhamil/clean-stack/commit/b38f7c4f05bc251f186f538eb9b87169b1f8e567))
+
 ## [2.2.1](https://github.com/axelhamil/clean-stack/compare/v2.2.0...v2.2.1) (2026-11-06)
 
 
