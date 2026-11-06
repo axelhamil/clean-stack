@@ -1,11 +1,10 @@
-import { Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import {
   type EntitlementsView,
   entitlementsForTier,
   isTier,
 } from "../../../../shared/entitlements";
 import type { EntitlementsReadError } from "../../../../shared/ports/entitlements-reader.port";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
   ActivePlanOverride,
   IPlanOverrideReader,

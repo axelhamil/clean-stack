@@ -5,8 +5,9 @@ import {
   onEvent,
   Result,
 } from "@packages/ddd-kit";
-import { EventTypes, OrgMemberRemovedPayload } from "@packages/events";
+import { EventTypes, PayloadByEventType } from "@packages/events";
 import { emitEvent } from "../../../../shared/event-emitter";
+import { payloadParser } from "../../../../shared/payload-parser";
 import type { ApiTokenError, IApiTokenRepository } from "../../../../shared/ports/api-token.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 
@@ -16,14 +17,13 @@ interface Deps {
   ITransactionService: IUnitOfWork;
 }
 
+const parsePayload = payloadParser(PayloadByEventType[EventTypes.ORG_MEMBER_REMOVED]);
+
 export const revokeTokensOnMembershipLost: (deps: Deps) => EventHandler = onEvent(
   EventTypes.ORG_MEMBER_REMOVED,
   "revoke-api-tokens-on-membership-lost",
-  (c: Deps) => async (event: IDomainEvent) => {
-    const parsed = OrgMemberRemovedPayload.safeParse(event.payload);
-    if (!parsed.success) return Result.ok();
-
-    const { userId, organizationId, actorUserId } = parsed.data;
+  (c: Deps) => async (_event: IDomainEvent, payload) => {
+    const { userId, organizationId, actorUserId } = payload;
 
     return c.ITransactionService.run(async (): Promise<Result<void, ApiTokenError>> => {
       const result = await c.IApiTokenRepository.revokeAllForMembership(userId, organizationId);
@@ -49,4 +49,5 @@ export const revokeTokensOnMembershipLost: (deps: Deps) => EventHandler = onEven
       return Result.ok();
     });
   },
+  { payload: parsePayload },
 );

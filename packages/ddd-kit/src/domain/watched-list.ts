@@ -57,6 +57,17 @@ export abstract class WatchedList<T> {
     return Result.ok();
   }
 
+  public copy(): this {
+    const copied: this = Object.create(Object.getPrototypeOf(this));
+
+    return Object.assign(copied, this, {
+      currentItems: [...this.currentItems],
+      initial: [...this.initial],
+      new: [...this.new],
+      removed: [...this.removed],
+    });
+  }
+
   public find(predicate: (item: T) => boolean): Option<T> {
     const item = this.currentItems.find(predicate);
     if (item === undefined) return None.of<T>();

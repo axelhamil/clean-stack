@@ -66,7 +66,7 @@ modules/<context>/
 
 ## Layer purity
 
-**Domain has zero external imports** (only `@packages/ddd-kit` + `zod`). **Application has zero infrastructure imports**: `application/**` imports only `@packages/ddd-kit`, `zod` and the ports and types it owns. NEVER `@packages/drizzle`, `better-auth`, `@aws-sdk/*`, `resend`, or any provider concrete type (`PgTransaction`, `SessionUser`, `S3Client`, ...). **Why**: application says *what*, not *how*; a use case importing a provider type survives a swap only by accident, which is exactly what ports exist to prevent. Cross-aggregate references use VO ids (`UserId`), never `SessionUser["id"]` or `string`.
+**Domain has zero external imports** (only `@packages/ddd-kit` + `zod`). **Application has zero infrastructure imports**: `application/**` imports only `@packages/ddd-kit`, `zod` and the ports and types it owns. NEVER `@packages/drizzle`, `better-auth`, `@aws-sdk/*`, `resend`, or any provider concrete type (`PgTransaction`, `SessionUser`, `S3Client`, ...). **Why**: application says *what*, not *how*; a use case importing a provider type survives a swap only by accident, which is exactly what ports exist to prevent. Cross-aggregate references use the typed id of the referenced module (`<name>-id.ts`, see `packages/ddd-kit/CLAUDE.md`), never `SessionUser["id"]` or `string`.
 
 ## Shared kernel (`shared/`)
 
@@ -140,7 +140,7 @@ async execute(input: PlaceOrderInput): Promise<Result<Order, OrderError>> {
 - A `uow.run()` started inside an open one joins its transaction: same connection, no savepoint, its collected events wait for the outermost run's flush. A failed `Result` returned at any depth (even swallowed by the outer work) rolls the whole unit back and the outermost `run()` resolves to that first failure; a throw at any depth rolls back and propagates, even when the outer work caught it. The ambient scope is marked closed when its run settles, so a promise that outlives its run reads the pool (`resolveExecutor()` returns `db`), never a transaction whose client went back to the pool. **Why**: node-postgres does not refuse a query on a released client, it may run on a connection another request now holds. Proven against Postgres by `check:uow-rollback`.
 - A run that collected events but has no flush handler rolls back with `EventsWithoutOutbox` instead of committing without them. The container wires the outbox enqueue, so this only catches a hand-built `TransactionService` that forgot it.
 - A callback that resolves to a failed `Result` rolls the whole transaction back (writes and collected events) and `run()` resolves to that `Result`. Return the failure, never throw a sentinel to force the rollback. **Why**: a failure is all or nothing without the caller remembering to throw, and a thrown sentinel has to be told apart from a real crash in every `catch`. Proven against Postgres by `check:uow-rollback`.
-- Repos must call `trackEventsOnSuccess(result, aggregate)` (helper in `@packages/drizzle`) inside their `save`/`create` impl, otherwise events stay on the aggregate buffer and are silently lost.
+- Repos must call `EventCollector.collectFrom(aggregate)` (`@packages/ddd-kit`) once their `save`/`create` write succeeded, otherwise events stay on the aggregate buffer and are silently lost.
 - `addEvent()` outside `uow.run()` = events lost (warning logged in dev via `EventCollector.setOutOfContextLogger`).
 
 **Outside an aggregate** (every shipped module today), a write and its `emitEvent(outbox, ...)` share one `uow.run(async () => ...)`. Stores take no `tx`: they read `resolveExecutor()`, so both land in the run's transaction. `emitEvent` passes no `tx`: the outbox reads `resolveExecutor()` too. In tests, use `mockUnitOfWork` and record `UnitOfWorkContext.transaction()` inside the store and `enqueue` mocks, then assert both saw the same one: a call count passes even when both writes run outside the transaction.
@@ -151,14 +151,20 @@ An action only the auth library can perform commits on that connection, so it ca
 
 **Handlers built in** (`shared/event-handlers.ts` `buildEventDispatcher` subscribes them to every catalog type, so a type with no handler cannot exist): `audit-log` (`AuditEventSubscriber`, writes `audit_log` if the event is in `RETENTION_MAP`), `webhook-fanout` (`WebhookFanoutSubscriber`, creates `webhook_delivery` rows for matching org-scoped endpoints) and `notification-fanout` (`NotificationFanoutSubscriber`, creates notification rows and schedules email digests, honouring user/org preference precedence). Each runs its own short `uow.run` and writes with a key derived from `eventId` and `ON CONFLICT DO NOTHING`, so a redelivery writes nothing twice.
 
-**User-defined handlers** via `onEvent(type, handlerName, factory)` + inwire binding, auto-discovered at boot via `EVENT_HANDLER_SYMBOL`:
+**User-defined handlers** via `onEvent(type, handlerName, factory, { payload })` + inwire binding, auto-discovered at boot via `EVENT_HANDLER_SYMBOL`. The parser comes from `payloadParser(PayloadByEventType[type])` (`shared/payload-parser.ts`), declared as a module constant (built inline, its type is not inferred into the body):
 
 ```typescript
+const parsePayload = payloadParser(PayloadByEventType[EventTypes.ORDER_PLACED]);
+
 b.add(
   "NotifyCustomerOnOrderPlaced",
-  onEvent(EventTypes.ORDER_PLACED, "notify-customer-on-order-placed", (c) => async (event) => {
-    await c.IEmailService.sendTemplate("order_confirmed", ..., handlerIdempotency("notify-customer-on-order-placed", event));
-  }),
+  onEvent(
+    EventTypes.ORDER_PLACED,
+    "notify-customer-on-order-placed",
+    (c) => async (event, payload) =>
+      c.IEmailService.sendTemplate("order_confirmed", payload.email, ..., handlerIdempotency("notify-customer-on-order-placed", event)),
+    { payload: parsePayload },
+  ),
 )
 ```
 
@@ -184,7 +190,7 @@ Domain and application use `Result<T, E>` (no throw); the controller translates 
 
 ## Observability (`IInstrumentation`)
 
-**Single port, DI everywhere.** `IInstrumentation` (`shared/ports/instrumentation.port.ts`) combines `startSpan`, `capture`, `addBreadcrumb`, `setSpanAttributes` and `flush(timeoutMs)` (drains pending events, resolves `false` when the timeout cut it short; the shutdown calls it last). Default `NoOpInstrumentation`; `SentryInstrumentation` swaps in when `env.SENTRY_DSN` is set (`container.ts`). **No module-level singleton, no service locator**: every I/O class receives it via constructor. Sentry SDK init exception: `import "./shared/services/sentry-init"` is the first import of `index.ts` (it must hook async-hooks before pino/Hono/Drizzle).
+**Single port, DI everywhere.** `IInstrumentation` (`@packages/ddd-kit`, so a package can depend on it too) combines `startSpan`, `capture`, `addBreadcrumb`, `setSpanAttributes` (writes onto the span open around the caller, silently dropped outside one) and `flush(timeoutMs)` (drains pending events, resolves `false` when the timeout cut it short; the shutdown calls it last). Default `NoOpInstrumentation`; `SentryInstrumentation` swaps in when `env.SENTRY_DSN` is set (`container.ts`). **No module-level singleton, no service locator**: every I/O class receives it via constructor. Sentry SDK init exception: `import "./shared/services/sentry-init"` is the first import of `index.ts` (it must hook async-hooks before pino/Hono/Drizzle).
 
 **Instrumentation pattern** (see [`docs/OBSERVABILITY.md`](../../docs/OBSERVABILITY.md)):
 - **Outer span** wraps the method body: `{ name: "ClassName > methodName" }`. No `op`, no attributes.

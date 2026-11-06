@@ -1,7 +1,6 @@
-import { Result, uuidv7 } from "@packages/ddd-kit";
+import { type IInstrumentation, Result, uuidv7 } from "@packages/ddd-kit";
 import { and, eq, quotaUsageSchema, resolveExecutor, sql } from "@packages/drizzle";
 import { dbOperationFailure } from "../../../../shared/db-failure";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
   IQuotaUsageStore,
   QuotaError,

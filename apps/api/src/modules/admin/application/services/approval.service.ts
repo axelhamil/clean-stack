@@ -3,10 +3,15 @@ import {
   type ApprovalAction,
   type StaffPermission,
 } from "@packages/access-control";
-import { type AppError, type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
+import {
+  type AppError,
+  type IInstrumentation,
+  type IUnitOfWork,
+  Option,
+  Result,
+} from "@packages/ddd-kit";
 import { type EventType, EventTypes } from "@packages/events";
 import { emitEvent } from "../../../../shared/event-emitter";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { IStaffStore, StaffStoreError } from "../../../../shared/ports/staff-store.port";
 import { type StaffEnv, staffAccessOf } from "../../../../shared/staff-access";

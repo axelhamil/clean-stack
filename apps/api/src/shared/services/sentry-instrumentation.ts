@@ -1,10 +1,5 @@
+import type { Breadcrumb, ErrorContext, IInstrumentation, SpanOptions } from "@packages/ddd-kit";
 import * as Sentry from "@sentry/bun";
-import type {
-  Breadcrumb,
-  ErrorContext,
-  IInstrumentation,
-  SpanOptions,
-} from "../ports/instrumentation.port";
 
 export class SentryInstrumentation implements IInstrumentation {
   startSpan<T>(options: SpanOptions, callback: () => T | Promise<T>): T | Promise<T> {

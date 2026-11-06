@@ -1,8 +1,7 @@
-import { type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { POLICY_TYPES, POLICY_VERSIONS, type PolicyType } from "@packages/policies";
 import { emitEvent } from "../../../../shared/event-emitter";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { IPolicyAcceptanceStore, PolicyError } from "../ports/policy-acceptance.port";
 

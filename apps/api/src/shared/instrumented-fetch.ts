@@ -1,4 +1,4 @@
-import type { IInstrumentation } from "./ports/instrumentation.port";
+import type { IInstrumentation } from "@packages/ddd-kit";
 
 export function instrumentedFetch(
   instrumentation: IInstrumentation,

@@ -1,29 +1,22 @@
-import type { UUID } from "../primitives/uuid";
 import type { IDomainEvent } from "./domain-event";
-import { Entity } from "./entity";
+import { type AnyId, Entity } from "./entity";
 
 export interface IAggregate {
   getDomainEvents(): IDomainEvent[];
-  clearEvents(): void;
 }
 
 export interface IEventSource {
   pullDomainEvents(): IDomainEvent[];
 }
 
-export abstract class Aggregate<T> extends Entity<T> implements IAggregate, IEventSource {
+export abstract class Aggregate<T, Id extends AnyId = AnyId>
+  extends Entity<T, Id>
+  implements IAggregate, IEventSource
+{
   private _domainEvents: IDomainEvent[] = [];
-
-  protected constructor(props: T, id?: UUID<string | number>) {
-    super(props, id);
-  }
 
   public getDomainEvents(): IDomainEvent[] {
     return [...this._domainEvents];
-  }
-
-  public clearEvents(): void {
-    this._domainEvents = [];
   }
 
   public pullDomainEvents(): IDomainEvent[] {
@@ -34,14 +27,6 @@ export abstract class Aggregate<T> extends Entity<T> implements IAggregate, IEve
 
   protected addEvent(event: IDomainEvent): void {
     this._domainEvents.push(event);
-  }
-
-  public hasEvents(): boolean {
-    return this._domainEvents.length > 0;
-  }
-
-  public getEventCount(): number {
-    return this._domainEvents.length;
   }
 
   protected addEvents(events: IDomainEvent[]): void {

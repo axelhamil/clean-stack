@@ -1,9 +1,4 @@
-import type {
-  Breadcrumb,
-  ErrorContext,
-  IInstrumentation,
-  SpanOptions,
-} from "../ports/instrumentation.port";
+import type { Breadcrumb, ErrorContext, IInstrumentation, SpanOptions } from "@packages/ddd-kit";
 
 export class NoOpInstrumentation implements IInstrumentation {
   startSpan<T>(_options: SpanOptions, callback: () => T | Promise<T>): T | Promise<T> {

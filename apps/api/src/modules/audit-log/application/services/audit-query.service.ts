@@ -1,4 +1,4 @@
-import type { Result } from "@packages/ddd-kit";
+import type { IInstrumentation, Result } from "@packages/ddd-kit";
 import type {
   AuditError,
   AuditFilters,
@@ -6,7 +6,6 @@ import type {
   ChainVerification,
   IAuditPort,
 } from "../../../../shared/ports/audit.port";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 
 export class AuditQueryService {
   constructor(

@@ -129,7 +129,7 @@ class PlaceOrderUseCase {
 
 That's it. The event is in `outbox_event` (same TX as the order row), `audit_log` row written automatically, every matching `webhook_endpoint` receives a `webhook_delivery`.
 
-> **Repos must opt into auto-tracking.** In your repo `save()`/`create()` impl, return `trackEventsOnSuccess(result, aggregate)` (helper in `@packages/drizzle`): that pushes pulled events into the ALS collector. Without it, events stay buffered on the aggregate and are silently lost.
+> **Repos must opt into auto-tracking.** In your repo `save()`/`create()` impl, call `EventCollector.collectFrom(aggregate)` (`@packages/ddd-kit`) once the write succeeded: that pushes pulled events into the ALS collector. Without it, events stay buffered on the aggregate and are silently lost.
 
 ## How to add an in-process handler
 
@@ -607,7 +607,6 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |
 | `packages/drizzle/src/schema/{outbox,audit-log,webhooks}.ts` | The 4 tables |
 | `packages/drizzle/src/services/transaction-manager.service.ts` | `TransactionService.run()`: ALS flush + nested runs joining the outermost transaction + rollback when the callback resolves to a failed `Result` |
-| `packages/drizzle/src/repositories/track-events.ts` | `trackEventsOnSuccess()` repo helper |
 | `apps/api/src/shared/services/outbox-dispatcher.service.ts` | LISTEN/NOTIFY worker, wake schedule, start and stop |
 | `apps/api/src/shared/services/outbox-relay.ts` | Claim by lease, run the named handlers, settle, dead announcement |
 | `apps/api/src/shared/services/drizzle-outbox.service.ts` | Outbox repository: enqueue, claim, `pendingState`, `markDelivered`, `markFailed` |

@@ -71,19 +71,23 @@ describe("backupCodeUsedNotifier", () => {
     expect(call[3].locale).toBe("en");
   });
 
-  it("skips invalid payloads without sending", async () => {
+  it("fails a malformed payload without sending", async () => {
     const { service, sendTemplate } = makeEmailService();
     const handler = backupCodeUsedNotifier({
       IEmailService: service,
       IProfileStore: makeProfileStore(),
     });
 
-    await handler.handle({
-      eventType: EventTypes.USER_MFA_BACKUP_CODE_USED,
-      aggregateId: "u1",
-      dateOccurred: new Date(),
-      payload: { wrong: true },
-    });
+    await expect(
+      handler.handle({
+        eventType: EventTypes.USER_MFA_BACKUP_CODE_USED,
+        aggregateId: "u1",
+        dateOccurred: new Date(),
+        payload: { wrong: true },
+      }),
+    ).rejects.toThrow(
+      "user.mfa.backup_code_used has a malformed payload: userId: invalid_type, email: invalid_type",
+    );
 
     expect(sendTemplate).not.toHaveBeenCalled();
   });

@@ -1,4 +1,4 @@
-import { type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { generateToken, hmacToken } from "../../../../shared/crypto/api-token";
 import { emitEvent } from "../../../../shared/event-emitter";
@@ -9,7 +9,6 @@ import {
   ownerReaches,
   type TokenOwner,
 } from "../../../../shared/ports/api-token.port";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 
 export type CreateTokenServiceInput = {

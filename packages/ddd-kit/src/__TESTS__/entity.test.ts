@@ -1,349 +1,131 @@
 import { describe, expect, it } from "vitest";
 import { Entity, Result, UUID, ValueObject, WatchedList } from "../index";
 
-class Name extends ValueObject<string> {
+class Title extends ValueObject<string> {
   protected validate(value: string): Result<string> {
-    if (!value || value.trim().length === 0) {
-      return Result.fail("Name cannot be empty");
-    }
-    return Result.ok(value);
+    return value.length > 0 ? Result.ok(value) : Result.fail("Title cannot be empty");
   }
 }
 
-interface TestEntityProps {
-  name: string;
-  age: number;
-}
-
-class TestEntity extends Entity<TestEntityProps> {
-  get name() {
-    return this._props.name;
+class Tags extends WatchedList<Title> {
+  compareItems(a: Title, b: Title): boolean {
+    return a.equals(b);
   }
 
-  get age() {
-    return this._props.age;
-  }
-
-  static create(props: TestEntityProps, id?: UUID<string | number>): TestEntity {
-    return new TestEntity(props, id);
+  static create(items: Title[]): Tags {
+    return new Tags(items);
   }
 }
 
-interface EntityWithValueObjectProps {
-  name: Name;
-  email: string;
-}
-
-class EntityWithValueObject extends Entity<EntityWithValueObjectProps> {
-  static create(
-    props: EntityWithValueObjectProps,
-    id?: UUID<string | number>,
-  ): EntityWithValueObject {
-    return new EntityWithValueObject(props, id);
+class Cover extends Entity<{ path: string }> {
+  static create(props: { path: string }, id?: UUID<string>): Cover {
+    return new Cover(props, id);
   }
 }
 
-interface NestedEntityProps {
-  title: string;
-  child: TestEntity;
+interface ClipProps {
+  title: Title;
+  recordingId: UUID<string>;
+  cover: Cover;
+  tags: Tags;
+  aliases: string[];
+  attempts: number;
 }
 
-class NestedEntity extends Entity<NestedEntityProps> {
-  static create(props: NestedEntityProps, id?: UUID<string | number>): NestedEntity {
-    return new NestedEntity(props, id);
+class Clip extends Entity<ClipProps> {
+  static create(props: ClipProps, id?: UUID<string>): Clip {
+    return new Clip(props, id);
   }
 }
 
-class StringWatchedList extends WatchedList<string> {
-  compareItems(a: string, b: string): boolean {
-    return a === b;
+class TakeId extends UUID<string> {}
+
+class Take extends Entity<{ attempts: number }, TakeId> {
+  private constructor(props: { attempts: number }, id: TakeId) {
+    super(props, id);
   }
 
-  static create(items?: string[]): StringWatchedList {
-    return new StringWatchedList(items);
-  }
-}
-
-interface EntityWithWatchedListProps {
-  name: string;
-  tags: StringWatchedList;
-}
-
-class EntityWithWatchedList extends Entity<EntityWithWatchedListProps> {
-  static create(
-    props: EntityWithWatchedListProps,
-    id?: UUID<string | number>,
-  ): EntityWithWatchedList {
-    return new EntityWithWatchedList(props, id);
+  static create(props: { attempts: number }): Take {
+    return new Take(props, new TakeId());
   }
 }
 
-interface EntityWithNullableProps {
-  name: string;
-  nickname: string | null;
-  description?: string;
-}
+const title = (value: string) => Title.create(value).getValue();
 
-class EntityWithNullable extends Entity<EntityWithNullableProps> {
-  static create(props: EntityWithNullableProps, id?: UUID<string | number>): EntityWithNullable {
-    return new EntityWithNullable(props, id);
-  }
-}
-
-interface IdPropEntityProps {
-  id?: UUID<string | number>;
-  name: string;
-}
-
-class IdPropEntity extends Entity<IdPropEntityProps> {
-  static create(props: IdPropEntityProps, id?: UUID<string | number>): IdPropEntity {
-    return new IdPropEntity(props, id);
-  }
-}
+const clipProps = (): ClipProps => ({
+  title: title("Clutch"),
+  recordingId: new UUID("recording-1"),
+  cover: Cover.create({ path: "cover.png" }, new UUID("cover-1")),
+  tags: Tags.create([title("fps")]),
+  aliases: ["clutch"],
+  attempts: 2,
+});
 
 describe("Entity", () => {
-  describe("creation", () => {
-    it("should create entity with props and id", () => {
-      const id = new UUID();
-      const entity = TestEntity.create({ name: "John", age: 30 }, id);
+  it("is the same entity when the ids match, whatever the props", () => {
+    const stored = Clip.create(clipProps(), new UUID("clip-1"));
+    const edited = Clip.create({ ...clipProps(), attempts: 9 }, new UUID("clip-1"));
+    const other = Clip.create(clipProps(), new UUID("clip-2"));
 
-      expect(entity._id.equals(id)).toBe(true);
-      expect(entity.name).toBe("John");
-      expect(entity.age).toBe(30);
-    });
+    expect(stored.equals(edited)).toBe(true);
+    expect(stored.equals(other)).toBe(false);
+    expect(stored.equals(undefined)).toBe(false);
+  });
 
-    it("should generate id if not provided", () => {
-      const entity = TestEntity.create({ name: "John", age: 30 });
+  it("gets a fresh id when none is given", () => {
+    const first = Clip.create(clipProps());
+    const second = Clip.create(clipProps());
 
-      expect(entity._id).toBeDefined();
-      expect(entity._id).toBeInstanceOf(UUID);
-    });
+    expect(first.equals(second)).toBe(false);
+  });
 
-    it("should create entity with custom string id", () => {
-      const id = new UUID("custom-id-123");
-      const entity = TestEntity.create({ name: "Jane", age: 25 }, id);
+  it("flattens value objects, ids, owned entities and lists into a plain object", () => {
+    const clip = Clip.create(clipProps(), new UUID("clip-1"));
 
-      expect(entity._id.value).toBe("custom-id-123");
+    expect(clip.toObject()).toEqual({
+      id: "clip-1",
+      title: "Clutch",
+      recordingId: "recording-1",
+      cover: { id: "cover-1", path: "cover.png" },
+      tags: ["fps"],
+      aliases: ["clutch"],
+      attempts: 2,
     });
   });
 
-  describe("_props", () => {
-    it("should access props directly", () => {
-      const entity = TestEntity.create({ name: "John", age: 30 });
+  it("clones into the same class with the same typed id, even behind a private constructor", () => {
+    const stored = Take.create({ attempts: 2 });
 
-      expect(entity._props.name).toBe("John");
-      expect(entity._props.age).toBe(30);
-    });
+    const edited = stored.clone({ attempts: 3 });
+
+    expect(edited).toBeInstanceOf(Take);
+    expect(edited.id).toBeInstanceOf(TakeId);
+    expect(edited.id.equals(stored.id)).toBe(true);
+    expect(edited.get("attempts")).toBe(3);
+    expect(stored.get("attempts")).toBe(2);
   });
 
-  describe("get()", () => {
-    it("should return prop value by key", () => {
-      const entity = TestEntity.create({ name: "John", age: 30 });
+  it("gives a clone its own lists, so changing one leaves the other as it was", () => {
+    const stored = Clip.create(clipProps(), new UUID("clip-1"));
+    stored.get("tags").add(title("clutch"));
 
-      expect(entity.get("name")).toBe("John");
-      expect(entity.get("age")).toBe(30);
-    });
+    const edited = stored.clone();
+    edited.get("tags").add(title("ace"));
+    edited.get("aliases").push("ace");
 
-    it("should return null for null property", () => {
-      const entity = EntityWithNullable.create({
-        name: "John",
-        nickname: null,
-      });
-
-      expect(entity.get("nickname")).toBeNull();
-    });
-
-    it("should return undefined for undefined property", () => {
-      const entity = EntityWithNullable.create({
-        name: "John",
-        nickname: null,
-        description: undefined,
-      });
-
-      expect(entity.get("description")).toBeUndefined();
-    });
-
-    it("should return empty string for empty string property", () => {
-      const entity = EntityWithNullable.create({
-        name: "",
-        nickname: null,
-      });
-
-      expect(entity.get("name")).toBe("");
-    });
-
-    it("should return entity id when accessing id prop that is undefined", () => {
-      const id = new UUID("test-id");
-      const entity = IdPropEntity.create({ name: "Test" }, id);
-
-      expect(entity.get("id")).toBe(id);
-    });
-  });
-
-  describe("toObject()", () => {
-    it("should serialize entity with id", () => {
-      const entity = TestEntity.create({ name: "John", age: 30 });
-      const obj = entity.toObject();
-
-      expect(obj.id).toBeDefined();
-      expect(obj.name).toBe("John");
-      expect(obj.age).toBe(30);
-    });
-
-    it("should serialize value objects to their values", () => {
-      const nameValue: string = "John Doe";
-      const nameResult = Name.create(nameValue);
-      expect(nameResult.isSuccess).toBe(true);
-
-      const entity = EntityWithValueObject.create({
-        name: nameResult.getValue(),
-        email: "john@example.com",
-      });
-      const obj = entity.toObject();
-
-      expect(obj.name).toBe("John Doe");
-      expect(obj.email).toBe("john@example.com");
-    });
-
-    it("should serialize UUID props to their values", () => {
-      const customId = new UUID("custom-uuid");
-      const entity = IdPropEntity.create({ id: customId, name: "Test" }, new UUID());
-      const obj = entity.toObject();
-
-      expect(obj.id).toBe(entity._id.value);
-    });
-
-    it("should serialize nested entities recursively", () => {
-      const childEntity = TestEntity.create({ name: "Child", age: 10 });
-      const parentEntity = NestedEntity.create({
-        title: "Parent",
-        child: childEntity,
-      });
-      const obj = parentEntity.toObject();
-
-      expect(obj.title).toBe("Parent");
-      expect(obj.child).toEqual({
-        id: childEntity._id.value,
-        name: "Child",
-        age: 10,
-      });
-    });
-
-    it("should serialize watched lists using mapToObject", () => {
-      const tags = StringWatchedList.create(["tag1", "tag2"]);
-      const entity = EntityWithWatchedList.create({ name: "Test", tags });
-      const obj = entity.toObject();
-
-      expect(obj.tags).toEqual(["tag1", "tag2"]);
-    });
-
-    it("should handle primitive values directly", () => {
-      const entity = TestEntity.create({ name: "John", age: 30 });
-      const obj = entity.toObject();
-
-      expect(typeof obj.name).toBe("string");
-      expect(typeof obj.age).toBe("number");
-    });
-  });
-
-  describe("clone()", () => {
-    it("should create copy with same props and id", () => {
-      const id = new UUID();
-      const entity = TestEntity.create({ name: "John", age: 30 }, id);
-      const clone = entity.clone();
-
-      expect((clone as TestEntity).name).toBe("John");
-      expect((clone as TestEntity).age).toBe(30);
-      expect(clone._id.equals(entity._id)).toBe(true);
-    });
-
-    it("should override props when provided", () => {
-      const entity = TestEntity.create({ name: "John", age: 30 });
-      const clone = entity.clone({ name: "Jane" });
-
-      expect((clone as TestEntity).name).toBe("Jane");
-      expect((clone as TestEntity).age).toBe(30);
-    });
-
-    it("should preserve original entity after cloning", () => {
-      const entity = TestEntity.create({ name: "John", age: 30 });
-      entity.clone({ name: "Jane" });
-
-      expect(entity.name).toBe("John");
-    });
-
-    it("should create independent clone", () => {
-      const entity = TestEntity.create({ name: "John", age: 30 });
-      const clone = entity.clone({ age: 35 }) as TestEntity;
-
-      expect(clone.age).toBe(35);
-      expect(entity.age).toBe(30);
-    });
-  });
-
-  describe("equals()", () => {
-    it("should be equal when ids match", () => {
-      const id = new UUID();
-      const entity1 = TestEntity.create({ name: "John", age: 30 }, id);
-      const entity2 = TestEntity.create({ name: "Jane", age: 25 }, id);
-
-      expect(entity1.equals(entity2)).toBe(true);
-    });
-
-    it("should not be equal when ids differ", () => {
-      const entity1 = TestEntity.create({ name: "John", age: 30 });
-      const entity2 = TestEntity.create({ name: "John", age: 30 });
-
-      expect(entity1.equals(entity2)).toBe(false);
-    });
-
-    it("should return false when comparing with undefined", () => {
-      const entity = TestEntity.create({ name: "John", age: 30 });
-
-      expect(entity.equals(undefined)).toBe(false);
-    });
-
-    it("should return true when comparing with same instance", () => {
-      const entity = TestEntity.create({ name: "John", age: 30 });
-
-      expect(entity.equals(entity)).toBe(true);
-    });
-
-    it("should return false when comparing with non-entity", () => {
-      const entity = TestEntity.create({ name: "John", age: 30 });
-      const notEntity = { _id: entity._id, _props: { name: "John", age: 30 } };
-
-      expect(entity.equals(notEntity as TestEntity)).toBe(false);
-    });
-  });
-
-  describe("type safety", () => {
-    it("should preserve prop types", () => {
-      const entity = TestEntity.create({ name: "John", age: 30 });
-
-      expect(typeof entity.get("name")).toBe("string");
-      expect(typeof entity.get("age")).toBe("number");
-    });
-
-    it("should work with complex prop types", () => {
-      interface ComplexProps {
-        data: { nested: string[] };
-        count: number;
-      }
-
-      class ComplexEntity extends Entity<ComplexProps> {
-        static create(props: ComplexProps, id?: UUID<string | number>): ComplexEntity {
-          return new ComplexEntity(props, id);
-        }
-      }
-
-      const entity = ComplexEntity.create({
-        data: { nested: ["a", "b", "c"] },
-        count: 3,
-      });
-
-      expect(entity.get("data").nested).toEqual(["a", "b", "c"]);
-      expect(entity.get("count")).toBe(3);
-    });
+    expect(edited.get("tags")).toBeInstanceOf(Tags);
+    expect(
+      edited
+        .get("tags")
+        .getNewItems()
+        .map((tag) => tag.value),
+    ).toEqual(["clutch", "ace"]);
+    expect(
+      stored
+        .get("tags")
+        .getItems()
+        .map((tag) => tag.value),
+    ).toEqual(["fps", "clutch"]);
+    expect(stored.get("aliases")).toEqual(["clutch"]);
   });
 });

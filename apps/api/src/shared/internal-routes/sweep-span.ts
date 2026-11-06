@@ -1,4 +1,4 @@
-import type { IInstrumentation, SpanOptions } from "../ports/instrumentation.port";
+import type { IInstrumentation, SpanOptions } from "@packages/ddd-kit";
 
 const DB_ATTRS = { "db.system.name": "postgresql" } as const;
 

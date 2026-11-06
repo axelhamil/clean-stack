@@ -1,8 +1,7 @@
-import { type AppError, type IUnitOfWork, Result } from "@packages/ddd-kit";
+import { type AppError, type IInstrumentation, type IUnitOfWork, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { setOrgSsoEnforced } from "../../auth-queries";
 import { emitEvent } from "../event-emitter";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IOutboxRepository } from "../ports/outbox.port";
 
 export type AdminActionError = AppError<"ADMIN_ACTION_PROVIDER_FAILURE">;

@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { Result } from "./result";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -89,5 +88,5 @@ export class UUID<T extends string | number> {
 }
 
 export function randomUuidV4(): string {
-  return randomUUID();
+  return globalThis.crypto.randomUUID();
 }

@@ -1,5 +1,4 @@
-import type { IUnitOfWork } from "@packages/ddd-kit";
-
+import type { IInstrumentation, IUnitOfWork } from "@packages/ddd-kit";
 import type { AuditActorType } from "@packages/drizzle";
 import {
   auditLogSchema,
@@ -11,7 +10,6 @@ import {
 } from "@packages/drizzle";
 import { retentionFor } from "@packages/events";
 import type { BuiltInEventHandler } from "../event-handlers";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { DeliveredEvent } from "../ports/outbox.port";
 import { computeAuditHash, GENESIS_HASH } from "./audit-hash";
 import { readActorId } from "./event-actor";

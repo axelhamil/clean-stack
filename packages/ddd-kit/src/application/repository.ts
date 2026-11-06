@@ -5,10 +5,12 @@ import type { PaginatedResult, PaginationParams } from "./pagination";
 import type { RepoScope } from "./scope";
 
 export interface BaseRepository<T extends IEntity<unknown>, E = string> {
+  save(entity: T): Promise<Result<void, E>>;
   create(entity: T): Promise<Result<T, E>>;
   update(entity: T): Promise<Result<T, E>>;
   delete(id: T["_id"]): Promise<Result<T["_id"], E>>;
   findById(id: T["_id"]): Promise<Result<Option<T>, E>>;
+  findByIdForUpdate(id: T["_id"]): Promise<Result<Option<T>, E>>;
   findAll(pagination?: PaginationParams): Promise<Result<PaginatedResult<T>, E>>;
   findMany(
     props: Partial<T["_props"]>,
@@ -24,10 +26,12 @@ export interface ScopedRepository<
   TScope extends RepoScope,
   E = string,
 > {
+  save(entity: T, scope: TScope): Promise<Result<void, E>>;
   create(entity: T, scope: TScope): Promise<Result<T, E>>;
   update(entity: T, scope: TScope): Promise<Result<T, E>>;
   delete(id: T["_id"], scope: TScope): Promise<Result<T["_id"], E>>;
   findById(id: T["_id"], scope: TScope): Promise<Result<Option<T>, E>>;
+  findByIdForUpdate(id: T["_id"], scope: TScope): Promise<Result<Option<T>, E>>;
   findAll(scope: TScope, pagination?: PaginationParams): Promise<Result<PaginatedResult<T>, E>>;
   findMany(
     props: Partial<T["_props"]>,

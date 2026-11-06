@@ -1,4 +1,4 @@
-import { Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import {
   and,
   authSchema,
@@ -16,7 +16,6 @@ import {
 import { ENDED_SESSION_COLUMNS, endedSessionsOf } from "../../../../shared/db/ended-sessions";
 import { createDbFailure } from "../../../../shared/db-failure";
 import { afterTimeIdCursor, exactInstant } from "../../../../shared/pagination/time-id-cursor";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { EndedSessions } from "../../../../shared/ports/staff-store.port";
 import type { ListUsersInput } from "../../application/dto/list-users.dto";
 import type {

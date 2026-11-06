@@ -4,7 +4,7 @@ import {
   COOKIE_CONSENT_VERSION,
   type ConsentCategory,
 } from "@packages/cookie-consent";
-import { type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import {
   type EventType,
   EventTypes,
@@ -12,7 +12,6 @@ import {
   type UserCookieConsentWithdrawnPayload,
 } from "@packages/events";
 import { emitEvent } from "../../../../shared/event-emitter";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { ConsentError, ConsentRecordRow, IConsentStore } from "../ports/consent.port";
 

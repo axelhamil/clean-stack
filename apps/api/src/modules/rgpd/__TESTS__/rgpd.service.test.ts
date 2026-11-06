@@ -1,12 +1,17 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { type IUnitOfWork, Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
+import {
+  type IInstrumentation,
+  type ILogger,
+  type IUnitOfWork,
+  Option,
+  Result,
+  UnitOfWorkContext,
+} from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork, type UnitOfWorkMock } from "@packages/test/bun/unit-of-work";
 import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
 import type { EmailError, IEmailService } from "../../../shared/ports/email.port";
-import type { IInstrumentation } from "../../../shared/ports/instrumentation.port";
-import type { ILogger } from "../../../shared/ports/logger.port";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import type {
   IStaffStore,

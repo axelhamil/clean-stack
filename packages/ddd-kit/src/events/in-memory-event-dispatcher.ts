@@ -1,6 +1,11 @@
 import type { IDomainEvent } from "../domain/domain-event";
 import { Result } from "../primitives/result";
-import type { EventHandlerFn, HandlerOutcome, IEventDispatcher } from "./event-dispatcher";
+import {
+  describeFailure,
+  type EventHandlerFn,
+  type HandlerOutcome,
+  type IEventDispatcher,
+} from "./event-dispatcher";
 
 interface NamedHandler<E extends IDomainEvent> {
   name: string;
@@ -9,7 +14,6 @@ interface NamedHandler<E extends IDomainEvent> {
 
 const HANDLER_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
-/** `IEventDispatcher` held in process memory. */
 export class InMemoryEventDispatcher<E extends IDomainEvent = IDomainEvent>
   implements IEventDispatcher<E>
 {
@@ -43,14 +47,17 @@ export class InMemoryEventDispatcher<E extends IDomainEvent = IDomainEvent>
     }
 
     try {
-      await named.handle(event);
+      const reaction = await named.handle(event);
+      if (reaction instanceof Result && reaction.isFailure) {
+        return { name: handlerName, ok: false, error: describeFailure(reaction.getError()) };
+      }
 
       return { name: handlerName, ok: true };
     } catch (error) {
       return {
         name: handlerName,
         ok: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: describeFailure(error),
       };
     }
   }

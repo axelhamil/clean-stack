@@ -1,3 +1,4 @@
+import type { IInstrumentation } from "@packages/ddd-kit";
 import {
   db,
   eq,
@@ -6,7 +7,6 @@ import {
   sql,
   TransactionService,
 } from "@packages/drizzle";
-import type { IInstrumentation } from "../src/shared/ports/instrumentation.port";
 import type { DeliveredEvent } from "../src/shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 import { NotificationFanoutSubscriber } from "../src/shared/services/notification-fanout-subscriber";

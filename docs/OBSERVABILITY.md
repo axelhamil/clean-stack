@@ -17,8 +17,9 @@ clean-stack ships error tracking + tracing primitives via Sentry on the API (`@s
 ## Architecture, one port, two impls, DI everywhere
 
 ```
+packages/ddd-kit/src/application/
+  instrumentation.ts                   IInstrumentation { startSpan, capture, addBreadcrumb, setSpanAttributes, flush }
 apps/api/src/shared/
-  ports/instrumentation.port.ts        IInstrumentation { startSpan, capture, addBreadcrumb, setSpanAttributes, flush }
   services/
     noop-instrumentation.ts            Always-bound default, silent passthrough
     sentry-instrumentation.ts          Wraps Sentry.startSpan + captureException + addBreadcrumb
@@ -74,7 +75,7 @@ Without these the plugin is no-op; the build emits `.map` files locally but neve
 Every infrastructure-level repository and external-I/O service wraps its public methods with a Sentry span + `instrumentation.capture()` on caught errors. Pattern inspired by [nikolovlazar/nextjs-clean-architecture](https://github.com/nikolovlazar/nextjs-clean-architecture/blob/main/src/infrastructure/repositories/todos.repository.ts), adapted to the codebase's `Result<T, E>` discipline + DI:
 
 ```ts
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
+import type { IInstrumentation } from "@packages/ddd-kit";
 
 export class DrizzleFooRepository implements IFooRepository {
   constructor(private readonly instrumentation: IInstrumentation) {}
@@ -167,7 +168,7 @@ The Sentry SDK protocol (DSN format) is implemented by [GlitchTip](https://glitc
 SENTRY_DSN=https://<public-key>@glitchtip.your-domain.com/<project-id>
 ```
 
-No code change. For a non-compatible provider, replace `SentryInstrumentation` with your own `IInstrumentation` impl. The port (`apps/api/src/shared/ports/instrumentation.port.ts`) is the contract.
+No code change. For a non-compatible provider, replace `SentryInstrumentation` with your own `IInstrumentation` impl. The port (`IInstrumentation` in `packages/ddd-kit/src/application/instrumentation.ts`) is the contract.
 
 ## Privacy / EU residency
 

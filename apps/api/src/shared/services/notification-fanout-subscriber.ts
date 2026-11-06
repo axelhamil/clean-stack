@@ -1,4 +1,4 @@
-import type { IUnitOfWork } from "@packages/ddd-kit";
+import type { IInstrumentation, IUnitOfWork } from "@packages/ddd-kit";
 import {
   and,
   eq,
@@ -11,7 +11,6 @@ import {
 } from "@packages/drizzle";
 import { type NotificationChannel, notificationConfigOf } from "@packages/events";
 import type { BuiltInEventHandler } from "../event-handlers";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { DeliveredEvent } from "../ports/outbox.port";
 import type { StaffEnv } from "../staff-access";
 import { DEFAULT_DIGEST_HOUR_UTC, digestDueAt } from "./digest-schedule";

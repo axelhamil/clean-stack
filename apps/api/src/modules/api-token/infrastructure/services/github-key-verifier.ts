@@ -1,5 +1,5 @@
+import type { IInstrumentation } from "@packages/ddd-kit";
 import { z } from "zod";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 
 const publicKeysSchema = z.object({
   public_keys: z.array(

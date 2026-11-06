@@ -1,6 +1,6 @@
+import type { IInstrumentation } from "@packages/ddd-kit";
 import { Client, type ClientConfig } from "pg";
 import type { Logger } from "../logger";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 
 const RECONNECT_BACKOFF_MS = 250;
 const RECONNECT_MAX_BACKOFF_MS = 15_000;

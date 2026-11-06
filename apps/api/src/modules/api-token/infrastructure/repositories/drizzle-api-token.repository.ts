@@ -1,4 +1,4 @@
-import { Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import { and, apiTokenSchema, eq, isNull, lt, or, resolveExecutor } from "@packages/drizzle";
 import { dbOperationFailure } from "../../../../shared/db-failure";
 import type {
@@ -8,7 +8,6 @@ import type {
   IApiTokenRepository,
   TokenOwner,
 } from "../../../../shared/ports/api-token.port";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 const t = apiTokenSchema.apiToken;

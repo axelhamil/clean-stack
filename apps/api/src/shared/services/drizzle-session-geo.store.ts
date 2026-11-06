@@ -1,4 +1,4 @@
-import { Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import {
   and,
   desc,
@@ -11,7 +11,6 @@ import {
   schema,
 } from "@packages/drizzle";
 import { dbOperationFailure } from "../db-failure";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { ISessionGeoStore, PreviousSession, SessionGeoError } from "../ports/session-geo.port";
 
 const failure = dbOperationFailure("SESSION_GEO_PROVIDER_FAILURE");

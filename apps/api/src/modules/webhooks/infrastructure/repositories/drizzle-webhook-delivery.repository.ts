@@ -1,4 +1,4 @@
-import { Option, Result, uuidv7 } from "@packages/ddd-kit";
+import { type IInstrumentation, Option, Result, uuidv7 } from "@packages/ddd-kit";
 import {
   and,
   asc,
@@ -22,7 +22,6 @@ import {
   webhooksSchema,
 } from "@packages/drizzle";
 import { createDbFailure } from "../../../../shared/db-failure";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
   DeliveryClaimRequest,
   DeliveryFailure,

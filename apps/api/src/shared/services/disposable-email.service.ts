@@ -1,8 +1,7 @@
 import { resolveMx } from "node:dns/promises";
-import { Result } from "@packages/ddd-kit";
+import { type IInstrumentation, Result } from "@packages/ddd-kit";
 import { env } from "../env";
 import type { DisposableEmailError, IDisposableEmailService } from "../ports/disposable-email.port";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 import { raceWithTimeout } from "../race-with-timeout";
 
 // disposable-email-domains is a CJS array of domains with no type declarations.

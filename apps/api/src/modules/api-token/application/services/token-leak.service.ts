@@ -1,4 +1,4 @@
-import { type IUnitOfWork, type Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, type IUnitOfWork, type Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { toLocale } from "@packages/i18n";
 import { hmacToken, parseToken } from "../../../../shared/crypto/api-token";
@@ -9,7 +9,6 @@ import type {
   IApiTokenRepository,
 } from "../../../../shared/ports/api-token.port";
 import type { IEmailService } from "../../../../shared/ports/email.port";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { IUserAccountStore } from "../../../../shared/ports/user-account.port";
 

@@ -1,9 +1,9 @@
-import { type EventHandler, type IDomainEvent, onEvent, Result } from "@packages/ddd-kit";
-import { EventTypes, UserMfaBackupCodeUsedPayload } from "@packages/events";
+import { type EventHandler, type IDomainEvent, onEvent } from "@packages/ddd-kit";
+import { EventTypes, PayloadByEventType } from "@packages/events";
 import { env } from "../env";
 import { handlerIdempotency } from "../handler-idempotency";
 import { localeForUser } from "../locale-for-user";
-import { logger } from "../logger";
+import { payloadParser } from "../payload-parser";
 import type { IEmailService } from "../ports/email.port";
 import type { IProfileStore } from "../ports/profile.port";
 
@@ -14,23 +14,20 @@ interface BackupCodeUsedNotifierDeps {
 
 const HANDLER_NAME = "notify-backup-code-used";
 
+const parsePayload = payloadParser(PayloadByEventType[EventTypes.USER_MFA_BACKUP_CODE_USED]);
+
 export const backupCodeUsedNotifier: (deps: BackupCodeUsedNotifierDeps) => EventHandler = onEvent(
   EventTypes.USER_MFA_BACKUP_CODE_USED,
   HANDLER_NAME,
-  (deps: BackupCodeUsedNotifierDeps) => async (event: IDomainEvent) => {
-    const parsed = UserMfaBackupCodeUsedPayload.safeParse(event.payload);
-    if (!parsed.success) {
-      logger.warn({ eventType: event.eventType }, "backup-code-used notifier: invalid payload");
-      return Result.ok();
-    }
-
+  (deps: BackupCodeUsedNotifierDeps) => async (event: IDomainEvent, payload) => {
     const securityUrl = `${env.APP_URL}/settings/account`;
-    const locale = await localeForUser(deps.IProfileStore, parsed.data.userId);
+    const locale = await localeForUser(deps.IProfileStore, payload.userId);
     return deps.IEmailService.sendTemplate(
       "backup_code_used",
-      parsed.data.email,
+      payload.email,
       { securityUrl },
       { locale, ...handlerIdempotency(HANDLER_NAME, event) },
     );
   },
+  { payload: parsePayload },
 );

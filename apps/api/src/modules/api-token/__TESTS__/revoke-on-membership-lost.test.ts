@@ -125,12 +125,14 @@ describe("revokeTokensOnMembershipLost", () => {
     expect(outbox.enqueue).not.toHaveBeenCalled();
   });
 
-  it("silently ignores events with an invalid payload", async () => {
+  it("fails an event with a malformed payload without revoking", async () => {
     const repo = makeRepo();
     const outbox = makeOutbox();
     const handler = revokeTokensOnMembershipLost(makeDeps(repo, outbox));
 
-    await handler.handle(makeOrgMemberRemovedEvent({ garbage: true }));
+    await expect(handler.handle(makeOrgMemberRemovedEvent({ garbage: true }))).rejects.toThrow(
+      "org.member.removed has a malformed payload",
+    );
 
     expect(repo.revokeAllForMembership).not.toHaveBeenCalled();
     expect(outbox.enqueue).not.toHaveBeenCalled();

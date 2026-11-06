@@ -1,11 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
-import { InMemoryEventDispatcher, Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
+import {
+  type IInstrumentation,
+  InMemoryEventDispatcher,
+  Option,
+  Result,
+  UnitOfWorkContext,
+} from "@packages/ddd-kit";
 import { EventTypes, OUTBOX_LAST_ERROR_MAX_LENGTH, OutboxEventDeadPayload } from "@packages/events";
 import { mockPort, type PortMock } from "@packages/test/bun";
 import { mockUnitOfWork, type UnitOfWorkMock } from "@packages/test/bun/unit-of-work";
 import { mockInstrumentation } from "../../../__TESTS__/mock-instrumentation";
 import { logger } from "../../logger";
-import type { IInstrumentation } from "../../ports/instrumentation.port";
 import type {
   DeliveredEvent,
   IOutboxRepository,

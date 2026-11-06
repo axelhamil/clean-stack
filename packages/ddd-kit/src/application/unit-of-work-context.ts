@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { IDomainEvent } from "../domain/domain-event";
 
-export interface UnitOfWorkScope {
+interface UnitOfWorkScope {
   tx: unknown;
   events: IDomainEvent[];
   closed: boolean;

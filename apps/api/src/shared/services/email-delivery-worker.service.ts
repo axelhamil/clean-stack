@@ -1,4 +1,4 @@
-import { type IUnitOfWork, Option, type Result } from "@packages/ddd-kit";
+import { type IInstrumentation, type IUnitOfWork, Option, type Result } from "@packages/ddd-kit";
 import { type EmailTemplateKey, renderTemplate } from "@packages/emails";
 import { EventTypes } from "@packages/events";
 import { DEFAULT_LOCALE } from "@packages/i18n";
@@ -16,7 +16,6 @@ import type {
   EmailQueueError,
   IEmailQueue,
 } from "../ports/email-queue.port";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IOutboxRepository } from "../ports/outbox.port";
 import { canonicalize } from "./audit-hash";
 
