@@ -160,7 +160,7 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
     );
   }
 
-  async revoke(id: string, reason: ApiTokenRevokedReason): Promise<Result<void, ApiTokenError>> {
+  async revoke(id: string, reason: ApiTokenRevokedReason): Promise<Result<boolean, ApiTokenError>> {
     const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleApiTokenRepository > revoke" },
@@ -169,12 +169,13 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
           const query = exec
             .update(t)
             .set({ revokedAt: new Date(), revokedReason: reason })
-            .where(and(eq(t.id, id), isNull(t.revokedAt)));
-          await this.instrumentation.startSpan(
+            .where(and(eq(t.id, id), isNull(t.revokedAt)))
+            .returning({ id: t.id });
+          const rows = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-          return Result.ok();
+          return Result.ok(rows.length > 0);
         } catch (err) {
           this.instrumentation.capture(err);
           return Result.fail(storeFailure("revoke"));

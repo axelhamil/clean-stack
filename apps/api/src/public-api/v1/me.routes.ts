@@ -1,11 +1,12 @@
+import { AppErrorException, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { Hono } from "hono";
 import { z } from "zod";
-import { updateUserName } from "../../auth-queries";
 import { di } from "../../container";
 import { emitEvent } from "../../shared/event-emitter";
 import type { ApiTokenVariables } from "../../shared/middleware/api-token.middleware";
 import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
+import type { UserAccountError } from "../../shared/ports/user-account.port";
 import { zV } from "../../shared/validator";
 import { requireScope } from "../require-scope";
 import { meResponseSchema } from "./schemas";
@@ -25,8 +26,10 @@ export const mePublicRoutes = new Hono<{ Variables: ApiTokenVariables }>()
       const { name } = c.req.valid("json");
       const userId = c.get("user").id;
 
-      await di.ITransactionService.run(async () => {
-        await updateUserName(userId, name);
+      const updated = await di.ITransactionService.run(async () => {
+        const written = await di.IUserAccountStore.setName(userId, name);
+        if (written.isFailure) return written;
+
         await emitEvent(
           di.IOutboxRepository,
           EventTypes.USER_PROFILE_UPDATED,
@@ -35,7 +38,10 @@ export const mePublicRoutes = new Hono<{ Variables: ApiTokenVariables }>()
           { userId, changes: { name } },
           {},
         );
+
+        return Result.ok<UserAccountError>();
       });
+      if (updated.isFailure) throw new AppErrorException(updated.getError());
 
       return c.json({ ok: true });
     },

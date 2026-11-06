@@ -1,6 +1,6 @@
 import { AppErrorException } from "@packages/ddd-kit";
 import { Hono } from "hono";
-import { HTTPException } from "hono/http-exception";
+import { every } from "hono/combine";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
@@ -11,6 +11,8 @@ import { zV } from "../../shared/validator";
 import { createTokenBodySchema } from "./application/dto/create-token.dto";
 
 type Vars = AuthVariables;
+
+const requireTokenCreationInOrg = every(requireOrg, requireOrgPermission({ apiToken: ["create"] }));
 
 /** The JSON shape of a token: no secret material, absent values as `null`. */
 function toTokenJson(record: ApiTokenRecord) {
@@ -51,13 +53,12 @@ export const apiTokenRoutes = new Hono<{ Variables: Vars }>()
 
       if (body.organizationId !== null) {
         if (session.activeOrganizationId !== body.organizationId) {
-          throw new HTTPException(403, { message: "Organization mismatch" });
+          throw new AppErrorException({
+            code: "API_TOKEN_ORGANIZATION_NOT_FOUND",
+            message: "Switch to this organization before creating a token for it.",
+          });
         }
-        const noop = async () => {};
-        // biome-ignore lint/suspicious/noExplicitAny: body scope drives org auth, not path (conditional middleware composition)
-        await requireOrg(c as any, noop);
-        // biome-ignore lint/suspicious/noExplicitAny: body scope drives org auth, not path (conditional middleware composition)
-        await requireOrgPermission({ apiToken: ["create"] })(c as any, noop);
+        await requireTokenCreationInOrg(c, async () => {});
       }
 
       const result = await di.ApiTokenService.create({

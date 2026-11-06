@@ -1,4 +1,5 @@
-import type { Option } from "@packages/ddd-kit";
+import type { Option, Result } from "@packages/ddd-kit";
+import type { BillingError } from "./subscription-read.port";
 
 export interface StripePriceLite {
   priceId: string;
@@ -11,5 +12,5 @@ export interface StripePriceLite {
 }
 
 export interface IStripeCatalogSource {
-  listActivePrices(): Promise<StripePriceLite[]>;
+  listActivePrices(): Promise<Result<StripePriceLite[], BillingError>>;
 }

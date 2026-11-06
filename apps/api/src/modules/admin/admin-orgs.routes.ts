@@ -9,7 +9,6 @@ import {
   requireStaffPermission,
   requireStepUp,
 } from "../../shared/middleware/staff.middleware";
-import { AdminActionService } from "../../shared/services/admin-action.service";
 import {
   setSsoEnforcementBodySchema,
   ssoEnforcementChangeNeedsStepUp,
@@ -19,12 +18,6 @@ import { addStaffNoteBodySchema } from "./application/dto/add-staff-note.dto";
 import { listOrgsQuerySchema } from "./application/dto/list-orgs.dto";
 import { setPlanOverrideBodySchema } from "./application/dto/set-plan-override.dto";
 import { serializeStaffNote } from "./staff-note-response";
-
-const actionSvc = new AdminActionService(
-  di.IOutboxRepository,
-  di.ITransactionService,
-  di.IInstrumentation,
-);
 
 export const adminOrgRoutes = new Hono<{ Variables: AuthVariables }>()
   .get(
@@ -132,7 +125,7 @@ export const adminOrgRoutes = new Hono<{ Variables: AuthVariables }>()
       if (ssoEnforcementChangeNeedsStepUp(body))
         await assertStepUp(c.get("user"), c.get("session"));
 
-      const result = await actionSvc.setSsoEnforcement({
+      const result = await di.AdminActionService.setSsoEnforcement({
         organizationId: c.req.param("id"),
         enforced,
         actorUserId: c.get("user").id,

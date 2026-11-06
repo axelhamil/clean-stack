@@ -1,10 +1,15 @@
-import { Option } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
 import type Stripe from "stripe";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
   IStripeCatalogSource,
   StripePriceLite,
 } from "../../application/ports/stripe-catalog.port";
+import type { BillingError } from "../../application/ports/subscription-read.port";
+
+function isLiveProduct(product: Stripe.Price["product"]): product is Stripe.Product {
+  return typeof product === "object" && !("deleted" in product && product.deleted === true);
+}
 
 export class StripeCatalogSource implements IStripeCatalogSource {
   constructor(
@@ -12,8 +17,8 @@ export class StripeCatalogSource implements IStripeCatalogSource {
     private readonly instrumentation: IInstrumentation,
   ) {}
 
-  async listActivePrices(): Promise<StripePriceLite[]> {
-    return this.instrumentation.startSpan<StripePriceLite[]>(
+  async listActivePrices(): Promise<Result<StripePriceLite[], BillingError>> {
+    return this.instrumentation.startSpan<Result<StripePriceLite[], BillingError>>(
       { name: "StripeCatalogSource > listActivePrices" },
       async () => {
         try {
@@ -22,8 +27,10 @@ export class StripeCatalogSource implements IStripeCatalogSource {
             () => this.stripe.prices.list({ active: true, expand: ["data.product"] }),
           );
 
-          return res.data.flatMap((price): StripePriceLite[] => {
-            const product = price.product as Stripe.Product;
+          const prices = res.data.flatMap((price): StripePriceLite[] => {
+            const product = price.product;
+            if (!isLiveProduct(product)) return [];
+
             const tier = product.metadata?.tier;
             if (!tier) return [];
 
@@ -41,9 +48,14 @@ export class StripeCatalogSource implements IStripeCatalogSource {
               },
             ];
           });
+
+          return Result.ok(prices);
         } catch (err) {
           this.instrumentation.capture(err);
-          throw err;
+          return Result.fail({
+            code: "BILLING_PROVIDER_FAILURE",
+            message: "The plan catalog could not be loaded.",
+          });
         }
       },
     );

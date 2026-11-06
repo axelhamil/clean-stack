@@ -116,7 +116,7 @@ describe("POST /admin/impersonation/:id/start", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ reason: "testing self" }),
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
   });
 
   it("relays the impersonation cookie and emits the start event", async () => {

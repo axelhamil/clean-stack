@@ -19,14 +19,6 @@ mock.module("../../../container", () => ({
   },
 }));
 
-const mockUpdateUserName = mock(async () => {});
-
-const realAuthQueries = await import("../../../auth-queries");
-mock.module("../../../auth-queries", () => ({
-  ...realAuthQueries,
-  updateUserName: mockUpdateUserName,
-}));
-
 const { requireCurrentPolicies } = await import("../policy.middleware");
 const { mePublicRoutes } = await import("../../../public-api/v1/me.routes");
 

@@ -1,4 +1,4 @@
-import { type AnyPgColumn, and, or, type SQL, sql } from "@packages/drizzle";
+import { type AnyPgColumn, and, lt, or, type SQL, sql } from "@packages/drizzle";
 import { z } from "zod";
 
 const SEPARATOR = "~";
@@ -35,6 +35,6 @@ export function afterTimeIdCursor(
 ): SQL | undefined {
   return or(
     sql`${timeColumn} < ${cursor.at}`,
-    and(sql`${timeColumn} = ${cursor.at}`, sql`${idColumn} < ${cursor.id}`),
+    and(sql`${timeColumn} = ${cursor.at}`, lt(idColumn, cursor.id)),
   );
 }

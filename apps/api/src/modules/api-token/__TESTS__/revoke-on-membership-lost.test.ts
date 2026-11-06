@@ -1,35 +1,26 @@
-import { describe, expect, it, mock } from "bun:test";
-import { Option, Result } from "@packages/ddd-kit";
+import { describe, expect, it } from "bun:test";
+import { Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { mockPort, type PortMock } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
+import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
 import type { ApiTokenError, IApiTokenRepository } from "../../../shared/ports/api-token.port";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import { revokeTokensOnMembershipLost } from "../application/event-handlers/revoke-on-membership-lost";
 
-function makeRepo(over: Partial<IApiTokenRepository> = {}): IApiTokenRepository {
-  return {
-    insert: mock(async () => Result.ok()),
-    listByOwner: mock(async () => Result.ok([])),
-    findByIdForOwner: mock(async () => Result.ok(Option.none())),
-    findByHmac: mock(async () => Result.ok(Option.none())),
-    revoke: mock(async () => Result.ok()),
-    revokeAllForMembership: mock(async () => Result.ok<string[], ApiTokenError>([])),
-    touchLastUsed: mock(async () => Result.ok(false)),
-    rehash: mock(async () => Result.ok()),
-    ...over,
-  } as IApiTokenRepository;
+function makeRepo(revoked: Result<string[], ApiTokenError> = Result.ok([])) {
+  const repo = mockPort<IApiTokenRepository>();
+  repo.revokeAllForMembership.mockResolvedValue(revoked);
+  return repo;
 }
 
-function makeOutbox(): IOutboxRepository {
-  return {
-    enqueue: mock(async () => {}),
-    findPendingBatch: mock(async () => []),
-    markDispatched: mock(async () => {}),
-    markFailed: mock(async () => {}),
-  } as unknown as IOutboxRepository;
+function makeOutbox() {
+  const outbox = mockPort<IOutboxRepository>();
+  outbox.enqueue.mockResolvedValue(undefined);
+  return outbox;
 }
 
-function makeDeps(repo: IApiTokenRepository, outbox = makeOutbox()) {
+function makeDeps(repo: PortMock<IApiTokenRepository>, outbox = makeOutbox()) {
   return {
     IApiTokenRepository: repo,
     IOutboxRepository: outbox,
@@ -52,9 +43,7 @@ function makeOrgMemberRemovedEvent(payload: object) {
 describe("revokeTokensOnMembershipLost", () => {
   it("revokes tokens of the removed member in the target org and emits one event per token", async () => {
     const tokenIds = ["tok-a", "tok-b"];
-    const repo = makeRepo({
-      revokeAllForMembership: mock(async () => Result.ok<string[], ApiTokenError>(tokenIds)),
-    });
+    const repo = makeRepo(Result.ok(tokenIds));
     const outbox = makeOutbox();
     const handler = revokeTokensOnMembershipLost(makeDeps(repo, outbox));
 
@@ -67,24 +56,23 @@ describe("revokeTokensOnMembershipLost", () => {
     );
 
     expect(repo.revokeAllForMembership).toHaveBeenCalledWith("user-1", "org-1");
-    expect(outbox.enqueue).toHaveBeenCalledTimes(2);
-
-    const calls = (outbox.enqueue as ReturnType<typeof mock>).mock.calls;
-    for (const [events] of calls) {
-      const event = events[0];
-      expect(event.eventType).toBe(EventTypes.API_TOKEN_REVOKED);
-      expect(event.payload.reason).toBe("membership_lost");
-      expect(event.payload.actorUserId).toBe("admin-1");
-      expect(event.payload.userId).toBe("user-1");
-      expect(event.payload.organizationId).toBe("org-1");
-      expect(tokenIds).toContain(event.payload.tokenId);
-    }
+    expect(enqueuedEvents(outbox)).toEqual(
+      tokenIds.map((tokenId) => ({
+        eventType: EventTypes.API_TOKEN_REVOKED,
+        aggregateId: tokenId,
+        payload: {
+          userId: "user-1",
+          actorUserId: "admin-1",
+          organizationId: "org-1",
+          tokenId,
+          reason: "membership_lost",
+        },
+      })),
+    );
   });
 
   it("does not emit any event when no tokens are revoked", async () => {
-    const repo = makeRepo({
-      revokeAllForMembership: mock(async () => Result.ok<string[], ApiTokenError>([])),
-    });
+    const repo = makeRepo();
     const outbox = makeOutbox();
     const handler = revokeTokensOnMembershipLost(makeDeps(repo, outbox));
 
@@ -100,12 +88,10 @@ describe("revokeTokensOnMembershipLost", () => {
   });
 
   it("does not revoke tokens from a different organization", async () => {
-    const repo = makeRepo({
-      revokeAllForMembership: mock(async (_userId: string, organizationId: string) => {
-        if (organizationId === "org-other") return Result.ok<string[], ApiTokenError>(["tok-x"]);
-        return Result.ok<string[], ApiTokenError>([]);
-      }),
-    });
+    const repo = makeRepo();
+    repo.revokeAllForMembership.mockImplementation(async (_userId, organizationId) =>
+      Result.ok(organizationId === "org-other" ? ["tok-x"] : []),
+    );
     const outbox = makeOutbox();
     const handler = revokeTokensOnMembershipLost(makeDeps(repo, outbox));
 
@@ -122,14 +108,7 @@ describe("revokeTokensOnMembershipLost", () => {
   });
 
   it("given a repository failure, when handled, then it throws so the delivery is retried", async () => {
-    const repo = makeRepo({
-      revokeAllForMembership: mock(async () =>
-        Result.fail<string[], ApiTokenError>({
-          code: "API_TOKEN_PROVIDER_FAILURE",
-          message: "db error",
-        }),
-      ),
-    });
+    const repo = makeRepo(Result.fail({ code: "API_TOKEN_PROVIDER_FAILURE", message: "db error" }));
     const outbox = makeOutbox();
     const handler = revokeTokensOnMembershipLost(makeDeps(repo, outbox));
 

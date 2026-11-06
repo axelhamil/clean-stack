@@ -246,6 +246,18 @@ describe("AdminModerationService impersonation", () => {
     expect(outcome()).toBe("rolled_back");
   });
 
+  it("refuses to impersonate one's own account before announcing anything", async () => {
+    const { service, outbox, outcome } = setup();
+    const library = mock(async () => Result.ok("cookie"));
+
+    const result = await service.startImpersonation({ ...start, userId: "admin" }, library);
+
+    expect(result.getError()).toMatchObject({ code: "ADMIN_IMPERSONATION_SELF_FORBIDDEN" });
+    expect(library).not.toHaveBeenCalled();
+    expect(types(outbox)).toEqual([]);
+    expect(outcome()).toBe("not_started");
+  });
+
   it("hands the library's answer back on success", async () => {
     const { service, outcome } = setup();
 

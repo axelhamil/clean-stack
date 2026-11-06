@@ -24,8 +24,6 @@ export class BillingPortalService {
       return Result.fail({ code: "BILLING_NOT_FOUND", message: "No paid subscription to manage." });
     }
 
-    const url = await this.gateway.createSessionUrl(customer.unwrap(), returnUrl);
-
-    return Result.ok(url);
+    return this.gateway.createSessionUrl(customer.unwrap(), returnUrl);
   }
 }

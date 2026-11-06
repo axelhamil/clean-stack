@@ -3,7 +3,7 @@ import type Stripe from "stripe";
 
 export interface PaymentFailure {
   organizationId: string;
-  subscriptionId: string;
+  subscriptionId: Option<string>;
   invoiceId: string;
 }
 
@@ -19,7 +19,9 @@ export function paymentFailureOf(event: Stripe.Event): Option<PaymentFailure> {
 
   return Option.some({
     organizationId,
-    subscriptionId: typeof details?.subscription === "string" ? details.subscription : "",
+    subscriptionId: Option.fromNullable(
+      typeof details?.subscription === "string" ? details.subscription : null,
+    ),
     invoiceId: invoice.id,
   });
 }

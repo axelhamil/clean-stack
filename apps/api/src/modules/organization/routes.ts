@@ -6,16 +6,9 @@ import { requireFeature } from "../../shared/middleware/billing.middleware";
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.middleware";
 import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
-import { AdminActionService } from "../../shared/services/admin-action.service";
 import { ScimConnectionService } from "../../shared/services/scim-connection.service";
 import { setSsoEnforcementBodySchema } from "../../shared/services/set-sso-enforcement.dto";
 import { zV } from "../../shared/validator";
-
-const actionSvc = new AdminActionService(
-  di.IOutboxRepository,
-  di.ITransactionService,
-  di.IInstrumentation,
-);
 
 const scimSvc = new ScimConnectionService(
   di.IOutboxRepository,
@@ -47,7 +40,7 @@ export const organizationSettingsRoutes = new Hono<{ Variables: AuthVariables }>
     zV("json", setSsoEnforcementBodySchema),
     async (c) => {
       const orgId = c.get("orgId");
-      const result = await actionSvc.setSsoEnforcement({
+      const result = await di.AdminActionService.setSsoEnforcement({
         organizationId: orgId,
         enforced: c.req.valid("json").enforced,
         actorUserId: c.get("user").id,

@@ -24,7 +24,8 @@ describe("paymentFailureOf", () => {
   it("announces an invoice still unpaid", () => {
     const failure = paymentFailureOf(invoiceEvent("invoice.payment_failed", "open", "org-1"));
 
-    expect(failure.unwrap()).toEqual({
+    const { organizationId, subscriptionId, invoiceId } = failure.unwrap();
+    expect({ organizationId, subscriptionId: subscriptionId.unwrapOr("none"), invoiceId }).toEqual({
       organizationId: "org-1",
       subscriptionId: "sub_1",
       invoiceId: "in_1",

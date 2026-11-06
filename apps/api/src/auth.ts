@@ -406,8 +406,8 @@ async function handleStripeEvent(event: Stripe.Event): Promise<void> {
   await emit(
     EventTypes.BILLING_PAYMENT_FAILED,
     "subscription",
-    subscriptionId || invoiceId,
-    { organizationId, subscriptionId, invoiceId, actorUserId: null },
+    subscriptionId.unwrapOr(invoiceId),
+    { organizationId, subscriptionId: subscriptionId.unwrapOr(""), invoiceId, actorUserId: null },
     organizationId,
     derivedEventId(event.id, EventTypes.BILLING_PAYMENT_FAILED),
   );

@@ -33,6 +33,8 @@ import type { IRateLimiter, IRateLimitUsage } from "./shared/ports/rate-limiter.
 import type { ISessionGeoStore } from "./shared/ports/session-geo.port";
 import type { ISweepRunStore } from "./shared/ports/sweep-run.port";
 import type { ITotpVerifier } from "./shared/ports/totp-verifier.port";
+import type { IUserAccountStore } from "./shared/ports/user-account.port";
+import { AdminActionService } from "./shared/services/admin-action.service";
 import { AuditEventSubscriber } from "./shared/services/audit-event-subscriber";
 import { backupCodeUsedNotifier } from "./shared/services/backup-code-used-notifier";
 import { DisposableEmailService } from "./shared/services/disposable-email.service";
@@ -42,6 +44,7 @@ import { DrizzleOutboxRepository } from "./shared/services/drizzle-outbox.servic
 import { DrizzleSessionGeoStore } from "./shared/services/drizzle-session-geo.store";
 import { DrizzleSweepRunStore } from "./shared/services/drizzle-sweep-run.store";
 import { DrizzleTotpVerifier } from "./shared/services/drizzle-totp-verifier";
+import { DrizzleUserAccountStore } from "./shared/services/drizzle-user-account.store";
 import { QueuedEmailService } from "./shared/services/email.service";
 import { EmailDeliveryWorker } from "./shared/services/email-delivery-worker.service";
 import { HeaderIpGeoService } from "./shared/services/header-ip-geo.service";
@@ -81,7 +84,9 @@ declare module "inwire" {
     ICaptchaService: ICaptchaService;
     IIpGeoService: IIpGeoService;
     ISessionGeoStore: ISessionGeoStore;
+    IUserAccountStore: IUserAccountStore;
     SecuritySignalsService: SecuritySignalsService;
+    AdminActionService: AdminActionService;
     AuditEventSubscriber: AuditEventSubscriber;
     WebhookFanoutSubscriber: WebhookFanoutSubscriber;
     NotificationFanoutSubscriber: NotificationFanoutSubscriber;
@@ -173,6 +178,10 @@ export const di = container()
   )
   .add("ISessionGeoStore", (c): ISessionGeoStore => new DrizzleSessionGeoStore(c.IInstrumentation))
   .add(
+    "IUserAccountStore",
+    (c): IUserAccountStore => new DrizzleUserAccountStore(c.IInstrumentation),
+  )
+  .add(
     "SecuritySignalsService",
     (c) =>
       new SecuritySignalsService(c.ISessionGeoStore, c.IOutboxRepository, {
@@ -180,6 +189,10 @@ export const di = container()
         denyAsns: env.SECURITY_DENY_ASNS,
         impossibleTravelWindowMinutes: env.IMPOSSIBLE_TRAVEL_WINDOW_MINUTES,
       }),
+  )
+  .add(
+    "AdminActionService",
+    (c) => new AdminActionService(c.IOutboxRepository, c.ITransactionService, c.IInstrumentation),
   )
   .add(
     "AuditEventSubscriber",

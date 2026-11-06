@@ -1,11 +1,12 @@
 import { describe, expect, it, mock } from "bun:test";
-import { Option } from "@packages/ddd-kit";
+import { Option, Result } from "@packages/ddd-kit";
 import { ENTITLEMENTS } from "../../../shared/entitlements";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type {
   IStripeCatalogSource,
   StripePriceLite,
 } from "../application/ports/stripe-catalog.port";
+import type { BillingError } from "../application/ports/subscription-read.port";
 import { BillingCatalogService } from "../application/services/billing-catalog.service";
 
 const proPrice: StripePriceLite = {
@@ -19,7 +20,7 @@ const proPrice: StripePriceLite = {
 };
 
 function makeSource(prices: StripePriceLite[]): IStripeCatalogSource {
-  return { listActivePrices: mock(async () => prices) };
+  return { listActivePrices: mock(async () => Result.ok<StripePriceLite[], BillingError>(prices)) };
 }
 
 describe("BillingCatalogService", () => {
@@ -45,17 +46,35 @@ describe("BillingCatalogService", () => {
     expect(catalog.map((c) => c.tier)).toEqual(["free"]);
   });
 
-  it("degrades to a free-only catalog when the source rejects (no throw)", async () => {
+  it("degrades to a free-only catalog when the source fails", async () => {
     const source: IStripeCatalogSource = {
-      listActivePrices: mock(async () => {
-        throw new Error("stripe down");
-      }),
+      listActivePrices: mock(async () =>
+        Result.fail<StripePriceLite[], BillingError>({
+          code: "BILLING_PROVIDER_FAILURE",
+          message: "stripe down",
+        }),
+      ),
     };
     const svc = new BillingCatalogService(source, new NoOpInstrumentation());
     const catalog = await svc.getCatalog();
     expect(catalog.length).toBe(1);
     expect(catalog[0]?.tier).toBe("free");
     expect(catalog[0]?.priceId).toBeNull();
+  });
+
+  it("asks the source again after a failure instead of caching the degraded catalog", async () => {
+    const source: IStripeCatalogSource = {
+      listActivePrices: mock(async () =>
+        Result.fail<StripePriceLite[], BillingError>({
+          code: "BILLING_PROVIDER_FAILURE",
+          message: "stripe down",
+        }),
+      ),
+    };
+    const svc = new BillingCatalogService(source, new NoOpInstrumentation(), () => 1000);
+    await svc.getCatalog();
+    await svc.getCatalog();
+    expect(source.listActivePrices).toHaveBeenCalledTimes(2);
   });
 
   it("caches within the TTL (single upstream call for two reads)", async () => {

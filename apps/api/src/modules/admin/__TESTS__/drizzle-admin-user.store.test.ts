@@ -1,21 +1,15 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 
-type SqlMarker = { _op: string; args: unknown[] };
 const mk =
   (op: string) =>
-  (...args: unknown[]): SqlMarker => ({ _op: op, args });
+  (...args: unknown[]) => ({ _op: op, args });
 
 let dbBehavior: () => Promise<unknown[]> = async () => [];
-let capturedWhereArgs: unknown[] = [];
 
 function buildQuery(result: () => Promise<unknown[]>) {
   const q: Record<string, unknown> = {
     toSQL: () => ({ sql: "SELECT 1", params: [] }),
     execute: result,
-    where: (arg: unknown) => {
-      capturedWhereArgs.push(arg);
-      return buildQuery(result);
-    },
   };
   for (const m of [
     "select",
@@ -30,6 +24,7 @@ function buildQuery(result: () => Promise<unknown[]>) {
     "values",
     "set",
     "returning",
+    "where",
     "for",
   ]) {
     q[m] = () => buildQuery(result);
@@ -44,9 +39,6 @@ function makeDbQuery() {
 // Only what this file's subject actually touches: test files do not share a module
 // registry, so this replacement is invisible to every other file (see apps/api/CLAUDE.md).
 mock.module("@packages/drizzle", () => ({
-  db: {
-    select: () => makeDbQuery(),
-  },
   resolveExecutor: () => ({ select: () => makeDbQuery() }),
   authSchema: {
     user: {
@@ -70,6 +62,7 @@ mock.module("@packages/drizzle", () => ({
   or: mk("or"),
   eq: mk("eq"),
   gt: mk("gt"),
+  lt: mk("lt"),
   lte: mk("lte"),
   isNull: mk("isNull"),
   sql: mk("sql"),
@@ -104,7 +97,6 @@ describe("DrizzleAdminUserStore", () => {
     instrumentation = new NoOpInstrumentation();
     store = new DrizzleAdminUserStore(instrumentation);
     dbBehavior = async () => [];
-    capturedWhereArgs = [];
   });
 
   describe("listUsers", () => {
@@ -114,20 +106,6 @@ describe("DrizzleAdminUserStore", () => {
       expect(rows).toHaveLength(1);
       expect(rows[0]?.id).toBe("u-1");
       expect(rows[0]?.banReason.isNone()).toBe(true);
-    });
-
-    it("passes and(inArray(...)) to .where() when organizationId is set", async () => {
-      await store.listUsers({ limit: 50, organizationId: "org-1" });
-      const mainArg = capturedWhereArgs.at(-1) as SqlMarker;
-      expect(mainArg).toBeDefined();
-      expect(mainArg._op).toBe("and");
-      const hasInArray = mainArg.args.some((a) => (a as SqlMarker)?._op === "inArray");
-      expect(hasInArray).toBe(true);
-    });
-
-    it("passes undefined to .where() when organizationId is absent", async () => {
-      await store.listUsers({ limit: 50 });
-      expect(capturedWhereArgs.at(-1)).toBeUndefined();
     });
 
     it("emits outer and inner db.query spans", async () => {

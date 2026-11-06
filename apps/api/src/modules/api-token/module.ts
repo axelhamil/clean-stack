@@ -1,9 +1,10 @@
-import type { EventHandler } from "@packages/ddd-kit";
+import { type EventHandler, Option } from "@packages/ddd-kit";
 import { defineModule } from "inwire";
 import { env } from "../../shared/env";
 import type { IApiTokenRepository } from "../../shared/ports/api-token.port";
 import { revokeTokensOnMembershipLost } from "./application/event-handlers/revoke-on-membership-lost";
 import { ApiTokenService } from "./application/services/api-token.service";
+import { TokenLeakService } from "./application/services/token-leak.service";
 import { DrizzleApiTokenRepository } from "./infrastructure/repositories/drizzle-api-token.repository";
 import { GithubKeyVerifier } from "./infrastructure/services/github-key-verifier";
 
@@ -11,6 +12,7 @@ declare module "inwire" {
   interface AppDeps {
     IApiTokenRepository: IApiTokenRepository;
     ApiTokenService: ApiTokenService;
+    TokenLeakService: TokenLeakService;
     RevokeTokensOnMembershipLost: EventHandler;
     GithubKeyVerifier: GithubKeyVerifier;
   }
@@ -33,6 +35,23 @@ export const apiTokenModule = defineModule()((b) =>
             pepper: env.API_TOKEN_PEPPER ?? "dev-only-pepper-not-for-production-use",
             maxExpiryDays: env.API_TOKEN_MAX_EXPIRY_DAYS,
             pepperVersion: env.API_TOKEN_PEPPER_VERSION,
+          },
+        ),
+    )
+    .add(
+      "TokenLeakService",
+      (c) =>
+        new TokenLeakService(
+          c.IApiTokenRepository,
+          c.IOutboxRepository,
+          c.ITransactionService,
+          c.IEmailService,
+          c.IUserAccountStore,
+          c.IInstrumentation,
+          {
+            prefix: env.API_TOKEN_PREFIX,
+            pepper: env.API_TOKEN_PEPPER ?? "dev-only-pepper-not-for-production-use",
+            pepperPrevious: Option.fromNullable(env.API_TOKEN_PEPPER_PREVIOUS),
           },
         ),
     )

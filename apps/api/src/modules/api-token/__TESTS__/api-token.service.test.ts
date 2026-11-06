@@ -1,31 +1,30 @@
-import { describe, expect, it, mock } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import { EventTypes } from "@packages/events";
+import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import type {
-  ApiTokenError,
-  ApiTokenRecord,
-  IApiTokenRepository,
-} from "../../../shared/ports/api-token.port";
+import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
+import type { ApiTokenRecord, IApiTokenRepository } from "../../../shared/ports/api-token.port";
+import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import { ApiTokenService } from "../application/services/api-token.service";
 
-function makeRepo(over: Partial<IApiTokenRepository> = {}): IApiTokenRepository {
-  return {
-    insert: mock(async () => Result.ok()),
-    listByOwner: mock(async () => Result.ok<ApiTokenRecord[]>([])),
-    findByIdForOwner: mock(async () => Result.ok(Option.none<ApiTokenRecord>())),
-    findByHmac: mock(async () => Result.ok(Option.none<ApiTokenRecord>())),
-    revoke: mock(async () => Result.ok()),
-    revokeAllForMembership: mock(async () => Result.ok<string[]>([])),
-    touchLastUsed: mock(async () => Result.ok(false)),
-    rehash: mock(async () => Result.ok()),
-    ...over,
-  } as IApiTokenRepository;
+function makeRepo() {
+  const repo = mockPort<IApiTokenRepository>();
+  repo.insert.mockResolvedValue(Result.ok());
+  repo.listByOwner.mockResolvedValue(Result.ok([]));
+  repo.findByIdForOwner.mockResolvedValue(Result.ok(Option.none()));
+  repo.revoke.mockResolvedValue(Result.ok(true));
+  return repo;
 }
 
-const outbox = { enqueue: mock(async () => "evt") } as never;
+function makeOutbox() {
+  const outbox = mockPort<IOutboxRepository>();
+  outbox.enqueue.mockResolvedValue(undefined);
+  return outbox;
+}
 
-function makeService(repo = makeRepo()) {
+function makeService(repo = makeRepo(), outbox = makeOutbox()) {
   return new ApiTokenService(repo, outbox, mockUnitOfWork().unitOfWork, new NoOpInstrumentation(), {
     prefix: "clean_",
     pepper: "a".repeat(32),
@@ -68,11 +67,7 @@ describe("ApiTokenService", () => {
   });
 
   it("revokes nothing when the token belongs to someone else", async () => {
-    const repo = makeRepo({
-      findByIdForOwner: mock(async () =>
-        Result.ok<Option<ApiTokenRecord>, ApiTokenError>(Option.none<ApiTokenRecord>()),
-      ),
-    });
+    const repo = makeRepo();
     const result = await makeService(repo).revoke("tok1", { kind: "personal", userId: "u2" }, "u2");
     expect(result.isFailure).toBe(true);
     expect(result.getError().code).toBe("API_TOKEN_NOT_FOUND");
@@ -127,10 +122,11 @@ const LEAKY_REPO_ROWS = [
 ];
 
 describe("ApiTokenService.list: visibility scope", () => {
-  const leakyRepo = () =>
-    makeRepo({
-      listByOwner: mock(async () => Result.ok<ApiTokenRecord[], ApiTokenError>(LEAKY_REPO_ROWS)),
-    });
+  const leakyRepo = () => {
+    const repo = makeRepo();
+    repo.listByOwner.mockResolvedValue(Result.ok(LEAKY_REPO_ROWS));
+    return repo;
+  };
 
   it("shows the caller's personal token alongside the active organization's", async () => {
     const result = await makeService(leakyRepo()).list({
@@ -167,12 +163,11 @@ describe("ApiTokenService.list: visibility scope", () => {
 });
 
 describe("ApiTokenService.revoke: visibility scope", () => {
-  const repoReturning = (found: ApiTokenRecord) =>
-    makeRepo({
-      findByIdForOwner: mock(async () =>
-        Result.ok<Option<ApiTokenRecord>, ApiTokenError>(Option.some(found)),
-      ),
-    });
+  const repoReturning = (found: ApiTokenRecord) => {
+    const repo = makeRepo();
+    repo.findByIdForOwner.mockResolvedValue(Result.ok(Option.some(found)));
+    return repo;
+  };
 
   it("revokes a personal token while an organization is active", async () => {
     const repo = repoReturning(MINE_PERSONAL);
@@ -213,5 +208,45 @@ describe("ApiTokenService.revoke: visibility scope", () => {
     expect(result.isFailure).toBe(true);
     expect(result.getError().code).toBe("API_TOKEN_NOT_FOUND");
     expect(repo.revoke).not.toHaveBeenCalled();
+  });
+});
+
+describe("ApiTokenService.revoke: already revoked", () => {
+  const owner = { kind: "personal", userId: "user-1" } as const;
+
+  it("writes nothing and announces nothing when the token was revoked before", async () => {
+    const repo = makeRepo();
+    repo.findByIdForOwner.mockResolvedValue(
+      Result.ok(Option.some({ ...MINE_PERSONAL, revokedAt: Option.some(new Date("2024-06-01")) })),
+    );
+    const outbox = makeOutbox();
+
+    const result = await makeService(repo, outbox).revoke("mine-personal", owner, "user-1");
+
+    expect(result.isSuccess).toBe(true);
+    expect(repo.revoke).not.toHaveBeenCalled();
+    expect(enqueuedEvents(outbox)).toEqual([]);
+  });
+
+  it("announces nothing when a concurrent revocation won the write", async () => {
+    const repo = makeRepo();
+    repo.findByIdForOwner.mockResolvedValue(Result.ok(Option.some(MINE_PERSONAL)));
+    repo.revoke.mockResolvedValue(Result.ok(false));
+    const outbox = makeOutbox();
+
+    const result = await makeService(repo, outbox).revoke("mine-personal", owner, "user-1");
+
+    expect(result.isSuccess).toBe(true);
+    expect(enqueuedEvents(outbox)).toEqual([]);
+  });
+
+  it("announces the revocation of a live token once", async () => {
+    const repo = makeRepo();
+    repo.findByIdForOwner.mockResolvedValue(Result.ok(Option.some(MINE_PERSONAL)));
+    const outbox = makeOutbox();
+
+    await makeService(repo, outbox).revoke("mine-personal", owner, "user-1");
+
+    expect(enqueuedEvents(outbox).map((e) => e.eventType)).toEqual([EventTypes.API_TOKEN_REVOKED]);
   });
 });

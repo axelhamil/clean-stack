@@ -84,7 +84,7 @@ export interface IApiTokenRepository {
     owner: TokenOwner,
   ): Promise<Result<Option<ApiTokenRecord>, ApiTokenError>>;
   findByHmac(hmac: string): Promise<Result<Option<ApiTokenRecord>, ApiTokenError>>;
-  revoke(id: string, reason: ApiTokenRevokedReason): Promise<Result<void, ApiTokenError>>;
+  revoke(id: string, reason: ApiTokenRevokedReason): Promise<Result<boolean, ApiTokenError>>;
   revokeAllForMembership(
     userId: string,
     organizationId: string,

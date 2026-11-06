@@ -124,11 +124,18 @@ export class AdminModerationService {
     return requestReset();
   }
 
-  startImpersonation<T, E>(
+  async startImpersonation<T, E>(
     input: ImpersonationStart,
     start: () => Promise<Result<T, E>>,
-  ): Promise<Result<T, E>> {
-    return this.uow.run(async () => {
+  ): Promise<Result<T, E | AppError<"ADMIN_IMPERSONATION_SELF_FORBIDDEN">>> {
+    if (input.actorUserId === input.userId) {
+      return Result.fail({
+        code: "ADMIN_IMPERSONATION_SELF_FORBIDDEN",
+        message: "You cannot impersonate your own account.",
+      });
+    }
+
+    return this.uow.run(async (): Promise<Result<T, E>> => {
       await emitEvent(this.outbox, EventTypes.ADMIN_IMPERSONATION_STARTED, "user", input.userId, {
         actorUserId: input.actorUserId,
         userId: input.userId,

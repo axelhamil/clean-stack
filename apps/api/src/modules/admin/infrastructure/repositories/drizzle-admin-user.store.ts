@@ -2,7 +2,6 @@ import { Option, Result } from "@packages/ddd-kit";
 import {
   and,
   authSchema,
-  db,
   desc,
   eq,
   gt,
@@ -106,6 +105,8 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
   constructor(private readonly instrumentation: IInstrumentation) {}
 
   async listUsers(input: ListUsersInput): Promise<Result<AdminUserListRow[], AdminStoreError>> {
+    const exec = resolveExecutor();
+
     return this.instrumentation.startSpan(
       { name: "DrizzleAdminUserStore > listUsers" },
       async () => {
@@ -126,7 +127,7 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
             conditions.push(
               inArray(
                 user.id,
-                db
+                exec
                   .select({ userId: member.userId })
                   .from(member)
                   .where(eq(member.organizationId, input.organizationId)),
@@ -134,7 +135,7 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
             );
           }
 
-          const query = db
+          const query = exec
             .select({ ...userColumns(), cursorAt: exactInstant(user.createdAt) })
             .from(user)
             .where(conditions.length ? and(...conditions) : undefined)
@@ -156,12 +157,14 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
   }
 
   async findUserById(id: string): Promise<Result<Option<AdminUserRow>, AdminStoreError>> {
+    const exec = resolveExecutor();
+
     return this.instrumentation.startSpan(
       { name: "DrizzleAdminUserStore > findUserById" },
       async () => {
         try {
           const { user } = authSchema;
-          const query = db.select(userColumns()).from(user).where(eq(user.id, id)).limit(1);
+          const query = exec.select(userColumns()).from(user).where(eq(user.id, id)).limit(1);
 
           const [row] = await this.instrumentation.startSpan(
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
@@ -178,12 +181,14 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
   }
 
   async listSessionsFor(userId: string): Promise<Result<AdminSessionRow[], AdminStoreError>> {
+    const exec = resolveExecutor();
+
     return this.instrumentation.startSpan(
       { name: "DrizzleAdminUserStore > listSessionsFor" },
       async () => {
         try {
           const { session } = authSchema;
-          const query = db
+          const query = exec
             .select({
               id: session.id,
               createdAt: session.createdAt,
@@ -211,12 +216,14 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
   }
 
   async listMembershipsFor(userId: string): Promise<Result<AdminMembershipRow[], AdminStoreError>> {
+    const exec = resolveExecutor();
+
     return this.instrumentation.startSpan(
       { name: "DrizzleAdminUserStore > listMembershipsFor" },
       async () => {
         try {
           const { member, organization } = multiTenantSchema;
-          const query = db
+          const query = exec
             .select({
               organizationId: member.organizationId,
               organizationName: organization.name,

@@ -47,7 +47,6 @@ const testUser = {
 mock.module("../../auth-queries", () => ({
   ...realAuthQueries,
   findUserById: async (id: string) => (id === "u1" ? testUser : undefined),
-  updateUserName: async () => {},
   findUserOrganizations: async () => [],
 }));
 
@@ -102,7 +101,7 @@ function makeRepo(): IApiTokenRepository {
     insert: async () => Result.ok(),
     listByOwner: async () => Result.ok([]),
     findByIdForOwner: async () => Result.ok(Option.none()),
-    revoke: async () => Result.ok(),
+    revoke: async () => Result.ok(true),
     revokeAllForMembership: async () => Result.ok([]),
   } as IApiTokenRepository;
 }

@@ -3,12 +3,12 @@ import {
   and,
   authSchema,
   count,
-  db,
   desc,
   eq,
   ilike,
   multiTenantSchema,
   or,
+  resolveExecutor,
 } from "@packages/drizzle";
 import { createDbFailure } from "../../../../shared/db-failure";
 import { afterTimeIdCursor, exactInstant } from "../../../../shared/pagination/time-id-cursor";
@@ -43,6 +43,8 @@ export class DrizzleAdminOrgStore implements IAdminOrgStore {
   constructor(private readonly instrumentation: IInstrumentation) {}
 
   async listOrgs(input: ListOrgsInput): Promise<Result<AdminOrgListRow[], AdminStoreError>> {
+    const exec = resolveExecutor();
+
     return this.instrumentation.startSpan({ name: "DrizzleAdminOrgStore > listOrgs" }, async () => {
       try {
         const { organization, member } = multiTenantSchema;
@@ -59,7 +61,7 @@ export class DrizzleAdminOrgStore implements IAdminOrgStore {
           conditions.push(afterTimeIdCursor(organization.createdAt, organization.id, input.cursor));
         }
 
-        const query = db
+        const query = exec
           .select({ ...orgColumns(), cursorAt: exactInstant(organization.createdAt) })
           .from(organization)
           .leftJoin(member, eq(member.organizationId, organization.id))
@@ -82,12 +84,14 @@ export class DrizzleAdminOrgStore implements IAdminOrgStore {
   }
 
   async findOrgById(id: string): Promise<Result<Option<AdminOrgRow>, AdminStoreError>> {
+    const exec = resolveExecutor();
+
     return this.instrumentation.startSpan(
       { name: "DrizzleAdminOrgStore > findOrgById" },
       async () => {
         try {
           const { organization, member } = multiTenantSchema;
-          const query = db
+          const query = exec
             .select(orgColumns())
             .from(organization)
             .leftJoin(member, eq(member.organizationId, organization.id))
@@ -112,12 +116,14 @@ export class DrizzleAdminOrgStore implements IAdminOrgStore {
   async listMembersOf(
     organizationId: string,
   ): Promise<Result<AdminOrgMemberRow[], AdminStoreError>> {
+    const exec = resolveExecutor();
+
     return this.instrumentation.startSpan(
       { name: "DrizzleAdminOrgStore > listMembersOf" },
       async () => {
         try {
           const { member } = multiTenantSchema;
-          const query = db
+          const query = exec
             .select({
               userId: member.userId,
               email: authSchema.user.email,
