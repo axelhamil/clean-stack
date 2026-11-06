@@ -11,7 +11,6 @@ src/
   config.ts                    `db`, `DbClient`, `Transaction`, `closeDb()` (ends the pool, called by the api shutdown)
   schema/<topic>.ts            one file per topic (auth, multi-tenant, outbox, audit-log, webhooks, billing, ...), re-exported as `<topic>Schema` from `index.ts`
   advisory-lock.ts             `lockForTransaction`, `tryLockForTransaction` (transaction scoped advisory lock)
-  repositories/track-events.ts `trackEventsOnSuccess`
   services/                    `TransactionService` (the `IUnitOfWork` impl)
   seeds/                       dev seeds
   rate-limit-client.ts         dedicated pool for the rate-limiter store, `closeRateLimitDb()`
@@ -26,7 +25,7 @@ src/
 
 ## Unit of work
 
-`TransactionService implements IUnitOfWork`; no transaction handle crosses its interface. It takes a minimal instrumentation slice (`UnitOfWorkInstrumentation`) because a package cannot import the app's port; any `IInstrumentation` fits.
+`TransactionService implements IUnitOfWork`; no transaction handle crosses its interface. It takes the kit's `IInstrumentation` port.
 
 - `run(cb)` opens the ambient scope (transaction + `EventCollector` buffer), runs `cb()`, drains the collected events and hands them to the `FlushHandler` (the outbox) before commit, so the writes and their events are atomic.
 - The outermost `run()` opens `db.transaction` and publishes it in `UnitOfWorkContext`; a nested `run()` joins it (no savepoint, no second connection) and its events are kept for the outermost flush. A failed `Result` at any depth marks the unit rollback-only (first failure kept) and the outermost `run()` resolves to it; a nested throw dooms it too, and the outermost `run()` rethrows that error even when the outer work caught it. **Why no savepoint**: `rollback to savepoint` cannot un-collect the in-memory event buffer, so a partial rollback would still emit events.
@@ -36,7 +35,7 @@ src/
 - A lock held until the transaction ends goes through `lockForTransaction(key)` (waits) or `tryLockForTransaction(key)` (gives up, returns `false`), both on `resolveExecutor()`. Outside a run the lock is released at once, so take it inside one. **Why the key and its hash never change**: during a deploy the old and the new instance run side by side, and a different key or hash makes them miss each other's lock.
 - The scope is closed when its run settles, so a promise that outlives the run gets `db`. **Why**: node-postgres does not guard a query on a released client, it may run on a connection another borrower holds.
 - A callback that resolves to a failed `Result` rolls everything back (writes and events) and `run()` resolves to that `Result`; return the failure, never throw a sentinel. Proven against Postgres by `check:uow-rollback` (`apps/api`).
-- A repository's `save`/`create` calls `trackEventsOnSuccess(result, aggregate)`, otherwise the events stay on the aggregate and are silently lost.
+- A repository's `save`/`create` calls `EventCollector.collectFrom(aggregate)` once the write succeeded, otherwise the events stay on the aggregate and are silently lost.
 - `run()` does not capture errors: it rethrows to a caller that knows whether the throw is expected, and the central error handler reports the unexpected ones. Capturing here would double-report every 5xx.
 
 ## Commands

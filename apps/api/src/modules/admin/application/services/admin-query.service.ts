@@ -1,10 +1,9 @@
-import { Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import { encodeTimeIdCursor } from "../../../../shared/pagination/time-id-cursor";
 import type {
   EntitlementsReadError,
   IEntitlementsReader,
 } from "../../../../shared/ports/entitlements-reader.port";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
   ActivePlanOverride,
   IPlanOverrideReader,

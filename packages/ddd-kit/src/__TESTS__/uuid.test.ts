@@ -1,183 +1,29 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { UUID, uuidv7 } from "../primitives/uuid";
-import { StubId } from "./stubs/uuid-stub";
+import { UUID, uuidv7 } from "../index";
 
-describe("UUID", () => {
-  describe("constructor", () => {
-    it("should create a UUID with a random value when no value is provided", () => {
-      const uuid = new UUID<string>();
+class RecordingId extends UUID<string> {}
 
-      expect(uuid.value).toBeDefined();
-      expect(typeof uuid.value).toBe("string");
-      expect(uuid.value.length).toBeGreaterThan(0);
-    });
+class ClipId extends UUID<string> {}
 
-    it("should create a UUID with the provided value", () => {
-      const testValue = "test-uuid-123";
-      const uuid = new UUID<string>(testValue);
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-      expect(uuid.value).toBe(testValue);
-    });
-  });
-
-  describe("value getter", () => {
-    it("should return the encapsulated value", () => {
-      const testValue = "test-value";
-      const uuid = new UUID<string>(testValue);
-
-      expect(uuid.value).toBe(testValue);
-    });
-  });
-
-  describe("copy via constructor", () => {
-    it("should create a new UUID from another UUID value", () => {
-      const originalUuid = new UUID<string>("original-uuid");
-      const newUuid = new UUID<string>(originalUuid.value);
-
-      expect(newUuid).toBeInstanceOf(UUID);
-      expect(newUuid.value).toBe(originalUuid.value);
-      expect(newUuid).not.toBe(originalUuid);
-    });
-  });
-
-  describe("equals()", () => {
-    it("should return true when comparing equal UUIDs", () => {
-      const value = "test-uuid";
-      const uuid1 = new UUID<string>(value);
-      const uuid2 = new UUID<string>(value);
-
-      expect(uuid1.equals(uuid2)).toBe(true);
-    });
-
-    it("should return false when comparing different UUIDs", () => {
-      const uuid1 = new UUID<string>("uuid-1");
-      const uuid2 = new UUID<string>("uuid-2");
-
-      expect(uuid1.equals(uuid2)).toBe(false);
-    });
-
-    it("should return false when comparing with null", () => {
-      const uuid = new UUID<string>("test-uuid");
-
-      // biome-ignore lint/suspicious/noExplicitAny: I need to test the equals method with null
-      expect(uuid.equals(null as any)).toBe(false);
-    });
-
-    it("should return false when comparing with undefined", () => {
-      const uuid = new UUID<string>("test-uuid");
-
-      // biome-ignore lint/suspicious/noExplicitAny: I need to test the equals method with undefined
-      expect(uuid.equals(undefined as any)).toBe(false);
-    });
-
-    it("should return false when subclass compares with base class", () => {
-      const uuid = new UUID<string>("test-uuid");
-      const stubId = StubId.create(new UUID<string>("test-uuid"));
-
-      // StubId.equals(UUID) should return false because UUID is not instanceof StubId
-      // biome-ignore lint/suspicious/noExplicitAny: Testing instanceof check with different UUID types
-      expect(stubId.equals(uuid as any)).toBe(false);
-    });
-
-    it("should return true when base class compares with subclass", () => {
-      const uuid = new UUID<string>("test-uuid");
-      const stubId = StubId.create(new UUID<string>("test-uuid"));
-
-      // UUID.equals(StubId) returns true because StubId is instanceof UUID
-      // biome-ignore lint/suspicious/noExplicitAny: Testing instanceof check with different UUID types
-      expect(uuid.equals(stubId as any)).toBe(true);
-    });
-  });
-
-  describe("generation", () => {
-    it("should generate valid UUID v7 format (time-ordered)", () => {
-      const uuid = new UUID<string>();
-
-      expect(uuid.value).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-      );
-    });
-
-    it("should generate UUIDs ordered across millisecond boundaries", async () => {
-      const a = new UUID<string>().value;
-      await new Promise((r) => setTimeout(r, 5));
-      const b = new UUID<string>().value;
-      await new Promise((r) => setTimeout(r, 5));
-      const c = new UUID<string>().value;
-      expect(a < b).toBe(true);
-      expect(b < c).toBe(true);
-    });
-
-    it("should generate unique UUIDs", () => {
-      const uuid1 = new UUID<string>();
-      const uuid2 = new UUID<string>();
-
-      expect(uuid1.value).not.toBe(uuid2.value);
-    });
-  });
-
-  describe("from number", () => {
-    it("should create UUID from number", () => {
-      const uuid = new UUID<number>(123);
-
-      expect(uuid.value).toBe(123);
-    });
-
-    it("should support numeric comparison", () => {
-      const uuid1 = new UUID<number>(42);
-      const uuid2 = new UUID<number>(42);
-      const uuid3 = new UUID<number>(99);
-
-      expect(uuid1.equals(uuid2)).toBe(true);
-      expect(uuid1.equals(uuid3)).toBe(false);
-    });
-  });
-});
-
-describe("StubId", () => {
-  describe("create()", () => {
-    it("should create a StubId from a UUID", () => {
-      const uuid = new UUID<string>("test-uuid");
-      const stubId = StubId.create(uuid);
-
-      expect(stubId).toBeInstanceOf(StubId);
-      expect(stubId.value).toBe(uuid.value);
-    });
-
-    it("should create a StubId with random value when UUID is not provided", () => {
-      const stubId = StubId.create(new UUID<string>());
-
-      expect(stubId).toBeInstanceOf(StubId);
-      expect(stubId.value).toBeDefined();
-      expect(typeof stubId.value).toBe("string");
-    });
-  });
-
-  describe("inheritance", () => {
-    it("should inherit from UUID", () => {
-      const uuid = new UUID<string>("test-uuid");
-      const stubId = StubId.create(uuid);
-
-      expect(stubId).toBeInstanceOf(UUID);
-    });
-
-    it("should have correct toStringTag", () => {
-      const uuid = new UUID<string>("test-uuid");
-      const stubId = StubId.create(uuid);
-
-      expect(Object.prototype.toString.call(stubId)).toBe("[object StubId]");
-    });
-  });
-});
-
-class XId extends UUID<string> {}
-
-describe("uuidv7 and UUID.parse", () => {
+describe("uuid", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("uuidv7 ids generated in one millisecond sort strictly ascending", () => {
+  it("generates version 7 ids that sort in the order they were created", async () => {
+    const first = uuidv7();
+    await pause(5);
+    const second = uuidv7();
+    await pause(5);
+    const third = new UUID<string>().value;
+
+    expect(first).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect([third, first, second].sort()).toEqual([first, second, third]);
+  });
+
+  it("keeps ids generated in one millisecond strictly ascending and unique", () => {
     vi.spyOn(Date, "now").mockReturnValue(1_800_000_000_000);
 
     const ids = Array.from({ length: 1000 }, () => uuidv7());
@@ -186,7 +32,7 @@ describe("uuidv7 and UUID.parse", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("uuidv7 stays ascending when the clock goes backwards", () => {
+  it("stays ascending when the clock goes backwards", () => {
     const now = vi.spyOn(Date, "now").mockReturnValue(1_900_000_000_000);
     const before = uuidv7();
     now.mockReturnValue(1_899_999_999_000);
@@ -196,24 +42,32 @@ describe("uuidv7 and UUID.parse", () => {
     expect(after > before).toBe(true);
   });
 
-  it("uuidv7 carries version 7 and the RFC variant", () => {
-    const ids = Array.from({ length: 50 }, () => uuidv7());
+  it("is equal to an id of the same type holding the same value", () => {
+    const id = new RecordingId("0199a000-0000-7000-8000-000000000001");
 
-    for (const id of ids) {
-      expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
-      expect(id[14]).toBe("7");
-      expect(["8", "9", "a", "b"]).toContain(id[19]);
-    }
+    expect(id.equals(new RecordingId("0199a000-0000-7000-8000-000000000001"))).toBe(true);
+    expect(id.equals(new RecordingId("0199a000-0000-7000-8000-000000000002"))).toBe(false);
+    expect(id.equals(undefined)).toBe(false);
   });
 
-  it("parse normalizes case and whitespace and returns a typed id", () => {
-    const parsed = XId.parse("  0190A3C2-7B4D-7E8F-9A0B-1C2D3E4F5A6B ");
+  it("is never equal to an id of another type, even with the same value", () => {
+    const recordingId = new RecordingId("0199a000-0000-7000-8000-000000000001");
+    const clipId = new ClipId("0199a000-0000-7000-8000-000000000001");
 
-    expect(parsed.getValue()).toBeInstanceOf(XId);
-    expect(parsed.getValue().value).toBe("0190a3c2-7b4d-7e8f-9a0b-1c2d3e4f5a6b");
+    expect(recordingId.equals(clipId)).toBe(false);
   });
 
-  it("parse rejects a non uuid string with its message", () => {
-    expect(XId.parse("nope").getError()).toBe('"nope" is not a uuid');
+  it("parses a uuid into the id type it is called on, trimmed and lowercased", () => {
+    const parsed = RecordingId.parse("  0199A000-0000-7000-8000-000000000001 ");
+
+    expect(parsed.getValue()).toBeInstanceOf(RecordingId);
+    expect(parsed.getValue().value).toBe("0199a000-0000-7000-8000-000000000001");
   });
+
+  it.each(["nope", "0199a000-0000-7000-8000-00000000000", "0199g000-0000-7000-8000-000000000001"])(
+    "refuses %s, which is not a uuid, with a plain message",
+    (raw) => {
+      expect(RecordingId.parse(raw).getError()).toBe(`"${raw}" is not a uuid`);
+    },
+  );
 });

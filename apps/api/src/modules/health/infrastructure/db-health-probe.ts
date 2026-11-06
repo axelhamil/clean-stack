@@ -1,7 +1,7 @@
+import type { IInstrumentation } from "@packages/ddd-kit";
 import { resolveExecutor, sql } from "@packages/drizzle";
 import type { OnInit } from "inwire";
 import type { HealthCheckFn, IHealthCheckRegistry } from "../../../shared/ports/health.port";
-import type { IInstrumentation } from "../../../shared/ports/instrumentation.port";
 
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 

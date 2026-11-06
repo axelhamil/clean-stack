@@ -2,7 +2,6 @@ import type { IDomainEvent } from "../domain/domain-event";
 
 export const EVENT_HANDLER_SYMBOL = Symbol.for("clean-stack/event-handler");
 
-/** A named reaction to one event type, discovered in the container by its marker symbol. */
 export type EventHandler<T extends IDomainEvent = IDomainEvent> = {
   readonly [EVENT_HANDLER_SYMBOL]: true;
   readonly eventType: string;

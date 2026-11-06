@@ -1,11 +1,17 @@
 import type { SCIMManagedConnection, SCIMScope } from "@better-auth/scim";
-import { type AppError, type IUnitOfWork, Option, Result, uuidv7 } from "@packages/ddd-kit";
+import {
+  type AppError,
+  type IInstrumentation,
+  type IUnitOfWork,
+  Option,
+  Result,
+  uuidv7,
+} from "@packages/ddd-kit";
 import { lockForTransaction, savepoint } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { auth } from "../../auth";
 import { findMemberOf, scimProvisionedMembers } from "../../auth-queries";
 import { emitEvent } from "../event-emitter";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IOutboxRepository } from "../ports/outbox.port";
 
 export type ScimConnectionError = AppError<

@@ -1,4 +1,4 @@
-import { Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import {
   alias,
   and,
@@ -15,7 +15,6 @@ import {
 } from "@packages/drizzle";
 import { NOTIFICATION_MAP } from "@packages/events";
 import { dbOperationFailure } from "../db-failure";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 import type {
   DueNotification,
   INotificationDigestStore,

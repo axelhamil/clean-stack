@@ -1,9 +1,8 @@
 import { describe, expect, it, spyOn } from "bun:test";
-import { AppErrorException } from "@packages/ddd-kit";
+import { AppErrorException, type IInstrumentation } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { createErrorHandler, SERVER_ERROR_MESSAGE } from "../middleware/error.middleware";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 import { NoOpInstrumentation } from "../services/noop-instrumentation";
 
 function makeSpy() {

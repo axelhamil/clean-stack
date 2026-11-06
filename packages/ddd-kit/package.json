@@ -1,68 +1,23 @@
 {
   "name": "@packages/ddd-kit",
   "version": "1.0.0",
+  "private": true,
   "description": "DDD primitives for TypeScript: Result, Option, Entity, Aggregate, ValueObject",
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
   "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
-    }
-  },
-  "keywords": [
-    "ddd",
-    "domain-driven-design",
-    "result",
-    "option",
-    "entity",
-    "aggregate",
-    "value-object",
-    "typescript",
-    "clean-architecture"
-  ],
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/axelhamil/clean-stack",
-    "directory": "packages/ddd-kit"
-  },
-  "publishConfig": {
-    "access": "public",
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
-    "exports": {
-      ".": {
-        "types": "./dist/index.d.ts",
-        "import": "./dist/index.js",
-        "require": "./dist/index.cjs",
-        "default": "./dist/index.js"
-      }
-    }
+    ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "tsup && tsc -p tsconfig.build.json",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest watch",
-    "test:coverage": "vitest run --coverage",
-    "prepublishOnly": "pnpm build && pnpm test"
-  },
-  "peerDependencies": {
-    "zod": ">=4.0.0"
-  },
-  "peerDependenciesMeta": {
-    "zod": {
-      "optional": true
-    }
+    "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
     "@packages/test": "workspace:*",
     "@packages/typescript-config": "workspace:*",
     "@types/node": "^26.6.5",
     "@vitest/coverage-v8": "^5.0.5",
-    "tsup": "^9.0.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
   }

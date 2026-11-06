@@ -2,7 +2,9 @@ import { UnitOfWorkContext } from "../application/unit-of-work-context";
 import type { IEventSource } from "../domain/aggregate";
 import type { IDomainEvent } from "../domain/domain-event";
 
-let outOfContextLogger: ((message: string, meta?: Record<string, unknown>) => void) | null = null;
+export type OutOfContextLogger = (message: string, meta?: Record<string, unknown>) => void;
+
+let outOfContextLogger: OutOfContextLogger | null = null;
 
 export const EventCollector = {
   add(events: IDomainEvent | IDomainEvent[]): void {
@@ -43,7 +45,11 @@ export const EventCollector = {
     return UnitOfWorkContext.current() !== undefined;
   },
 
-  setOutOfContextLogger(fn: typeof outOfContextLogger): void {
+  setOutOfContextLogger(fn: OutOfContextLogger | null): void {
     outOfContextLogger = fn;
+  },
+
+  releaseOutOfContextLogger(fn: OutOfContextLogger): void {
+    if (outOfContextLogger === fn) outOfContextLogger = null;
   },
 };

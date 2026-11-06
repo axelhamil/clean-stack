@@ -1,6 +1,5 @@
-import { Result } from "@packages/ddd-kit";
+import { type IInstrumentation, Result } from "@packages/ddd-kit";
 import type Stripe from "stripe";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IBillingPortalGateway } from "../../application/ports/billing-portal.port";
 import type { BillingError } from "../../application/ports/subscription-read.port";
 

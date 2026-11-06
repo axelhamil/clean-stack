@@ -1,6 +1,7 @@
 import {
   EventCollector,
   type IDomainEvent,
+  type IInstrumentation,
   type IUnitOfWork,
   Option,
   Result,
@@ -9,14 +10,6 @@ import {
 import { type DbClient, db, type Transaction } from "../config";
 
 export type FlushHandler = (events: IDomainEvent[], tx: Transaction) => Promise<void>;
-
-/**
- * The slice of the host's instrumentation port this service needs, declared here
- * because a package cannot import the app's port. Any `IInstrumentation` fits it.
- */
-export interface UnitOfWorkInstrumentation {
-  startSpan<T>(options: { name: string }, callback: () => Promise<T>): Promise<T>;
-}
 
 class FailedResultRollback extends Error {
   constructor(readonly result: unknown) {
@@ -67,7 +60,7 @@ export class TransactionService implements IUnitOfWork {
   private readonly flushHandler: Option<FlushHandler>;
 
   constructor(
-    private readonly instrumentation: UnitOfWorkInstrumentation,
+    private readonly instrumentation: IInstrumentation,
     flushHandler?: FlushHandler,
   ) {
     this.flushHandler = Option.fromNullable(flushHandler);

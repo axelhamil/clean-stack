@@ -1,8 +1,7 @@
-import { Result } from "@packages/ddd-kit";
+import { type IInstrumentation, Result } from "@packages/ddd-kit";
 import { CryptoHasher } from "bun";
 import { env } from "../env";
 import { instrumentedFetch } from "../instrumented-fetch";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IPasswordBreachService, PasswordBreachError } from "../ports/password-breach.port";
 
 export class HibpPasswordBreachService implements IPasswordBreachService {

@@ -1,344 +1,99 @@
 import { describe, expect, it } from "vitest";
-import { Result, sameJson, ValueObject } from "../index";
+import { Result, ValueObject } from "../index";
 
 class Email extends ValueObject<string> {
   protected validate(value: string): Result<string> {
-    if (!value.includes("@")) {
-      return Result.fail("Invalid email format");
-    }
+    if (!value.includes("@")) return Result.fail("Invalid email format");
+
     return Result.ok(value.toLowerCase());
   }
 }
 
-class Age extends ValueObject<number> {
-  protected validate(value: number): Result<number> {
-    if (value < 0 || value > 150) {
-      return Result.fail("Age must be between 0 and 150");
-    }
+interface FramingValue {
+  layout: string;
+  crop: { x: number; y: number };
+  tags: string[];
+}
+
+class Framing extends ValueObject<FramingValue> {
+  protected validate(value: FramingValue): Result<FramingValue> {
     return Result.ok(value);
   }
 }
 
-class Name extends ValueObject<string> {
-  protected validate(value: string): Result<string> {
-    if (!value || value.trim().length === 0) {
-      return Result.fail("Name cannot be empty");
-    }
-    if (value.length > 100) {
-      return Result.fail("Name cannot exceed 100 characters");
-    }
-    return Result.ok(value.trim());
+class Link extends ValueObject<{ site: URL }> {
+  protected validate(value: { site: URL }): Result<{ site: URL }> {
+    return Result.ok(value);
   }
 }
 
-interface AddressValue {
-  street: string;
-  city: string;
-  country: string;
-}
+type SlugError = { code: "SLUG_INVALID"; message: string };
 
-class Address extends ValueObject<AddressValue> {
-  protected validate(value: AddressValue): Result<AddressValue> {
-    if (!value.street || !value.city || !value.country) {
-      return Result.fail("Address fields cannot be empty");
+class Slug extends ValueObject<string, SlugError> {
+  protected validate(value: string): Result<string, SlugError> {
+    if (!/^[a-z0-9-]+$/.test(value)) {
+      return Result.fail({ code: "SLUG_INVALID", message: "Only lowercase letters and dashes" });
     }
+
     return Result.ok(value);
   }
 }
 
 describe("ValueObject", () => {
-  describe("create()", () => {
-    it("should succeed with valid value", () => {
-      const result = Email.create("test@example.com");
+  it("refuses a value its validation rejects, with the validation error", () => {
+    const result = Email.create("not-an-email");
 
-      expect(result.isSuccess).toBe(true);
-      expect(result.getValue().value).toBe("test@example.com");
-    });
-
-    it("should fail with invalid value", () => {
-      const result = Email.create("invalid-email");
-
-      expect(result.isFailure).toBe(true);
-      expect(result.getError()).toBe("Invalid email format");
-    });
-
-    it("should store validated/transformed value", () => {
-      const result = Email.create("TEST@EXAMPLE.COM");
-
-      expect(result.isSuccess).toBe(true);
-      expect(result.getValue().value).toBe("test@example.com");
-    });
-
-    it("should work with numeric values", () => {
-      const validAge = Age.create(25);
-      expect(validAge.isSuccess).toBe(true);
-      expect(validAge.getValue().value).toBe(25);
-
-      const invalidAge = Age.create(-5);
-      expect(invalidAge.isFailure).toBe(true);
-      expect(invalidAge.getError()).toBe("Age must be between 0 and 150");
-    });
-
-    it("should work with boundary values", () => {
-      const minAge = Age.create(0);
-      expect(minAge.isSuccess).toBe(true);
-
-      const maxAge = Age.create(150);
-      expect(maxAge.isSuccess).toBe(true);
-
-      const belowMin = Age.create(-1);
-      expect(belowMin.isFailure).toBe(true);
-
-      const aboveMax = Age.create(151);
-      expect(aboveMax.isFailure).toBe(true);
-    });
-
-    it("should work with complex object values", () => {
-      const result = Address.create({
-        street: "123 Main St",
-        city: "New York",
-        country: "USA",
-      });
-
-      expect(result.isSuccess).toBe(true);
-      expect(result.getValue().value.city).toBe("New York");
-    });
-
-    it("should fail with invalid complex object", () => {
-      const result = Address.create({
-        street: "",
-        city: "New York",
-        country: "USA",
-      });
-
-      expect(result.isFailure).toBe(true);
-      expect(result.getError()).toBe("Address fields cannot be empty");
-    });
+    expect(result.isFailure).toBe(true);
+    expect(result.getError()).toBe("Invalid email format");
   });
 
-  describe("value getter", () => {
-    it("should return the inner value", () => {
-      const email = Email.create("test@example.com").getValue();
+  it("holds the value its validation returns, not the raw input", () => {
+    const result = Email.create("OWNER@Example.COM");
 
-      expect(email.value).toBe("test@example.com");
-    });
-
-    it("should return frozen value for primitives", () => {
-      const age = Age.create(30).getValue();
-
-      expect(age.value).toBe(30);
-    });
-
-    it("should return frozen value for objects", () => {
-      const address = Address.create({
-        street: "123 Main St",
-        city: "New York",
-        country: "USA",
-      }).getValue();
-
-      expect(Object.isFrozen(address.value)).toBe(true);
-    });
+    expect(result.getValue()).toBeInstanceOf(Email);
+    expect(result.getValue().value).toBe("owner@example.com");
   });
 
-  describe("equals()", () => {
-    it("should be equal when primitive values match", () => {
-      const email1 = Email.create("test@example.com").getValue();
-      const email2 = Email.create("test@example.com").getValue();
+  it("keeps the typed error of its validation", () => {
+    const refused: Result<Slug, SlugError> = Slug.create("Not A Slug");
+    // @ts-expect-error: the error of a typed value object is its code, not a string
+    const untyped: Result<Slug, string> = Slug.create("clutch");
 
-      expect(email1.equals(email2)).toBe(true);
-    });
-
-    it("should not be equal when primitive values differ", () => {
-      const email1 = Email.create("test1@example.com").getValue();
-      const email2 = Email.create("test2@example.com").getValue();
-
-      expect(email1.equals(email2)).toBe(false);
-    });
-
-    it("should be equal when numeric values match", () => {
-      const age1 = Age.create(30).getValue();
-      const age2 = Age.create(30).getValue();
-
-      expect(age1.equals(age2)).toBe(true);
-    });
-
-    it("should not be equal when numeric values differ", () => {
-      const age1 = Age.create(30).getValue();
-      const age2 = Age.create(31).getValue();
-
-      expect(age1.equals(age2)).toBe(false);
-    });
-
-    it("should be equal for object values with same structure", () => {
-      const address1 = Address.create({
-        street: "123 Main St",
-        city: "New York",
-        country: "USA",
-      }).getValue();
-      const address2 = Address.create({
-        street: "123 Main St",
-        city: "New York",
-        country: "USA",
-      }).getValue();
-
-      expect(address1.equals(address2)).toBe(true);
-    });
-
-    it("should not be equal for object values with different structure", () => {
-      const address1 = Address.create({
-        street: "123 Main St",
-        city: "New York",
-        country: "USA",
-      }).getValue();
-      const address2 = Address.create({
-        street: "456 Oak Ave",
-        city: "New York",
-        country: "USA",
-      }).getValue();
-
-      expect(address1.equals(address2)).toBe(false);
-    });
+    expect(refused.getError().code).toBe("SLUG_INVALID");
+    expect(untyped.isSuccess).toBe(true);
   });
 
-  describe("immutability", () => {
-    it("should freeze primitive value", () => {
-      const email = Email.create("test@example.com").getValue();
+  it("freezes the value it holds", () => {
+    const framing = Framing.create({ layout: "split", crop: { x: 0, y: 0 }, tags: [] }).getValue();
 
-      expect(email.value).toBe("test@example.com");
-    });
-
-    it("should freeze object value", () => {
-      const address = Address.create({
-        street: "123 Main St",
-        city: "New York",
-        country: "USA",
-      }).getValue();
-
-      expect(Object.isFrozen(address.value)).toBe(true);
-      expect(() => {
-        (address.value as AddressValue).city = "Boston";
-      }).toThrow();
-    });
+    expect(Object.isFrozen(framing.value)).toBe(true);
+    expect(() => {
+      framing.value.layout = "full";
+    }).toThrow();
   });
 
-  describe("validation", () => {
-    it("should validate empty string", () => {
-      const result = Name.create("");
+  it("is equal by value, whatever the order of the keys at any depth", () => {
+    const left = Framing.create({ layout: "split", crop: { x: 1, y: 2 }, tags: ["a", "b"] });
+    const right = Framing.create({ tags: ["a", "b"], crop: { y: 2, x: 1 }, layout: "split" });
 
-      expect(result.isFailure).toBe(true);
-      expect(result.getError()).toBe("Name cannot be empty");
-    });
-
-    it("should validate whitespace only string", () => {
-      const result = Name.create("   ");
-
-      expect(result.isFailure).toBe(true);
-      expect(result.getError()).toBe("Name cannot be empty");
-    });
-
-    it("should trim whitespace when validate transforms value", () => {
-      const result = Name.create("  John Doe  ");
-
-      expect(result.isSuccess).toBe(true);
-      expect(result.getValue().value).toBe("John Doe");
-    });
-
-    it("should validate maximum length", () => {
-      const longName = "a".repeat(101);
-      const result = Name.create(longName);
-
-      expect(result.isFailure).toBe(true);
-      expect(result.getError()).toBe("Name cannot exceed 100 characters");
-    });
-
-    it("should accept maximum length value", () => {
-      const exactName = "a".repeat(100);
-      const result = Name.create(exactName);
-
-      expect(result.isSuccess).toBe(true);
-    });
+    expect(left.getValue().equals(right.getValue())).toBe(true);
   });
 
-  describe("type safety", () => {
-    it("should preserve type through creation", () => {
-      const email = Email.create("test@example.com").getValue();
+  it("is different when a field or the order of a list differs", () => {
+    const framing = Framing.create({ layout: "split", crop: { x: 1, y: 2 }, tags: ["a", "b"] });
+    const otherCrop = Framing.create({ layout: "split", crop: { x: 1, y: 3 }, tags: ["a", "b"] });
+    const otherOrder = Framing.create({ layout: "split", crop: { x: 1, y: 2 }, tags: ["b", "a"] });
 
-      expect(email).toBeInstanceOf(Email);
-      expect(email).toBeInstanceOf(ValueObject);
-    });
-
-    it("should return correct value type", () => {
-      const age = Age.create(30).getValue();
-
-      expect(typeof age.value).toBe("number");
-    });
-
-    it("should return correct object type", () => {
-      const address = Address.create({
-        street: "123 Main St",
-        city: "New York",
-        country: "USA",
-      }).getValue();
-
-      expect(typeof address.value).toBe("object");
-      expect(address.value.street).toBe("123 Main St");
-    });
+    expect(framing.getValue().equals(otherCrop.getValue())).toBe(false);
+    expect(framing.getValue().equals(otherOrder.getValue())).toBe(false);
   });
 
-  describe("edge cases", () => {
-    it("should handle zero as valid numeric value", () => {
-      const result = Age.create(0);
+  it("compares a nested value with internal slots through its json form", () => {
+    const link = Link.create({ site: new URL("https://a.test") }).getValue();
+    const same = Link.create({ site: new URL("https://a.test") }).getValue();
+    const other = Link.create({ site: new URL("https://b.test") }).getValue();
 
-      expect(result.isSuccess).toBe(true);
-      expect(result.getValue().value).toBe(0);
-    });
-
-    it("should handle special characters in string", () => {
-      const result = Email.create("test+special@example.com");
-
-      expect(result.isSuccess).toBe(true);
-      expect(result.getValue().value).toBe("test+special@example.com");
-    });
-
-    it("should handle unicode characters", () => {
-      const result = Name.create("José García");
-
-      expect(result.isSuccess).toBe(true);
-      expect(result.getValue().value).toBe("José García");
-    });
-  });
-});
-
-class Settings extends ValueObject<Record<string, unknown>> {
-  protected validate(value: Record<string, unknown>): Result<Record<string, unknown>> {
-    return Result.ok(value);
-  }
-}
-
-describe("sameJson", () => {
-  it("sameJson ignores object key order at any depth but not array order", () => {
-    const at = new Date("2026-01-01T00:00:00.000Z");
-
-    expect(sameJson({ a: 1, b: { c: [1, 2], d: at } }, { b: { d: at, c: [1, 2] }, a: 1 })).toBe(
-      true,
-    );
-    expect(sameJson({ list: [1, 2] }, { list: [2, 1] })).toBe(false);
-    expect(sameJson({ at }, { at: new Date("2026-01-02T00:00:00.000Z") })).toBe(false);
-  });
-
-  it("value objects with the same fields in another key order are equal", () => {
-    const left = Settings.create({ theme: "dark", nested: { a: 1, b: 2 } }).getValue();
-    const right = Settings.create({ nested: { b: 2, a: 1 }, theme: "dark" }).getValue();
-
-    expect(left.equals(right)).toBe(true);
-  });
-
-  it("sameJson compares nested values through their own json form", () => {
-    expect(sameJson({ site: new URL("https://a.test") }, { site: new URL("https://b.test") })).toBe(
-      false,
-    );
-    expect(sameJson({ site: new URL("https://a.test") }, { site: new URL("https://a.test") })).toBe(
-      true,
-    );
+    expect(link.equals(same)).toBe(true);
+    expect(link.equals(other)).toBe(false);
   });
 });

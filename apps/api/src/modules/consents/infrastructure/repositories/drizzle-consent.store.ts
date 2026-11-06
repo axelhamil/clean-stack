@@ -1,4 +1,4 @@
-import { Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import {
   and,
   consentSchema,
@@ -10,7 +10,6 @@ import {
   type SQL,
 } from "@packages/drizzle";
 import { dbOperationFailure } from "../../../../shared/db-failure";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
   ConsentError,
   ConsentRecordRow,

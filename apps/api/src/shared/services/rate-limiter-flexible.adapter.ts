@@ -1,8 +1,7 @@
-import { Result } from "@packages/ddd-kit";
+import { type IInstrumentation, Result } from "@packages/ddd-kit";
 import { type RateLimitDbClient, rateLimitSchema } from "@packages/drizzle";
 import type { RateLimiterAbstract } from "rate-limiter-flexible";
 import { RateLimiterDrizzle, RateLimiterMemory, RateLimiterRes } from "rate-limiter-flexible";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 import type {
   IRateLimiter,
   IRateLimitUsage,

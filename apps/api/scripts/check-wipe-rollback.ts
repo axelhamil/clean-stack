@@ -32,6 +32,7 @@ import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-wipe-rollback");
 
+import type { IInstrumentation } from "@packages/ddd-kit";
 import {
   apiTokenSchema,
   authSchema,
@@ -56,7 +57,6 @@ import { generateToken, hmacToken } from "../src/shared/crypto/api-token";
 import { env } from "../src/shared/env";
 import { logger } from "../src/shared/logger";
 import { requireApiToken } from "../src/shared/middleware/api-token.middleware";
-import type { IInstrumentation } from "../src/shared/ports/instrumentation.port";
 import { DrizzleEmailQueue } from "../src/shared/services/drizzle-email-queue.service";
 import { DrizzleOutboxRepository } from "../src/shared/services/drizzle-outbox.service";
 import { DrizzleTotpVerifier } from "../src/shared/services/drizzle-totp-verifier";

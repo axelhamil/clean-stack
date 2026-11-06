@@ -1,10 +1,9 @@
-import { AppErrorException, httpStatusFromCode } from "@packages/ddd-kit";
+import { AppErrorException, httpStatusFromCode, type IInstrumentation } from "@packages/ddd-kit";
 import type { ErrorHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { env } from "../env";
 import { logger } from "../logger";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 
 const isProd = env.NODE_ENV === "production";
 

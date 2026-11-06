@@ -1,4 +1,4 @@
-import type { EventHandler, IUnitOfWork } from "@packages/ddd-kit";
+import type { EventHandler, IInstrumentation, IUnitOfWork } from "@packages/ddd-kit";
 import { getRateLimitDbClient, TransactionService } from "@packages/drizzle";
 import { ALL_EVENT_TYPES } from "@packages/events";
 import { container } from "inwire";
@@ -25,7 +25,6 @@ import type { ICaptchaService } from "./shared/ports/captcha.port";
 import type { IDisposableEmailService } from "./shared/ports/disposable-email.port";
 import type { IEmailService } from "./shared/ports/email.port";
 import type { IEmailQueue } from "./shared/ports/email-queue.port";
-import type { IInstrumentation } from "./shared/ports/instrumentation.port";
 import type { IIpGeoService } from "./shared/ports/ip-geo.port";
 import type { INotificationDigestStore } from "./shared/ports/notification-digest.port";
 import type { IOutboxRepository } from "./shared/ports/outbox.port";

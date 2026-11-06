@@ -1,4 +1,4 @@
-import { Result } from "../primitives/result";
+import type { Result } from "../primitives/result";
 
 function inKeyOrder(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(inKeyOrder);
@@ -12,11 +12,11 @@ function inKeyOrder(value: unknown): unknown {
   );
 }
 
-export function sameJson(left: unknown, right: unknown): boolean {
+function sameJson(left: unknown, right: unknown): boolean {
   return JSON.stringify(inKeyOrder(left)) === JSON.stringify(inKeyOrder(right));
 }
 
-export abstract class ValueObject<T> {
+export abstract class ValueObject<T, E = string> {
   protected readonly _value: T;
 
   public constructor(value: T) {
@@ -27,7 +27,7 @@ export abstract class ValueObject<T> {
     return this._value;
   }
 
-  public equals(other: ValueObject<T>): boolean {
+  public equals(other: ValueObject<T, E>): boolean {
     if (this._value === other.value) return true;
     if (
       typeof this._value === "object" &&
@@ -40,24 +40,23 @@ export abstract class ValueObject<T> {
     return false;
   }
 
-  protected abstract validate(value: T): Result<T>;
+  protected abstract validate(value: T): Result<T, E>;
 
-  public static create<T extends ValueObject<V>, V>(
+  public static create<T extends ValueObject<V, E>, V, E = string>(
     this: new (
       value: V,
     ) => T,
     value: NoInfer<V>,
-  ): Result<T> {
+  ): Result<T, E> {
     // biome-ignore lint/complexity/noThisInStatic: Need `this` to create instance of subclass
     const ValueObjectConstructor = this as new (value: V) => T;
 
-    const tempInstance = new ValueObjectConstructor(value);
-    const validationResult = tempInstance.validate(value);
+    const candidate = new ValueObjectConstructor(value);
 
-    if (validationResult.isFailure) return Result.fail(validationResult.getError());
-
-    const validatedValue = validationResult.getValue();
-    const finalInstance = new ValueObjectConstructor(validatedValue);
-    return Result.ok(finalInstance);
+    return candidate
+      .validate(value)
+      .map((validated) =>
+        Object.is(validated, value) ? candidate : new ValueObjectConstructor(validated),
+      );
   }
 }

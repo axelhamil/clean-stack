@@ -1,3 +1,4 @@
+import type { IInstrumentation } from "@packages/ddd-kit";
 import type {
   AggregatedHealthCheck,
   AggregatedReport,
@@ -7,7 +8,6 @@ import type {
   HealthStatus,
   IHealthCheckRegistry,
 } from "../../../shared/ports/health.port";
-import type { IInstrumentation } from "../../../shared/ports/instrumentation.port";
 import { raceWithTimeout } from "../../../shared/race-with-timeout";
 
 const CHECK_TIMEOUT_MS = 5_000;

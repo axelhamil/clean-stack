@@ -1,8 +1,7 @@
-import { Result } from "@packages/ddd-kit";
+import { type IInstrumentation, Result } from "@packages/ddd-kit";
 import { z } from "zod";
 import { instrumentedFetch } from "../instrumented-fetch";
 import type { CaptchaError, ICaptchaService } from "../ports/captcha.port";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 
 const MAX_TOKEN_LENGTH = 2048;
 

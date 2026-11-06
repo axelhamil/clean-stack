@@ -44,8 +44,7 @@
       "project": ["**/*.ts", "**/*.tsx"]
     },
     "packages/ddd-kit": {
-      "project": ["src/**/*.ts"],
-      "ignore": ["**/stubs/**"]
+      "project": ["src/**/*.ts"]
     },
     "packages/drizzle": {
       "project": ["src/**/*.ts"]

@@ -1,4 +1,4 @@
-import { Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import { type EmailTemplateKey, renderTemplate } from "@packages/emails";
 import { DEFAULT_LOCALE } from "@packages/i18n";
 import type {
@@ -11,7 +11,6 @@ import type {
   TemplateVariables,
 } from "../ports/email.port";
 import type { EmailMessageInsert, IEmailQueue } from "../ports/email-queue.port";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 
 /**
  * Positional per-row key derived from the batch key. Only a fallback: the suffix

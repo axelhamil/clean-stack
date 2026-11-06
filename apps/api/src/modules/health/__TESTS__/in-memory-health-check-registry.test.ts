@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
+import type { IInstrumentation } from "@packages/ddd-kit";
 import { mockPort } from "@packages/test/bun";
-import type { IInstrumentation } from "../../../shared/ports/instrumentation.port";
 import { InMemoryHealthCheckRegistry } from "../infrastructure/in-memory-health-check-registry";
 
 describe("InMemoryHealthCheckRegistry.runAll", () => {

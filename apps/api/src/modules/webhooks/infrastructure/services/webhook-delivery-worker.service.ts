@@ -1,4 +1,4 @@
-import { type IUnitOfWork, Option, type Result } from "@packages/ddd-kit";
+import { type IInstrumentation, type IUnitOfWork, Option, type Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { decryptSecret, deriveOrgSubKey } from "../../../../shared/aead";
 import { env } from "../../../../shared/env";
@@ -16,7 +16,6 @@ import {
   unitsWithinLease,
 } from "../../../../shared/lease-budget";
 import type { Logger } from "../../../../shared/logger";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import { assertPublicUrl } from "../../../../shared/ssrf-guard";
 import type {

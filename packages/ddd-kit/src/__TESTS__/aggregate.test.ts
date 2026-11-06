@@ -1,301 +1,67 @@
 import { describe, expect, it } from "vitest";
-import { Aggregate, type IDomainEvent, UUID } from "../index";
+import { Aggregate, BaseDomainEvent, UUID } from "../index";
 
-interface TestPayload {
-  aggregateId: string;
-}
-
-class UserCreated implements IDomainEvent<TestPayload> {
-  readonly eventType = "UserCreated";
-  readonly dateOccurred = new Date();
-  aggregateId: string;
-  payload: TestPayload;
-
-  constructor(aggregateId: string) {
-    this.aggregateId = aggregateId;
-    this.payload = { aggregateId };
-  }
-}
-
-class UserNameChanged implements IDomainEvent<TestPayload & { newName: string }> {
-  readonly eventType = "UserNameChanged";
-  readonly dateOccurred = new Date();
-  aggregateId: string;
-  payload: TestPayload & { newName: string };
+class CounterIncremented extends BaseDomainEvent<{ count: number }> {
+  readonly eventType = "counter.incremented";
 
   constructor(
-    aggregateId: string,
-    public readonly newName: string,
+    readonly aggregateId: string,
+    readonly payload: { count: number },
   ) {
-    this.aggregateId = aggregateId;
-    this.payload = { aggregateId, newName };
+    super();
   }
 }
 
-interface TestAggregateProps {
-  name: string;
-  age: number;
-}
-
-class TestAggregate extends Aggregate<TestAggregateProps> {
-  get name(): string {
-    return this._props.name;
+class Counter extends Aggregate<{ count: number }> {
+  static create(): Counter {
+    return new Counter({ count: 0 }, new UUID("counter-1"));
   }
 
-  get age(): number {
-    return this._props.age;
-  }
-
-  static create(props: TestAggregateProps, id?: UUID<string | number>): TestAggregate {
-    const aggregate = new TestAggregate(props, id ?? new UUID());
-    aggregate.addEvent(new UserCreated(aggregate._id.value.toString()));
-    return aggregate;
-  }
-
-  static createWithoutEvent(props: TestAggregateProps, id?: UUID<string | number>): TestAggregate {
-    return new TestAggregate(props, id);
-  }
-
-  changeName(newName: string): void {
-    this._props.name = newName;
-    this.addEvent(new UserNameChanged(this._id.value.toString(), newName));
-  }
-
-  addMultipleEvents(events: IDomainEvent[]): void {
-    this.addEvents(events);
-  }
-
-  addSingleEvent(event: IDomainEvent): void {
-    this.addEvent(event);
+  increment(): void {
+    this._props.count += 1;
+    this.addEvent(new CounterIncremented(String(this._id.value), { count: this._props.count }));
   }
 }
 
 describe("Aggregate", () => {
-  describe("creation", () => {
-    it("should create aggregate with props and id", () => {
-      const id = new UUID();
-      const aggregate = TestAggregate.createWithoutEvent({ name: "John", age: 30 }, id);
+  it("clones with the same id and the merged props, leaving its pending events on the original", () => {
+    const counter = Counter.create();
+    counter.increment();
 
-      expect(aggregate._id.equals(id)).toBe(true);
-      expect(aggregate.name).toBe("John");
-      expect(aggregate.age).toBe(30);
-    });
+    const reset = counter.clone({ count: 0 });
 
-    it("should generate id if not provided", () => {
-      const aggregate = TestAggregate.createWithoutEvent({
-        name: "John",
-        age: 30,
-      });
-
-      expect(aggregate._id).toBeDefined();
-      expect(aggregate._id).toBeInstanceOf(UUID);
-    });
-
-    it("should extend Entity", () => {
-      const aggregate = TestAggregate.createWithoutEvent({
-        name: "John",
-        age: 30,
-      });
-
-      expect(aggregate.get("name")).toBe("John");
-      expect(aggregate.get("age")).toBe(30);
-    });
+    expect(reset).toBeInstanceOf(Counter);
+    expect(reset.id.equals(counter.id)).toBe(true);
+    expect(reset.get("count")).toBe(0);
+    expect(reset.getDomainEvents()).toEqual([]);
+    expect(counter.get("count")).toBe(1);
+    expect(counter.getDomainEvents()).toHaveLength(1);
   });
 
-  describe("domainEvents", () => {
-    it("should start with empty events when created without event", () => {
-      const aggregate = TestAggregate.createWithoutEvent({
-        name: "Test",
-        age: 25,
-      });
+  it("hands over its events once, in the order they happened", () => {
+    const counter = Counter.create();
+    counter.increment();
+    counter.increment();
 
-      expect(aggregate.getDomainEvents()).toHaveLength(0);
-    });
+    const pulled = counter.pullDomainEvents();
 
-    it("should have events when created with addEvent in factory", () => {
-      const aggregate = TestAggregate.create({ name: "John", age: 30 });
-
-      expect(aggregate.getDomainEvents()).toHaveLength(1);
-      expect(aggregate.getDomainEvents()[0]).toBeInstanceOf(UserCreated);
-    });
-
-    it("should return a copy of events (immutable)", () => {
-      const aggregate = TestAggregate.create({ name: "John", age: 30 });
-      const events1 = aggregate.getDomainEvents();
-      const events2 = aggregate.getDomainEvents();
-
-      expect(events1).not.toBe(events2);
-      expect(events1).toEqual(events2);
-    });
+    expect(
+      pulled.map(({ eventType, aggregateId, payload }) => ({ eventType, aggregateId, payload })),
+    ).toEqual([
+      { eventType: "counter.incremented", aggregateId: "counter-1", payload: { count: 1 } },
+      { eventType: "counter.incremented", aggregateId: "counter-1", payload: { count: 2 } },
+    ]);
+    expect(counter.pullDomainEvents()).toEqual([]);
   });
 
-  describe("addEvent()", () => {
-    it("should add event to collection", () => {
-      const aggregate = TestAggregate.create({ name: "John", age: 30 });
+  it("keeps the events that happen after a pull for the next one", () => {
+    const counter = Counter.create();
+    counter.increment();
+    const pulled = counter.pullDomainEvents();
 
-      expect(aggregate.getDomainEvents()).toHaveLength(1);
-      expect(aggregate.getDomainEvents()[0]).toBeInstanceOf(UserCreated);
-    });
+    counter.increment();
 
-    it("should accumulate multiple events", () => {
-      const aggregate = TestAggregate.create({ name: "John", age: 30 });
-      aggregate.changeName("Jane");
-
-      expect(aggregate.getDomainEvents()).toHaveLength(2);
-      expect(aggregate.getDomainEvents()[0]).toBeInstanceOf(UserCreated);
-      expect(aggregate.getDomainEvents()[1]).toBeInstanceOf(UserNameChanged);
-    });
-  });
-
-  describe("addEvents()", () => {
-    it("should add multiple events at once", () => {
-      const aggregate = TestAggregate.createWithoutEvent({
-        name: "John",
-        age: 30,
-      });
-      const events: IDomainEvent[] = [
-        new UserCreated(aggregate._id.value.toString()),
-        new UserNameChanged(aggregate._id.value.toString(), "Jane"),
-      ];
-
-      aggregate.addMultipleEvents(events);
-
-      expect(aggregate.getDomainEvents()).toHaveLength(2);
-    });
-  });
-
-  describe("clearEvents()", () => {
-    it("should remove all events from aggregate", () => {
-      const aggregate = TestAggregate.create({ name: "John", age: 30 });
-      aggregate.changeName("Jane");
-      expect(aggregate.getDomainEvents()).toHaveLength(2);
-
-      aggregate.clearEvents();
-
-      expect(aggregate.getDomainEvents()).toHaveLength(0);
-    });
-  });
-
-  describe("hasEvents()", () => {
-    it("should return true when aggregate has events", () => {
-      const aggregate = TestAggregate.create({ name: "John", age: 30 });
-
-      expect(aggregate.hasEvents()).toBe(true);
-    });
-
-    it("should return false when aggregate has no events", () => {
-      const aggregate = TestAggregate.createWithoutEvent({
-        name: "John",
-        age: 30,
-      });
-
-      expect(aggregate.hasEvents()).toBe(false);
-    });
-
-    it("should return false after clearing events", () => {
-      const aggregate = TestAggregate.create({ name: "John", age: 30 });
-      aggregate.clearEvents();
-
-      expect(aggregate.hasEvents()).toBe(false);
-    });
-  });
-
-  describe("getEventCount()", () => {
-    it("should return 0 for new aggregate without events", () => {
-      const aggregate = TestAggregate.createWithoutEvent({
-        name: "John",
-        age: 30,
-      });
-
-      expect(aggregate.getEventCount()).toBe(0);
-    });
-
-    it("should return correct count", () => {
-      const aggregate = TestAggregate.create({ name: "John", age: 30 });
-      aggregate.changeName("Jane");
-      aggregate.changeName("Alice");
-
-      expect(aggregate.getEventCount()).toBe(3);
-    });
-
-    it("should return 0 after clearing", () => {
-      const aggregate = TestAggregate.create({ name: "John", age: 30 });
-      aggregate.clearEvents();
-
-      expect(aggregate.getEventCount()).toBe(0);
-    });
-  });
-
-  describe("events preservation", () => {
-    it("should preserve events after prop changes", () => {
-      const aggregate = TestAggregate.create({ name: "John", age: 30 });
-      aggregate.changeName("Jane");
-
-      expect(aggregate.getDomainEvents()).toHaveLength(2);
-      expect(aggregate.name).toBe("Jane");
-    });
-
-    it("should preserve events through toObject()", () => {
-      const aggregate = TestAggregate.create({ name: "John", age: 30 });
-
-      aggregate.toObject();
-
-      expect(aggregate.getDomainEvents()).toHaveLength(1);
-    });
-  });
-
-  describe("Entity inheritance", () => {
-    it("should support clone()", () => {
-      const aggregate = TestAggregate.create({ name: "John", age: 30 });
-      const clone = aggregate.clone({ name: "Jane" });
-
-      expect((clone as TestAggregate).name).toBe("Jane");
-      expect((clone as TestAggregate).age).toBe(30);
-      expect(clone._id.equals(aggregate._id)).toBe(true);
-    });
-
-    it("should support equals()", () => {
-      const id = new UUID();
-      const aggregate1 = TestAggregate.createWithoutEvent({ name: "John", age: 30 }, id);
-      const aggregate2 = TestAggregate.createWithoutEvent({ name: "Jane", age: 25 }, id);
-
-      expect(aggregate1.equals(aggregate2)).toBe(true);
-    });
-
-    it("should support toObject()", () => {
-      const aggregate = TestAggregate.createWithoutEvent({
-        name: "John",
-        age: 30,
-      });
-      const obj = aggregate.toObject();
-
-      expect(obj.id).toBeDefined();
-      expect(obj.name).toBe("John");
-      expect(obj.age).toBe(30);
-    });
-  });
-
-  describe("event types", () => {
-    it("should correctly identify event types", () => {
-      const aggregate = TestAggregate.create({ name: "John", age: 30 });
-      aggregate.changeName("Jane");
-
-      const events = aggregate.getDomainEvents();
-      expect(events[0]?.eventType).toBe("UserCreated");
-      expect(events[1]?.eventType).toBe("UserNameChanged");
-    });
-
-    it("should set correct aggregateId on events", () => {
-      const id = new UUID("test-id");
-      const aggregate = TestAggregate.create({ name: "John", age: 30 }, id);
-
-      expect(aggregate.getDomainEvents()[0]?.aggregateId).toBe("test-id");
-    });
-
-    it("should set dateOccurred on events", () => {
-      const aggregate = TestAggregate.create({ name: "John", age: 30 });
-
-      expect(aggregate.getDomainEvents()[0]?.dateOccurred).toBeInstanceOf(Date);
-    });
+    expect(pulled).toHaveLength(1);
+    expect(counter.pullDomainEvents().map((event) => event.payload)).toEqual([{ count: 2 }]);
   });
 });

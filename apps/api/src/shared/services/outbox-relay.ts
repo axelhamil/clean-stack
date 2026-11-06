@@ -1,6 +1,7 @@
 import {
   type HandlerOutcome,
   type IEventDispatcher,
+  type IInstrumentation,
   type IUnitOfWork,
   uuidv7,
 } from "@packages/ddd-kit";
@@ -13,7 +14,6 @@ import { scrubText } from "@packages/sentry-scrub";
 import { OUTBOX_SETTLE_MARGIN_SECONDS } from "../env-bounds";
 import { failureSchedule } from "../jitter";
 import type { Logger } from "../logger";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 import type {
   DeliveredEvent,
   IOutboxRepository,

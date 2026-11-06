@@ -1,6 +1,6 @@
 import type { ApprovalAction } from "@packages/access-control";
 import { isApprovalAction } from "@packages/access-control";
-import { type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import {
   and,
   asc,
@@ -26,7 +26,6 @@ import {
 } from "../../../../shared/internal-routes/sweep-purge";
 import { sweepSpans } from "../../../../shared/internal-routes/sweep-span";
 import { afterTimeIdCursor } from "../../../../shared/pagination/time-id-cursor";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { ListApprovalsInput } from "../../application/dto/list-approvals.dto";
 import {
   APPROVAL_STATUSES,

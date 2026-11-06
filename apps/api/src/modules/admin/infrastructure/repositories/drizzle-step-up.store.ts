@@ -1,7 +1,6 @@
-import { Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import { authSchema, eq, resolveExecutor, staffSchema } from "@packages/drizzle";
 import { createDbFailure } from "../../../../shared/db-failure";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IStepUpStore, StepUpStoreError } from "../../application/ports/step-up-store.port";
 
 const fail = createDbFailure("ADMIN_STEP_UP_PROVIDER_FAILURE");

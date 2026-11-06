@@ -1,9 +1,7 @@
-import { type IUnitOfWork, uuidv7 } from "@packages/ddd-kit";
-
+import { type IInstrumentation, type IUnitOfWork, uuidv7 } from "@packages/ddd-kit";
 import { and, dbNow, eq, resolveExecutor, webhooksSchema } from "@packages/drizzle";
 import { isKnownEventType, isPublicEvent, matchesSubscription } from "@packages/events";
 import type { BuiltInEventHandler } from "../event-handlers";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { DeliveredEvent } from "../ports/outbox.port";
 
 const ep = webhooksSchema.webhookEndpoint;

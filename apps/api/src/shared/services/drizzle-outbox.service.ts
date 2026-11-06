@@ -1,4 +1,10 @@
-import { domainEventToOutboxRow, type IDomainEvent, Option, Result } from "@packages/ddd-kit";
+import {
+  domainEventToOutboxRow,
+  type IDomainEvent,
+  type IInstrumentation,
+  Option,
+  Result,
+} from "@packages/ddd-kit";
 import {
   and,
   claimedSet,
@@ -22,7 +28,6 @@ import {
   sql,
 } from "@packages/drizzle";
 import { PayloadByEventType } from "@packages/events";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 import type {
   IOutboxRepository,
   OutboxClaimRequest,

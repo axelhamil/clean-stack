@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
-import type { IDomainEvent } from "@packages/ddd-kit";
-import { uuidv7 } from "@packages/ddd-kit";
+import { type IDomainEvent, uuidv7 } from "@packages/ddd-kit";
 import type { EventType } from "@packages/events";
 import { logger } from "./logger";
 import type { IOutboxRepository } from "./ports/outbox.port";

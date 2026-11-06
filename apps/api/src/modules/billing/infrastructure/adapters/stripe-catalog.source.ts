@@ -1,6 +1,5 @@
-import { Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import type Stripe from "stripe";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
   IStripeCatalogSource,
   StripePriceLite,

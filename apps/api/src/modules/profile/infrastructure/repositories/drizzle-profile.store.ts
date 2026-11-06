@@ -1,8 +1,7 @@
-import { Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import { authSchema, eq, resolveExecutor, type SQL } from "@packages/drizzle";
 import { isLocale, type Locale } from "@packages/i18n";
 import { dbOperationFailure } from "../../../../shared/db-failure";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IProfileStore, ProfileError } from "../../../../shared/ports/profile.port";
 
 const dbAttrs = { "db.system.name": "postgresql" } as const;

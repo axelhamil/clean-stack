@@ -15,7 +15,7 @@ import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-uow-rollback");
 
-import { EventCollector, match, Result } from "@packages/ddd-kit";
+import { EventCollector, type IInstrumentation, match, Result } from "@packages/ddd-kit";
 import {
   ambientTransaction,
   authSchema,
@@ -30,7 +30,6 @@ import {
 } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { emitEvent } from "../src/shared/event-emitter";
-import type { IInstrumentation } from "../src/shared/ports/instrumentation.port";
 import { DrizzleOutboxRepository } from "../src/shared/services/drizzle-outbox.service";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 

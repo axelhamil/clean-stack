@@ -1,4 +1,4 @@
-import type { IUnitOfWork } from "@packages/ddd-kit";
+import type { IInstrumentation, ILogger, IUnitOfWork } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import type { MiddlewareHandler } from "hono";
 import { createMiddleware } from "hono/factory";
@@ -9,8 +9,6 @@ import type { ApiScope } from "../../modules/api-token/application/dto/create-to
 import { hmacToken, parseToken } from "../crypto/api-token";
 import { emitEvent } from "../event-emitter";
 import type { IApiTokenRepository } from "../ports/api-token.port";
-import type { IInstrumentation } from "../ports/instrumentation.port";
-import type { ILogger } from "../ports/logger.port";
 import type { IOutboxRepository } from "../ports/outbox.port";
 import { getRequestId } from "../request-context";
 

@@ -1,7 +1,6 @@
-import { Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import { and, eq, resolveExecutor, sql, webhooksSchema } from "@packages/drizzle";
 import { createDbFailure } from "../../../../shared/db-failure";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
   CreateEndpointArgs,
   IWebhookEndpointRepository,

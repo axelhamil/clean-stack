@@ -43,7 +43,6 @@ export {
   getRateLimitDbClient,
   type RateLimitDbClient,
 } from "./rate-limit-client";
-export { trackEventsOnSuccess } from "./repositories/track-events";
 export type { AuditActorType, AuditRetention } from "./schema/audit-log";
 
 import * as authSchema from "./schema/auth";

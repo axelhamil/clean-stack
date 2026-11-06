@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { IDomainEvent } from "../domain/domain-event";
 import { InMemoryEventDispatcher } from "../events/in-memory-event-dispatcher";
+import { Result } from "../primitives/result";
 
 const event: IDomainEvent = {
   eventId: "0190a3c2-7b4d-7e8f-9a0b-1c2d3e4f5a6b",
@@ -59,6 +60,24 @@ describe("InMemoryEventDispatcher", () => {
     const outcome = await dispatcher.run(event, "audit-log");
 
     expect(outcome).toEqual({ name: "audit-log", ok: false, error: "audit table locked" });
+  });
+
+  it("given a handler returning a failed Result, when run, then it is reported failed with the error text", async () => {
+    const dispatcher = new InMemoryEventDispatcher();
+    dispatcher.subscribe("user.created", "audit-log", () => Result.fail("gone"));
+    dispatcher.subscribe("user.created", "webhook-fanout", async () =>
+      Result.fail({ code: "WEBHOOK_UNAVAILABLE", message: "retry later" }),
+    );
+
+    const plain = await dispatcher.run(event, "audit-log");
+    const coded = await dispatcher.run(event, "webhook-fanout");
+
+    expect(plain).toEqual({ name: "audit-log", ok: false, error: "gone" });
+    expect(coded).toEqual({
+      name: "webhook-fanout",
+      ok: false,
+      error: "WEBHOOK_UNAVAILABLE: retry later",
+    });
   });
 
   it("given several handlers, when listed, then their names come in subscription order", () => {

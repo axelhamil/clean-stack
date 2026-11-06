@@ -1,4 +1,4 @@
-import { Option, Result, uuidv7 } from "@packages/ddd-kit";
+import { type IInstrumentation, Option, Result, uuidv7 } from "@packages/ddd-kit";
 import {
   and,
   asc,
@@ -28,7 +28,6 @@ import type {
   ChainVerification,
   IAuditPort,
 } from "../ports/audit.port";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 import { computeAuditHash, GENESIS_HASH } from "./audit-hash";
 
 const DEFAULT_LIMIT = 50;

@@ -5,7 +5,7 @@ description: Use when working on domain events, the transactional outbox, the Be
 
 # Events (transactional outbox)
 
-`IUnitOfWork.run(cb)` opens an `EventCollector`. `repo.save(agg)` reads the ambient transaction and calls `trackEventsOnSuccess` → events flushed via `outbox.enqueue` in the same TX (atomicity). `enqueue` also sends `pg_notify` on the same executor, so it leaves at commit and wakes `OutboxDispatcher`; its `OutboxRelay` claims due rows by lease (one statement, no transaction kept open) and runs every named handler not yet in the row's `deliveries` (built in `audit-log`, `webhook-fanout`, `notification-fanout`, plus each `onEvent(type, handlerName, ...)`), each in its own short transaction, then settles with `markDelivered` or `markFailed` guarded by the claimed `attempts`.
+`IUnitOfWork.run(cb)` opens an `EventCollector`. `repo.save(agg)` reads the ambient transaction and calls `EventCollector.collectFrom(agg)` once the write succeeded → events flushed via `outbox.enqueue` in the same TX (atomicity). `enqueue` also sends `pg_notify` on the same executor, so it leaves at commit and wakes `OutboxDispatcher`; its `OutboxRelay` claims due rows by lease (one statement, no transaction kept open) and runs every named handler not yet in the row's `deliveries` (built in `audit-log`, `webhook-fanout`, `notification-fanout`, plus each `onEvent(type, handlerName, ...)`), each in its own short transaction, then settles with `markDelivered` or `markFailed` guarded by the claimed `attempts`.
 
 ## BetterAuth → outbox bridge (`auth.ts`)
 

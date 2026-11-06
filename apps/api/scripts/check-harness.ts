@@ -7,7 +7,7 @@
  */
 
 import { Writable } from "node:stream";
-import type { Result } from "@packages/ddd-kit";
+import type { IInstrumentation, Result } from "@packages/ddd-kit";
 import { authSchema, db, eq } from "@packages/drizzle";
 import { symmetricEncrypt } from "better-auth/crypto";
 import { Hono } from "hono";
@@ -21,7 +21,6 @@ import {
   SIGNATURE_HEADER,
   sign,
 } from "../src/shared/internal-routes/internal-signature";
-import type { IInstrumentation } from "../src/shared/ports/instrumentation.port";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 import { seedEmail } from "./seed-account";
 

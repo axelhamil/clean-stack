@@ -10,10 +10,9 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import { createDbFailure } from "../../../../shared/db-failure";
 import { env } from "../../../../shared/env";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
   IStorageService,
   ObjectMetadata,

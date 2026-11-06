@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "bun:test";
-import { Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
+import { type IInstrumentation, Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import type { Locale } from "@packages/i18n";
 import { mockPort, type PortMock } from "@packages/test/bun";
@@ -13,7 +13,6 @@ import type {
   EmailMessageRecord,
   IEmailQueue,
 } from "../ports/email-queue.port";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IOutboxRepository } from "../ports/outbox.port";
 import { NoOpInstrumentation } from "../services/noop-instrumentation";
 import { enqueuedEvents } from "./enqueued-events";

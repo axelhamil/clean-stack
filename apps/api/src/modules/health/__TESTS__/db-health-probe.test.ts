@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
+import type { IInstrumentation } from "@packages/ddd-kit";
 import * as realDrizzle from "@packages/drizzle";
 import { mockPort } from "@packages/test/bun";
 import type { HealthCheckFn, IHealthCheckRegistry } from "../../../shared/ports/health.port";
-import type { IInstrumentation } from "../../../shared/ports/instrumentation.port";
 
 let execute: () => Promise<unknown> = async () => [];
 

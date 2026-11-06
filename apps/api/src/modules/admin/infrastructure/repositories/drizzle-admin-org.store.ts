@@ -1,4 +1,4 @@
-import { Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import {
   and,
   authSchema,
@@ -12,7 +12,6 @@ import {
 } from "@packages/drizzle";
 import { createDbFailure } from "../../../../shared/db-failure";
 import { afterTimeIdCursor, exactInstant } from "../../../../shared/pagination/time-id-cursor";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { ListOrgsInput } from "../../application/dto/list-orgs.dto";
 import type {
   AdminOrgListRow,

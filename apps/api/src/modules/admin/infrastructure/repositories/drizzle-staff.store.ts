@@ -4,7 +4,7 @@ import {
   type StaffPermission,
   type StaffRole,
 } from "@packages/access-control";
-import { type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import {
   and,
   asc,
@@ -32,7 +32,6 @@ import {
   withSweepGuards,
 } from "../../../../shared/internal-routes/sweep-purge";
 import { sweepSpans } from "../../../../shared/internal-routes/sweep-span";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
   EndedImpersonation,
   EndedSessions,

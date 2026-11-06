@@ -1,4 +1,4 @@
-import { Option, Result, uuidv7 } from "@packages/ddd-kit";
+import { type IInstrumentation, Option, Result, uuidv7 } from "@packages/ddd-kit";
 import {
   and,
   claimedSet,
@@ -33,7 +33,6 @@ import type {
   EmailQueueError,
   IEmailQueue,
 } from "../ports/email-queue.port";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 
 const em = emailSchema.emailMessage;
 const dbAttrs = { "db.system.name": "postgresql" } as const;

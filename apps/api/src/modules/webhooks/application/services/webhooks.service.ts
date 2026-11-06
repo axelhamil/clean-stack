@@ -1,11 +1,17 @@
 import { Buffer } from "node:buffer";
-import { type AppError, type IUnitOfWork, Option, Result, uuidv7 } from "@packages/ddd-kit";
+import {
+  type AppError,
+  type IInstrumentation,
+  type IUnitOfWork,
+  Option,
+  Result,
+  uuidv7,
+} from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { deriveOrgSubKey, encryptSecret, masterKeyFromHex } from "../../../../shared/aead";
 import { env } from "../../../../shared/env";
 import { emitEvent } from "../../../../shared/event-emitter";
 import { logger } from "../../../../shared/logger";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import { assertPublicUrl } from "../../../../shared/ssrf-guard";
 import type {

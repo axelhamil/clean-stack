@@ -1,6 +1,6 @@
+import type { IInstrumentation } from "@packages/ddd-kit";
 import { db } from "@packages/drizzle";
 import type { Logger } from "../logger";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 import { ensureNotificationTrigger, NOTIFICATION_NOTIFY_CHANNEL } from "./notification-trigger";
 import { PgListener, type PgListenerOptions } from "./pg-listener";
 

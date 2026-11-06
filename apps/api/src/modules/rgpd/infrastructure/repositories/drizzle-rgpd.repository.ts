@@ -1,5 +1,5 @@
 import { PERSONAL_ORG_SLUG_LIKE_PATTERN } from "@packages/access-control";
-import { Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import {
   and,
   apiTokenSchema,
@@ -20,7 +20,6 @@ import { verifyPassword as verifyHash } from "better-auth/crypto";
 import { ENDED_SESSION_COLUMNS, endedImpersonationsOf } from "../../../../shared/db/ended-sessions";
 import { dbOperationFailure } from "../../../../shared/db-failure";
 import type { Logger } from "../../../../shared/logger";
-import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 import type {
   ExecuteWipeOutput,
   IRgpdRepository,

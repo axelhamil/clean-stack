@@ -1,5 +1,5 @@
+import type { IInstrumentation } from "@packages/ddd-kit";
 import type { Logger } from "../logger";
-import type { IInstrumentation } from "../ports/instrumentation.port";
 import type { IOutboxRepository } from "../ports/outbox.port";
 import { OUTBOX_CHANNEL } from "./drizzle-outbox.service";
 import type { OutboxRelay } from "./outbox-relay";

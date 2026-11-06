@@ -2,8 +2,12 @@ import { UUID } from "../primitives/uuid";
 import { ValueObject } from "./value-object";
 import { WatchedList } from "./watched-list";
 
-export interface IEntity<T> {
-  readonly _id: UUID<string | number>;
+export type AnyId = UUID<string | number>;
+
+export type IdArgument<Id extends AnyId> = AnyId extends Id ? [id?: Id] : [id: Id];
+
+export interface IEntity<T, Id extends AnyId = AnyId> {
+  readonly _id: Id;
   readonly _props: T;
   equals(object?: IEntity<T>): boolean;
   toObject(): Record<string, unknown>;
@@ -13,13 +17,24 @@ function isEntity(v: unknown): v is IEntity<unknown> {
   return v instanceof Entity;
 }
 
-export abstract class Entity<T> implements IEntity<T> {
-  public readonly _props: T;
-  public readonly _id: UUID<string | number>;
+function withOwnCollection(prop: unknown): unknown {
+  if (Array.isArray(prop)) return [...prop];
+  if (prop instanceof WatchedList) return prop.copy();
 
-  protected constructor(props: T, id?: UUID<string | number>) {
-    this._id = id || new UUID();
+  return prop;
+}
+
+export abstract class Entity<T, Id extends AnyId = AnyId> implements IEntity<T, Id> {
+  public readonly _props: T;
+  public readonly _id: Id;
+
+  protected constructor(props: T, ...[id]: IdArgument<Id>) {
+    this._id = (id as Id | undefined) ?? (new UUID() as Id);
     this._props = props;
+  }
+
+  get id(): Id {
+    return this._id;
   }
 
   public equals(object?: IEntity<T>): boolean {
@@ -59,14 +74,15 @@ export abstract class Entity<T> implements IEntity<T> {
     };
   }
 
-  public clone(props?: Partial<T>): Entity<T> {
-    const clonedProps = { ...this._props, ...props };
+  public clone(props?: Partial<T>): this {
+    const EntityConstructor = this.constructor as new (props: T, id: Id) => this;
+    const ownProps = Object.fromEntries(
+      Object.entries(this._props as Record<string, unknown>).map(([key, prop]) => [
+        key,
+        withOwnCollection(prop),
+      ]),
+    ) as T;
 
-    const EntityConstructor = this.constructor as new (
-      props: T,
-      id?: UUID<string | number>,
-    ) => Entity<T>;
-
-    return new EntityConstructor(clonedProps, this._id);
+    return new EntityConstructor({ ...ownProps, ...props }, this._id);
   }
 }
