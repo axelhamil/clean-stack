@@ -1,14 +1,18 @@
 import { Option } from "@packages/ddd-kit";
 import { defineModule } from "inwire";
+import type { AdminSettings } from "../modules/admin/application/config/admin-settings";
 import type { ApiTokenSettings } from "../modules/api-token/application/config/api-token-settings";
 import type { BillingSettings } from "../modules/billing/application/config/billing-settings";
 import type { ConsentSettings } from "../modules/consents/application/config/consent-settings";
+import type { RgpdSettings } from "../modules/rgpd/application/config/rgpd-settings";
 import type {
   S3StorageSettings,
   StorageSettings,
   UploadSettings,
 } from "../modules/uploads/application/config/upload-settings";
+import type { WebhookSettings } from "../modules/webhooks/application/config/webhook-settings";
 import type { env } from "../shared/env";
+import type { StaffEnv } from "../shared/staff-access";
 
 type SettingsSource = Pick<
   typeof env,
@@ -30,6 +34,25 @@ type SettingsSource = Pick<
   | "S3_FORCE_PATH_STYLE"
   | "STRIPE_SECRET_KEY"
   | "STRIPE_WEBHOOK_SECRET"
+  | "APP_URL"
+  | "SWEEP_DEADLINE_MS"
+  | "RGPD_GRACE_PERIOD_DAYS"
+  | "RGPD_EXPORT_RATE_LIMIT_HOURS"
+  | "RGPD_SWEEP_BATCH_SIZE"
+  | "WEBHOOK_MASTER_KEY"
+  | "WEBHOOK_SECRET_GRACE_HOURS"
+  | "WEBHOOK_LEASE_SECONDS"
+  | "WEBHOOK_DEAD_RETRY_HOURS"
+  | "WEBHOOK_AUTO_DISABLE_MIN_FAILURES"
+  | "WEBHOOK_AUTO_DISABLE_AFTER_DAYS"
+  | "WEBHOOK_RESPONSE_CAPTURE_BYTES"
+  | "PLATFORM_ADMIN_IDS"
+  | "PLATFORM_ADMIN_REQUIRE_MFA"
+  | "ADMIN_STEP_UP_TTL_SECONDS"
+  | "ADMIN_APPROVAL_ENABLED"
+  | "ADMIN_APPROVAL_ACTIONS"
+  | "ADMIN_APPROVAL_TTL_HOURS"
+  | "OUTBOX_LEASE_SECONDS"
 >;
 
 function storageSettingsOf(source: SettingsSource): StorageSettings {
@@ -69,6 +92,36 @@ export const apiSettings = (source: SettingsSource) => {
     stripeSecretKey: Option.fromNullable(source.STRIPE_SECRET_KEY),
     stripeWebhookSecret: Option.fromNullable(source.STRIPE_WEBHOOK_SECRET),
   };
+  const webhookSettings: WebhookSettings = {
+    masterKeyHex: Option.fromNullable(source.WEBHOOK_MASTER_KEY),
+    secretGraceHours: source.WEBHOOK_SECRET_GRACE_HOURS,
+    delivery: {
+      leaseSeconds: source.WEBHOOK_LEASE_SECONDS,
+      deadRetrySeconds: source.WEBHOOK_DEAD_RETRY_HOURS * 3600,
+      autoDisableMinFailures: source.WEBHOOK_AUTO_DISABLE_MIN_FAILURES,
+      autoDisableAfterDays: source.WEBHOOK_AUTO_DISABLE_AFTER_DAYS,
+      responseCaptureBytes: source.WEBHOOK_RESPONSE_CAPTURE_BYTES,
+    },
+  };
+  const rgpdSettings: RgpdSettings = {
+    appUrl: source.APP_URL,
+    gracePeriodDays: source.RGPD_GRACE_PERIOD_DAYS,
+    exportRateLimitHours: source.RGPD_EXPORT_RATE_LIMIT_HOURS,
+    sweepDeadlineMs: source.SWEEP_DEADLINE_MS,
+    sweepBatchSize: source.RGPD_SWEEP_BATCH_SIZE,
+  };
+  const staffSettings: StaffEnv = {
+    PLATFORM_ADMIN_IDS: source.PLATFORM_ADMIN_IDS,
+    PLATFORM_ADMIN_REQUIRE_MFA: source.PLATFORM_ADMIN_REQUIRE_MFA,
+  };
+  const adminSettings: AdminSettings = {
+    stepUpTtlSeconds: source.ADMIN_STEP_UP_TTL_SECONDS,
+    approvalEnabled: source.ADMIN_APPROVAL_ENABLED,
+    approvalActions: source.ADMIN_APPROVAL_ACTIONS,
+    approvalTtlHours: source.ADMIN_APPROVAL_TTL_HOURS,
+    outboxLeaseSeconds: source.OUTBOX_LEASE_SECONDS,
+    supportUrl: `${source.APP_URL}/support`,
+  };
 
   return defineModule<Record<never, never>>()((b) =>
     b
@@ -76,6 +129,10 @@ export const apiSettings = (source: SettingsSource) => {
       .add("apiTokenSettings", (): ApiTokenSettings => apiTokenSettings)
       .add("uploadSettings", (): UploadSettings => uploadSettings)
       .add("storageSettings", (): StorageSettings => storageSettings)
-      .add("billingSettings", (): BillingSettings => billingSettings),
+      .add("billingSettings", (): BillingSettings => billingSettings)
+      .add("webhookSettings", (): WebhookSettings => webhookSettings)
+      .add("rgpdSettings", (): RgpdSettings => rgpdSettings)
+      .add("staffSettings", (): StaffEnv => staffSettings)
+      .add("adminSettings", (): AdminSettings => adminSettings),
   );
 };

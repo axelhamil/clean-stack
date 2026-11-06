@@ -1,96 +1,107 @@
 import { AppErrorException } from "@packages/ddd-kit";
+import type { RouteEnv, RouteGuards } from "@packages/http/route-guards";
 import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
-import { auth } from "../../auth";
-import { di } from "../../container";
-import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
-import { requireStaffPermission, requireStepUp } from "../../shared/middleware/staff.middleware";
 import { isReplayableStripeEvent } from "../../shared/ports/stripe-event.port";
 import { requeueOutboxBodySchema } from "./application/dto/requeue-outbox.dto";
+import type { IAuthProvider } from "./application/ports/auth-provider.port";
+import type { OpsService } from "./application/services/ops.service";
+import type { StripeReplayService } from "./application/services/stripe-replay.service";
 
-export const adminOpsRoutes = new Hono<{ Variables: AuthVariables }>()
-  .get("/dead-letters", requireAuth, requireStaffPermission("ops.read"), async (c) => {
-    const result = await di.OpsService.deadLetters();
-    if (result.isFailure) throw new AppErrorException(result.getError());
+export interface AdminOpsRoutesDeps {
+  routeGuards: RouteGuards;
+  IAuthProvider: Pick<IAuthProvider, "handle">;
+  OpsService: Pick<OpsService, "deadLetters" | "requeue" | "sweeps">;
+  StripeReplayService: Pick<StripeReplayService, "list" | "replay">;
+}
 
-    const { outbox, queues } = result.getValue();
+export function createAdminOpsRoutes(deps: AdminOpsRoutesDeps) {
+  const { routeGuards: g } = deps;
 
-    return c.json({
-      outbox: {
-        total: outbox.total,
-        items: outbox.items.map((row) => ({
-          id: row.id,
-          eventType: row.eventType,
-          attempts: row.attempts,
-          deadAt: row.deadAt.toISOString(),
-          lastError: row.lastError.toNull(),
-        })),
+  return new Hono<RouteEnv>()
+    .get("/dead-letters", g.requireAuth, g.requireStaffPermission("ops.read"), async (c) => {
+      const result = await deps.OpsService.deadLetters();
+      if (result.isFailure) throw new AppErrorException(result.getError());
+
+      const { outbox, queues } = result.getValue();
+
+      return c.json({
+        outbox: {
+          total: outbox.total,
+          items: outbox.items.map((row) => ({
+            id: row.id,
+            eventType: row.eventType,
+            attempts: row.attempts,
+            deadAt: row.deadAt.toISOString(),
+            lastError: row.lastError.toNull(),
+          })),
+        },
+        queues,
+      });
+    })
+    .post(
+      "/outbox/requeue",
+      g.requireAuth,
+      g.requireStaffPermission("ops.manage"),
+      g.requireStepUp,
+      zV("json", requeueOutboxBodySchema),
+      async (c) => {
+        const result = await deps.OpsService.requeue({
+          actorUserId: g.currentUserId(c),
+          ids: c.req.valid("json").ids,
+        });
+        if (result.isFailure) throw new AppErrorException(result.getError());
+
+        return c.json(result.getValue());
       },
-      queues,
-    });
-  })
-  .post(
-    "/outbox/requeue",
-    requireAuth,
-    requireStaffPermission("ops.manage"),
-    requireStepUp,
-    zV("json", requeueOutboxBodySchema),
-    async (c) => {
-      const result = await di.OpsService.requeue({
-        actorUserId: c.get("user").id,
-        ids: c.req.valid("json").ids,
-      });
+    )
+    .get("/sweeps", g.requireAuth, g.requireStaffPermission("ops.read"), async (c) => {
+      const result = await deps.OpsService.sweeps();
       if (result.isFailure) throw new AppErrorException(result.getError());
 
-      return c.json(result.getValue());
-    },
-  )
-  .get("/sweeps", requireAuth, requireStaffPermission("ops.read"), async (c) => {
-    const result = await di.OpsService.sweeps();
-    if (result.isFailure) throw new AppErrorException(result.getError());
-
-    return c.json({
-      items: result.getValue().map((run) => ({
-        label: run.label,
-        outcome: run.outcome,
-        count: run.count,
-        late: run.late,
-        finishedAt: run.finishedAt.toISOString(),
-      })),
-    });
-  })
-  .get("/stripe-events", requireAuth, requireStaffPermission("ops.read"), async (c) => {
-    const result = await di.StripeReplayService.list();
-    if (result.isFailure) throw new AppErrorException(result.getError());
-
-    const { configured, items } = result.getValue();
-
-    return c.json({
-      configured,
-      items: items.map((row) => ({
-        id: row.id,
-        type: row.type,
-        status: row.status,
-        receivedAt: row.receivedAt.toISOString(),
-        lastError: row.lastError.toNull(),
-        replayedAt: row.replayedAt.map((date) => date.toISOString()).toNull(),
-        replayable: isReplayableStripeEvent(row.type),
-      })),
-    });
-  })
-  .post(
-    "/stripe-events/:id/replay",
-    requireAuth,
-    requireStaffPermission("ops.manage"),
-    requireStepUp,
-    async (c) => {
-      const result = await di.StripeReplayService.replay({
-        actorUserId: c.get("user").id,
-        stripeEventId: c.req.param("id"),
-        handler: (request) => auth.handler(request),
+      return c.json({
+        items: result.getValue().map((run) => ({
+          label: run.label,
+          outcome: run.outcome,
+          count: run.count,
+          late: run.late,
+          finishedAt: run.finishedAt.toISOString(),
+        })),
       });
+    })
+    .get("/stripe-events", g.requireAuth, g.requireStaffPermission("ops.read"), async (c) => {
+      const result = await deps.StripeReplayService.list();
       if (result.isFailure) throw new AppErrorException(result.getError());
 
-      return c.json({ ok: true });
-    },
-  );
+      const { configured, items } = result.getValue();
+
+      return c.json({
+        configured,
+        items: items.map((row) => ({
+          id: row.id,
+          type: row.type,
+          status: row.status,
+          receivedAt: row.receivedAt.toISOString(),
+          lastError: row.lastError.toNull(),
+          replayedAt: row.replayedAt.map((date) => date.toISOString()).toNull(),
+          replayable: isReplayableStripeEvent(row.type),
+        })),
+      });
+    })
+    .post(
+      "/stripe-events/:id/replay",
+      g.requireAuth,
+      g.requireStaffPermission("ops.manage"),
+      g.requireStepUp,
+      async (c) => {
+        const result = await deps.StripeReplayService.replay({
+          actorUserId: g.currentUserId(c),
+          stripeEventId: c.req.param("id"),
+          handler: (request) => deps.IAuthProvider.handle(request),
+        });
+        if (result.isFailure) throw new AppErrorException(result.getError());
+
+        return c.json({ ok: true });
+      },
+    );
+}

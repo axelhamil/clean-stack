@@ -1,15 +1,26 @@
 // `/internal/*`: gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
-import { AppErrorException } from "@packages/ddd-kit";
+import { AppErrorException, type IInstrumentation } from "@packages/ddd-kit";
+import type { RouteGuard } from "@packages/http/route-guards";
 import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
-import { di } from "../../container";
-import { env } from "../../shared/env";
-import { internalLayers } from "../../shared/internal-routes/internal-layers";
 import { type SweepBeat, withSweepHeartbeat } from "../../shared/internal-routes/sweep-heartbeat";
 import { sweepSpans } from "../../shared/internal-routes/sweep-span";
+import type { ISweepRunStore } from "../../shared/ports/sweep-run.port";
+import type { RgpdSettings } from "./application/config/rgpd-settings";
 import { sweepBodySchema } from "./application/dto/process-pending-deletions.dto";
-import type { ProcessPendingDeletionsOutput } from "./application/services/rgpd.service";
+import type {
+  ProcessPendingDeletionsOutput,
+  RgpdService,
+} from "./application/services/rgpd.service";
+
+export interface RgpdInternalRoutesDeps {
+  internalGuards: readonly RouteGuard[];
+  ISweepRunStore: ISweepRunStore;
+  IInstrumentation: IInstrumentation;
+  RgpdService: Pick<RgpdService, "processPendingDeletions">;
+  rgpdSettings: Pick<RgpdSettings, "sweepBatchSize" | "sweepDeadlineMs">;
+}
 
 function beatOfDeletions(output: ProcessPendingDeletionsOutput): SweepBeat | undefined {
   if (output.dryRun) return undefined;
@@ -20,29 +31,31 @@ function beatOfDeletions(output: ProcessPendingDeletionsOutput): SweepBeat | und
   return { outcome: output.truncated ? "truncated" : "ok", count };
 }
 
-export const rgpdInternalRoutes = new Hono()
-  .use("*", ...internalLayers)
-  .post("/rgpd-sweep", zV("json", sweepBodySchema), async (c) => {
-    const body = c.req.valid("json");
-    const output = await withSweepHeartbeat(
-      {
-        label: "rgpd-sweep",
-        store: di.ISweepRunStore,
-        spans: sweepSpans(di.IInstrumentation),
-        beatOf: beatOfDeletions,
-        dryRun: body.dryRun,
-      },
-      async () => {
-        const result = await di.RgpdService.processPendingDeletions({
-          batchSize: body.batchSize ?? env.RGPD_SWEEP_BATCH_SIZE,
+export function createRgpdInternalRoutes(deps: RgpdInternalRoutesDeps) {
+  return new Hono()
+    .use("*", ...deps.internalGuards)
+    .post("/rgpd-sweep", zV("json", sweepBodySchema), async (c) => {
+      const body = c.req.valid("json");
+      const output = await withSweepHeartbeat(
+        {
+          label: "rgpd-sweep",
+          store: deps.ISweepRunStore,
+          spans: sweepSpans(deps.IInstrumentation),
+          beatOf: beatOfDeletions,
           dryRun: body.dryRun,
-          deadlineMs: env.SWEEP_DEADLINE_MS,
-        });
-        if (result.isFailure) throw new AppErrorException(result.getError());
+        },
+        async () => {
+          const result = await deps.RgpdService.processPendingDeletions({
+            batchSize: body.batchSize ?? deps.rgpdSettings.sweepBatchSize,
+            dryRun: body.dryRun,
+            deadlineMs: deps.rgpdSettings.sweepDeadlineMs,
+          });
+          if (result.isFailure) throw new AppErrorException(result.getError());
 
-        return result.getValue();
-      },
-    );
+          return result.getValue();
+        },
+      );
 
-    return c.json(output);
-  });
+      return c.json(output);
+    });
+}

@@ -1,14 +1,19 @@
-import { type EventHandler, Option, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
+import type { IEmailService } from "@packages/email/email.port";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { defineModule } from "inwire";
-import { env } from "../../shared/env";
 import { logger } from "../../shared/logger";
 import type { IEntitlementsReader } from "../../shared/ports/entitlements-reader.port";
 import type { IPlanOverrideStore } from "../../shared/ports/plan-override.port";
 import type { IProfileStore } from "../../shared/ports/profile.port";
 import type { IStaffStore } from "../../shared/ports/staff-store.port";
 import type { IStripeEventGateway, IStripeEventStore } from "../../shared/ports/stripe-event.port";
+import type { ISweepRunStore } from "../../shared/ports/sweep-run.port";
+import type { ITotpVerifier } from "../../shared/ports/totp-verifier.port";
 import { StaffAccessService } from "../../shared/services/staff-access.service";
+import type { StaffEnv } from "../../shared/staff-access";
 import type { ApprovalHandlers } from "./application/approved-action";
+import type { AdminSettings } from "./application/config/admin-settings";
 import { closeApprovalsOfDeletedUser } from "./application/event-handlers/close-approvals-of-deleted-user";
 import { notifyImpersonatedUser } from "./application/event-handlers/notify-impersonated-user";
 import type { IAdminOrgStore } from "./application/ports/admin-org-store.port";
@@ -38,40 +43,23 @@ import { DrizzleStaffStore } from "./infrastructure/repositories/drizzle-staff.s
 import { DrizzleStaffNoteStore } from "./infrastructure/repositories/drizzle-staff-note.store";
 import { DrizzleStepUpStore } from "./infrastructure/repositories/drizzle-step-up.store";
 
-declare module "inwire" {
-  interface AppDeps {
-    IAdminUserStore: IAdminUserStore;
-    IAdminOrgStore: IAdminOrgStore;
-    AdminQueryService: AdminQueryService;
-    IStaffStore: IStaffStore;
-    StaffAccessService: StaffAccessService;
-    StaffService: StaffService;
-    AdminModerationService: AdminModerationService;
-    IStepUpStore: IStepUpStore;
-    StepUpService: StepUpService;
-    IApprovalStore: IApprovalStore;
-    ApprovalHandlers: ApprovalHandlers;
-    ApprovalService: ApprovalService;
-    IOpsStore: IOpsStore;
-    OpsService: OpsService;
-    StripeReplayService: StripeReplayService;
-    PlanOverrideService: PlanOverrideService;
-    IStaffNoteStore: IStaffNoteStore;
-    StaffNoteService: StaffNoteService;
-    ISavedViewStore: ISavedViewStore;
-    SavedViewService: SavedViewService;
-    InboxService: InboxService;
-    CloseApprovalsOfDeletedUser: EventHandler;
-    NotifyImpersonatedUser: EventHandler;
-    IProfileStore: IProfileStore;
-    EntitlementsService: IEntitlementsReader;
-    IPlanOverrideStore: IPlanOverrideStore;
-    IStripeEventStore: IStripeEventStore;
-    IStripeEventGateway: IStripeEventGateway;
-  }
+export interface AdminPrerequisites {
+  IInstrumentation: IInstrumentation;
+  ITransactionService: IUnitOfWork;
+  IOutboxRepository: IOutboxRepository;
+  IEmailService: IEmailService;
+  ITotpVerifier: ITotpVerifier;
+  ISweepRunStore: ISweepRunStore;
+  IProfileStore: IProfileStore;
+  EntitlementsService: IEntitlementsReader;
+  IPlanOverrideStore: IPlanOverrideStore;
+  IStripeEventStore: IStripeEventStore;
+  IStripeEventGateway: IStripeEventGateway;
+  staffSettings: StaffEnv;
+  adminSettings: AdminSettings;
 }
 
-export const adminModule = defineModule()((b) =>
+export const adminModule = defineModule<AdminPrerequisites>()((b) =>
   b
     .add("IAdminUserStore", (c): IAdminUserStore => new DrizzleAdminUserStore(c.IInstrumentation))
     .add("IAdminOrgStore", (c): IAdminOrgStore => new DrizzleAdminOrgStore(c.IInstrumentation))
@@ -92,7 +80,13 @@ export const adminModule = defineModule()((b) =>
     )
     .add(
       "StaffAccessService",
-      (c) => new StaffAccessService(c.IStaffStore, c.IOutboxRepository, c.ITransactionService, env),
+      (c) =>
+        new StaffAccessService(
+          c.IStaffStore,
+          c.IOutboxRepository,
+          c.ITransactionService,
+          c.staffSettings,
+        ),
     )
     .add(
       "StaffService",
@@ -102,7 +96,7 @@ export const adminModule = defineModule()((b) =>
           c.IAdminUserStore,
           c.IOutboxRepository,
           c.ITransactionService,
-          env,
+          c.staffSettings,
         ),
     )
     .add(
@@ -119,7 +113,7 @@ export const adminModule = defineModule()((b) =>
           c.ITotpVerifier,
           c.IOutboxRepository,
           c.ITransactionService,
-          env,
+          { ADMIN_STEP_UP_TTL_SECONDS: c.adminSettings.stepUpTtlSeconds },
           logger,
         ),
     )
@@ -278,20 +272,17 @@ export const adminModule = defineModule()((b) =>
           c.ITransactionService,
           c.IInstrumentation,
           c.ApprovalHandlers,
-          env,
+          c.staffSettings,
+          c.adminSettings,
         ),
     )
     .add("IOpsStore", (c): IOpsStore => new DrizzleOpsStore(c.IInstrumentation))
     .add(
       "OpsService",
       (c) =>
-        new OpsService(
-          c.IOpsStore,
-          c.ISweepRunStore,
-          c.IOutboxRepository,
-          c.ITransactionService,
-          env,
-        ),
+        new OpsService(c.IOpsStore, c.ISweepRunStore, c.IOutboxRepository, c.ITransactionService, {
+          OUTBOX_LEASE_SECONDS: c.adminSettings.outboxLeaseSeconds,
+        }),
     )
     .add(
       "StripeReplayService",
@@ -332,7 +323,7 @@ export const adminModule = defineModule()((b) =>
         IEmailService: c.IEmailService,
         AdminQueryService: c.AdminQueryService,
         IProfileStore: c.IProfileStore,
-        supportUrl: `${env.APP_URL}/support`,
+        supportUrl: c.adminSettings.supportUrl,
       }),
     ),
 );

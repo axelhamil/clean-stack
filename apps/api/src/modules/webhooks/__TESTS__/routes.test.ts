@@ -1,10 +1,20 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
-import type { WebhookDeliveryRecord } from "../application/ports/webhook-delivery.port";
+import { openRouteGuards } from "@packages/http/testing/route-guards";
+import { mockPort } from "@packages/test/bun";
+import { Hono } from "hono";
+import { createErrorHandler } from "../../../shared/middleware/error.middleware";
+import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
+import type {
+  WebhookDeliveryAttemptRecord,
+  WebhookDeliveryRecord,
+} from "../application/ports/webhook-delivery.port";
 import type {
   WebhookEndpointRecord,
   WebhookRepoError,
 } from "../application/ports/webhook-endpoint.port";
+import type { WebhookServiceError } from "../application/services/webhooks.service";
+import { createWebhooksRoutes, type WebhooksRoutesDeps } from "../routes";
 
 // ─── stub data ───────────────────────────────────────────────────────────────
 
@@ -30,13 +40,13 @@ const stubEndpointA: WebhookEndpointRecord = {
 };
 
 // Delivery that belongs to endpoint B, not A
-const crossDelivery = {
+const crossDelivery: WebhookDeliveryRecord & { attemptHistory: WebhookDeliveryAttemptRecord[] } = {
   id: DELIVERY_OF_B,
   endpointId: ENDPOINT_B,
   outboxEventId: "outbox-1",
   eventType: "user.created",
   payload: { userId: "u1" },
-  status: "success" as const,
+  status: "success",
   attempts: 1,
   nextAttemptAt: Option.none<Date>(),
   lastError: Option.none<string>(),
@@ -50,7 +60,9 @@ const mockFindEndpoint = mock(async () =>
   Result.ok<Option<WebhookEndpointRecord>, WebhookRepoError>(Option.some(stubEndpointA)),
 );
 const mockFindDelivery = mock(async (_deliveryId: string, endpointId: string, _orgId: string) =>
-  Result.ok(endpointId === crossDelivery.endpointId ? Option.some(crossDelivery) : Option.none()),
+  Result.ok<Option<typeof crossDelivery>, WebhookServiceError>(
+    endpointId === crossDelivery.endpointId ? Option.some(crossDelivery) : Option.none(),
+  ),
 );
 const mockReplayDelivery = mock(async (..._args: unknown[]) =>
   Result.ok<Option<WebhookDeliveryRecord>, WebhookRepoError>(Option.none()),
@@ -62,14 +74,17 @@ const mockUpdateEndpoint = mock(async () =>
   Result.ok<Option<WebhookEndpointRecord>, WebhookRepoError>(Option.some(stubEndpointA)),
 );
 const mockRotateSecret = mock(async () =>
-  Result.ok(Option.some({ endpoint: stubEndpointA, plaintextSecret: "whsec_new" })),
+  Result.ok<
+    Option<{ endpoint: WebhookEndpointRecord; plaintextSecret: string }>,
+    WebhookServiceError
+  >(Option.some({ endpoint: stubEndpointA, plaintextSecret: "whsec_new" })),
 );
 
-// ─── module mocks (must be declared before dynamic import) ───────────────────
-
-mock.module("../../../container", () => ({
-  di: {
+function makeApp() {
+  const routes = createWebhooksRoutes({
+    routeGuards: openRouteGuards({ userId: "user-1", orgId: ORG_ID }),
     WebhooksService: {
+      ...mockPort<WebhooksRoutesDeps["WebhooksService"]>(),
       findEndpoint: mockFindEndpoint,
       findDelivery: mockFindDelivery,
       replayDelivery: mockReplayDelivery,
@@ -77,48 +92,14 @@ mock.module("../../../container", () => ({
       updateEndpoint: mockUpdateEndpoint,
       rotateSecret: mockRotateSecret,
     },
-    PolicyAcceptanceService: {
-      hasAcceptedCurrent: mock(async () => Result.ok(true)),
-    },
-  },
-}));
-
-const realAuthMiddleware = await import("../../../shared/middleware/auth.middleware");
-mock.module("../../../shared/middleware/auth.middleware", () => ({
-  ...realAuthMiddleware,
-  // biome-ignore lint/suspicious/noExplicitAny: test stub
-  requireAuth: async (c: any, next: () => Promise<void>) => {
-    c.set("user", { id: "user-1" });
-    c.set("session", { activeOrganizationId: ORG_ID });
-    await next();
-  },
-}));
-
-mock.module("../../../shared/middleware/org.middleware", () => ({
-  // biome-ignore lint/suspicious/noExplicitAny: test stub
-  requireOrg: async (c: any, next: () => Promise<void>) => {
-    c.set("orgId", ORG_ID);
-    await next();
-  },
-  requireOrgPermission: () => async (_c: unknown, next: () => Promise<void>) => {
-    await next();
-  },
-}));
-
-// Dynamic import AFTER mocks are registered
-const { webhooksRoutes } = await import("../routes");
-const { Hono } = await import("hono");
-const { createErrorHandler } = await import("../../../shared/middleware/error.middleware");
-const { NoOpInstrumentation } = await import("../../../shared/services/noop-instrumentation");
-
-function makeApp() {
+  });
   const app = new Hono<{ Variables: { requestId: string } }>();
   app.use("*", async (c, next) => {
     c.set("requestId", "req-test");
     await next();
   });
   app.onError(createErrorHandler(new NoOpInstrumentation()));
-  app.route("/webhooks", webhooksRoutes);
+  app.route("/webhooks", routes);
   return app;
 }
 

@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Result } from "@packages/ddd-kit";
+import { mockPort } from "@packages/test/bun";
 import { Hono } from "hono";
 import { env } from "../../../shared/env";
+import { internalLayers } from "../../../shared/internal-routes/internal-layers";
 import {
   buildSignatureHeader,
   canonicalize,
@@ -9,18 +11,22 @@ import {
   sign,
 } from "../../../shared/internal-routes/internal-signature";
 import { createErrorHandler } from "../../../shared/middleware/error.middleware";
+import type {
+  ISweepRunStore,
+  SweepRun,
+  SweepRunStoreError,
+} from "../../../shared/ports/sweep-run.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
+import type { RgpdError } from "../application/ports/rgpd.port";
+import type {
+  ProcessPendingDeletionsInput,
+  ProcessPendingDeletionsOutput,
+} from "../application/services/rgpd.service";
+import { createRgpdInternalRoutes } from "../internal.routes";
 
-type SweepOutput = {
-  processed: number;
-  succeeded: string[];
-  failed: Array<{ userId: string; errorCode: string }>;
-  dryRun: boolean;
-  truncated: boolean;
-};
-type SweepResult = Result<SweepOutput, { code: string; message: string }>;
+type SweepResult = Result<ProcessPendingDeletionsOutput, RgpdError>;
 
-const SWEEP_OK: SweepOutput = {
+const SWEEP_OK: ProcessPendingDeletionsOutput = {
   processed: 2,
   succeeded: ["u1", "u2"],
   failed: [],
@@ -28,23 +34,23 @@ const SWEEP_OK: SweepOutput = {
   truncated: false,
 };
 
-const mockedExecute = mock<(...args: unknown[]) => Promise<SweepResult>>(async () =>
-  Result.ok(SWEEP_OK),
+const mockedExecute = mock<(input: ProcessPendingDeletionsInput) => Promise<SweepResult>>(
+  async () => Result.ok(SWEEP_OK),
 );
 
-const mockedRecord = mock<
-  (run: { label: string; outcome: string; count: number }) => Promise<void>
->(async () => {});
+const mockedRecord = mock<(run: SweepRun) => Promise<Result<void, SweepRunStoreError>>>(async () =>
+  Result.ok(),
+);
 
-mock.module("../../../container", () => ({
-  di: {
-    RgpdService: { processPendingDeletions: mockedExecute },
-    IInstrumentation: new NoOpInstrumentation(),
-    ISweepRunStore: { record: mockedRecord },
-  },
-}));
+const SETTINGS = { sweepBatchSize: 50, sweepDeadlineMs: 90_000 };
 
-const { rgpdInternalRoutes } = await import("../internal.routes");
+const routes = createRgpdInternalRoutes({
+  internalGuards: internalLayers,
+  ISweepRunStore: { ...mockPort<ISweepRunStore>(), record: mockedRecord },
+  IInstrumentation: new NoOpInstrumentation(),
+  RgpdService: { processPendingDeletions: mockedExecute },
+  rgpdSettings: SETTINGS,
+});
 
 function makeApp() {
   const app = new Hono<{ Variables: { requestId: string } }>();
@@ -53,7 +59,7 @@ function makeApp() {
     await next();
   });
   app.onError(createErrorHandler(new NoOpInstrumentation()));
-  app.route("/internal", rgpdInternalRoutes);
+  app.route("/internal", routes);
   return app;
 }
 
@@ -135,16 +141,16 @@ describe("POST /internal/rgpd-sweep", () => {
       expect(mockedExecute).toHaveBeenCalledWith({
         batchSize: 25,
         dryRun: true,
-        deadlineMs: env.SWEEP_DEADLINE_MS,
+        deadlineMs: SETTINGS.sweepDeadlineMs,
       });
     });
 
     it("should fall back to the env default batchSize when omitted", async () => {
       await postSignedSweep({ dryRun: false });
       expect(mockedExecute).toHaveBeenCalledWith({
-        batchSize: env.RGPD_SWEEP_BATCH_SIZE,
+        batchSize: SETTINGS.sweepBatchSize,
         dryRun: false,
-        deadlineMs: env.SWEEP_DEADLINE_MS,
+        deadlineMs: SETTINGS.sweepDeadlineMs,
       });
     });
   });

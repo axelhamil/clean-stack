@@ -119,7 +119,13 @@ const { NoOpInstrumentation } = await import("../../../shared/services/noop-inst
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-const OPTIONS = { leaseSeconds: 330, deadRetrySeconds: 21_600 };
+const OPTIONS = {
+  leaseSeconds: 330,
+  deadRetrySeconds: 21_600,
+  autoDisableMinFailures: 2,
+  autoDisableAfterDays: 5,
+  responseCaptureBytes: 4096,
+};
 
 function makeDelivery(over: Partial<WebhookDeliveryRecord> = {}): WebhookDeliveryRecord {
   return {

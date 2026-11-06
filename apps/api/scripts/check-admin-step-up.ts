@@ -10,7 +10,6 @@ import { Result } from "@packages/ddd-kit";
 import { authSchema, db, eq, staffSchema } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { di } from "../src/container";
-import { env } from "../src/shared/env";
 import {
   type AdminProbe,
   type AppCall,
@@ -137,7 +136,7 @@ async function proveExpiry(): Promise<void> {
 
   await db
     .update(staffSchema.adminStepUp)
-    .set({ verifiedAt: new Date(Date.now() - (env.ADMIN_STEP_UP_TTL_SECONDS + 1) * 1000) })
+    .set({ verifiedAt: new Date(Date.now() - (di.adminSettings.stepUpTtlSeconds + 1) * 1000) })
     .where(eq(staffSchema.adminStepUp.sessionId, sessionId));
 
   const refused = await call(cookie, "POST", `/admin/users/${target.id}/ban`, { reason: "probe" });
@@ -388,12 +387,12 @@ async function proveNoTwoFactorRefusalIsAccurate(): Promise<void> {
   const cookie = await probes.sessionCookie(probe);
   const target = await probes.user("no-mfa-policy-target");
   const banPath = `/admin/users/${target.id}/ban`;
-  Object.assign(env, { PLATFORM_ADMIN_REQUIRE_MFA: false });
+  Object.assign(di.staffSettings, { PLATFORM_ADMIN_REQUIRE_MFA: false });
 
   const permanent = await call(cookie, "POST", banPath, { reason: "probe" });
   const submitted = await submit(cookie, "000000");
   const timed = await call(cookie, "POST", banPath, { reason: "probe", expiresIn: DAY_SECONDS });
-  Object.assign(env, { PLATFORM_ADMIN_REQUIRE_MFA: true });
+  Object.assign(di.staffSettings, { PLATFORM_ADMIN_REQUIRE_MFA: true });
 
   check(
     "a sensitive action without two-factor says to turn it on",

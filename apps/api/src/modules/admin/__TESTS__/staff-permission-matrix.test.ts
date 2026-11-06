@@ -27,33 +27,19 @@ mock.module("../../../shared/middleware/staff.middleware", () => ({
   assertStepUp: async () => {},
 }));
 
-const { adminApprovalRoutes } = await import("../approvals.routes");
-const { adminImpersonationRoutes } = await import("../admin-impersonation.routes");
-const { adminOpsRoutes } = await import("../ops.routes");
-const { adminOrgRoutes } = await import("../admin-orgs.routes");
-const { adminUserRoutes } = await import("../routes");
-const { adminStaffRoutes } = await import("../staff.routes");
-const { adminWorkspaceRoutes } = await import("../workspace.routes");
+const { mountAdminRoutes } = await import("./mount-admin-routes");
 const { createAuditLogRoutes } = await import("../../audit-log/routes");
 const { routeGuards } = await import("../../../composition/route-guards");
 const { listBackRoutes } = await import("../../../shared/surface/back-routes");
 
-const app = new Hono()
-  .route("/admin", adminStaffRoutes)
-  .route("/admin", adminWorkspaceRoutes)
-  .route("/admin/approvals", adminApprovalRoutes)
-  .route("/admin/users", adminUserRoutes)
-  .route("/admin/orgs", adminOrgRoutes)
-  .route("/admin/ops", adminOpsRoutes)
-  .route("/admin/impersonation", adminImpersonationRoutes)
-  .route(
-    "/admin/audit-log",
-    createAuditLogRoutes({
-      routeGuards,
-      IOutboxRepository: mockPort<IOutboxRepository>(),
-      AuditQueryService: mockPort<AuditLogRoutesDeps["AuditQueryService"]>(),
-    }),
-  );
+const app = new Hono().route("/", mountAdminRoutes(routeGuards)).route(
+  "/admin/audit-log",
+  createAuditLogRoutes({
+    routeGuards,
+    IOutboxRepository: mockPort<IOutboxRepository>(),
+    AuditQueryService: mockPort<AuditLogRoutesDeps["AuditQueryService"]>(),
+  }),
+);
 app.onError((err, c) =>
   c.text(err instanceof HTTPException ? err.message : "unguarded", GATE_STATUS),
 );

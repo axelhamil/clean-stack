@@ -1,3 +1,4 @@
+import type { StaffAccess } from "@packages/access-control";
 import { Option } from "@packages/ddd-kit";
 import { HTTPException } from "hono/http-exception";
 import type { RouteGuard, RouteGuards } from "../route-guards";
@@ -6,6 +7,11 @@ export interface FakeRequester {
   userId?: string;
   orgId?: string;
   clientIp?: string;
+  email?: string;
+  sessionId?: string;
+  twoFactorEnabled?: boolean;
+  impersonatedBy?: string;
+  staff?: StaffAccess;
 }
 
 const open: RouteGuard = async (_c, next) => {
@@ -41,5 +47,22 @@ export function openRouteGuards(requester: FakeRequester = {}): RouteGuards {
     },
     activeOrgId: () => orgId,
     clientIp: () => requester.clientIp ?? "198.51.100.7",
+    currentSession: () => {
+      if (userId.isNone()) throw new HTTPException(401, { message: "Unauthorized" });
+
+      return {
+        id: requester.sessionId ?? "session-1",
+        userId: userId.unwrap(),
+        email: requester.email ?? `${userId.unwrap()}@example.com`,
+        twoFactorEnabled: requester.twoFactorEnabled ?? true,
+        impersonatedBy: Option.fromNullable(requester.impersonatedBy),
+      };
+    },
+    currentStaff: () => {
+      if (!requester.staff) throw new HTTPException(403, { message: "Forbidden" });
+
+      return requester.staff;
+    },
+    assertStepUp: async () => {},
   };
 }

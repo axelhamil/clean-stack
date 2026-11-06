@@ -1,6 +1,8 @@
+import type { IInstrumentation, IUnitOfWork } from "@packages/ddd-kit";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { defineModule } from "inwire";
-import { env } from "../../shared/env";
 import { logger } from "../../shared/logger";
+import type { WebhookSettings } from "./application/config/webhook-settings";
 import type { IWebhookDeliveryRepository } from "./application/ports/webhook-delivery.port";
 import type { IWebhookEndpointRepository } from "./application/ports/webhook-endpoint.port";
 import {
@@ -12,17 +14,14 @@ import { DrizzleWebhookDeliveryRepository } from "./infrastructure/repositories/
 import { DrizzleWebhookEndpointRepository } from "./infrastructure/repositories/drizzle-webhook-endpoint.repository";
 import { WebhookDeliveryWorker } from "./infrastructure/services/webhook-delivery-worker.service";
 
-declare module "inwire" {
-  interface AppDeps {
-    IWebhookEndpointRepository: IWebhookEndpointRepository;
-    IWebhookDeliveryRepository: IWebhookDeliveryRepository;
-    WebhookMasterKey: MasterKeyProvider;
-    WebhooksService: WebhooksService;
-    WebhookDeliveryWorker: WebhookDeliveryWorker;
-  }
+export interface WebhooksPrerequisites {
+  IInstrumentation: IInstrumentation;
+  ITransactionService: IUnitOfWork;
+  IOutboxRepository: IOutboxRepository;
+  webhookSettings: WebhookSettings;
 }
 
-export const webhooksModule = defineModule()((b) =>
+export const webhooksModule = defineModule<WebhooksPrerequisites>()((b) =>
   b
     .add(
       "IWebhookEndpointRepository",
@@ -32,7 +31,10 @@ export const webhooksModule = defineModule()((b) =>
       "IWebhookDeliveryRepository",
       (c): IWebhookDeliveryRepository => new DrizzleWebhookDeliveryRepository(c.IInstrumentation),
     )
-    .add("WebhookMasterKey", () => masterKeyProvider(env.WEBHOOK_MASTER_KEY))
+    .add(
+      "WebhookMasterKey",
+      (c): MasterKeyProvider => masterKeyProvider(c.webhookSettings.masterKeyHex.toUndefined()),
+    )
     .add(
       "WebhooksService",
       (c) =>
@@ -43,6 +45,7 @@ export const webhooksModule = defineModule()((b) =>
           c.IOutboxRepository,
           c.WebhookMasterKey,
           c.IInstrumentation,
+          c.webhookSettings,
         ),
     )
     .add(
@@ -56,10 +59,7 @@ export const webhooksModule = defineModule()((b) =>
           c.ITransactionService,
           logger,
           c.IInstrumentation,
-          {
-            leaseSeconds: env.WEBHOOK_LEASE_SECONDS,
-            deadRetrySeconds: env.WEBHOOK_DEAD_RETRY_HOURS * 3600,
-          },
+          c.webhookSettings.delivery,
         ),
     ),
 );

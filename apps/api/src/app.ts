@@ -1,18 +1,21 @@
+import type { RouteGuard } from "@packages/http/route-guards";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
 import { auth } from "./auth";
+import { BetterAuthProvider } from "./composition/auth-provider";
 import { type AppRouteGuards, routeGuards } from "./composition/route-guards";
 import { di } from "./container";
-import { adminImpersonationRoutes } from "./modules/admin/admin-impersonation.routes";
-import { adminOrgRoutes } from "./modules/admin/admin-orgs.routes";
-import { adminApprovalRoutes } from "./modules/admin/approvals.routes";
-import { adminInternalRoutes } from "./modules/admin/internal.routes";
-import { adminOpsRoutes } from "./modules/admin/ops.routes";
-import { adminUserRoutes } from "./modules/admin/routes";
-import { adminStaffRoutes } from "./modules/admin/staff.routes";
-import { adminWorkspaceRoutes } from "./modules/admin/workspace.routes";
+import { createAdminImpersonationRoutes } from "./modules/admin/admin-impersonation.routes";
+import { createAdminOrgRoutes } from "./modules/admin/admin-orgs.routes";
+import type { IAuthProvider } from "./modules/admin/application/ports/auth-provider.port";
+import { createAdminApprovalRoutes } from "./modules/admin/approvals.routes";
+import { createAdminInternalRoutes } from "./modules/admin/internal.routes";
+import { createAdminOpsRoutes } from "./modules/admin/ops.routes";
+import { createAdminUserRoutes } from "./modules/admin/routes";
+import { createAdminStaffRoutes } from "./modules/admin/staff.routes";
+import { createAdminWorkspaceRoutes } from "./modules/admin/workspace.routes";
 import { createApiTokenRoutes } from "./modules/api-token/routes";
 import { createApiTokenScanningRoutes } from "./modules/api-token/scanning.routes";
 import { createAuditLogRoutes } from "./modules/audit-log/routes";
@@ -24,19 +27,21 @@ import { createNotificationsRoutes } from "./modules/notifications/routes";
 import { organizationSettingsRoutes } from "./modules/organization/routes";
 import { createPolicyRoutes } from "./modules/policies/routes";
 import { createProfileRoutes } from "./modules/profile/routes";
-import { rgpdInternalRoutes } from "./modules/rgpd/internal.routes";
-import { rgpdMeRoutes } from "./modules/rgpd/routes";
+import { createRgpdInternalRoutes } from "./modules/rgpd/internal.routes";
+import { createRgpdRoutes } from "./modules/rgpd/routes";
 import { createUploadsRoutes } from "./modules/uploads/routes";
-import { webhooksRoutes } from "./modules/webhooks/routes";
+import { createWebhooksRoutes } from "./modules/webhooks/routes";
 import { createPublicApiV1 } from "./public-api";
 import { env, FRONT_ORIGINS } from "./shared/env";
 import { cspReportCors, makeCspReportApp } from "./shared/internal-routes/csp-report.route";
 import { flushNotificationEmailsRoutes } from "./shared/internal-routes/flush-notification-emails.route";
+import { internalLayers } from "./shared/internal-routes/internal-layers";
 import { sweepAuditLogRoutes } from "./shared/internal-routes/sweep-audit-log.route";
 import { sweepConsentsRoutes } from "./shared/internal-routes/sweep-consents.route";
 import { sweepEmailMessagesRoutes } from "./shared/internal-routes/sweep-email-messages.route";
 import { sweepNotificationsRoutes } from "./shared/internal-routes/sweep-notifications.route";
 import { sweepOutboxRoutes } from "./shared/internal-routes/sweep-outbox.route";
+import { runSweepRequest } from "./shared/internal-routes/sweep-route";
 import { sweepStripeEventsRoutes } from "./shared/internal-routes/sweep-stripe-events.route";
 import { sweepWebhookDeliveryRoutes } from "./shared/internal-routes/sweep-webhook-delivery.route";
 import { logger } from "./shared/logger";
@@ -47,6 +52,7 @@ import { httpLogger } from "./shared/middleware/logger.middleware";
 import { resolveClientIp } from "./shared/middleware/rate-limit.ip";
 import { requireRateLimit } from "./shared/middleware/rate-limit.middleware";
 import {
+  ACCOUNT_DELETE_POLICY,
   ADMIN_STEP_UP_USER_POLICY,
   AUTH_FORGOT_PASSWORD_POLICY,
   AUTH_MAGIC_LINK_POLICY,
@@ -77,7 +83,20 @@ type AppEnv = {
 
 const app = new Hono<AppEnv>();
 
-const routeDeps = di.scope({ routeGuards: (): AppRouteGuards => routeGuards }, { name: "routes" });
+const routeDeps = di.scope(
+  {
+    routeGuards: (): AppRouteGuards => routeGuards,
+    internalGuards: (): readonly RouteGuard[] => internalLayers,
+    runSweep: (): typeof runSweepRequest => runSweepRequest,
+    IAuthProvider: (c): IAuthProvider => new BetterAuthProvider(c.IInstrumentation),
+    accountDeleteRateLimit: (c): RouteGuard =>
+      requireRateLimit(
+        { limiter: c.IRateLimiter, outbox: c.IOutboxRepository },
+        ACCOUNT_DELETE_POLICY,
+      ),
+  },
+  { name: "routes" },
+);
 
 const allowedOrigins = FRONT_ORIGINS;
 const apiTokenPepper = env.API_TOKEN_PEPPER ?? "dev-only-pepper-not-for-production-use";
@@ -200,8 +219,8 @@ app.on(["GET", "POST", "PUT", "PATCH", "DELETE"], "/api/auth/admin/*", (c) =>
 app.on(["GET", "POST", "PUT", "PATCH", "DELETE"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
 app.route("/internal", healthInternalRoutes);
-app.route("/internal", rgpdInternalRoutes);
-app.route("/internal", adminInternalRoutes);
+app.route("/internal", createRgpdInternalRoutes(routeDeps));
+app.route("/internal", createAdminInternalRoutes(routeDeps));
 app.route("/internal", sweepOutboxRoutes);
 app.route("/internal", sweepAuditLogRoutes);
 app.route("/internal", sweepWebhookDeliveryRoutes);
@@ -236,20 +255,20 @@ app.use(
 app.route("/api/token-scanning", createApiTokenScanningRoutes(routeDeps));
 
 const routes = app
-  .route("/me", rgpdMeRoutes)
+  .route("/me", createRgpdRoutes(routeDeps))
   .route("/me", createProfileRoutes(routeDeps))
   .route("/me/policies", createPolicyRoutes(routeDeps))
   .route("/uploads", createUploadsRoutes(routeDeps))
-  .route("/admin", adminStaffRoutes)
-  .route("/admin", adminWorkspaceRoutes)
-  .route("/admin/approvals", adminApprovalRoutes)
-  .route("/admin/users", adminUserRoutes)
-  .route("/admin/orgs", adminOrgRoutes)
-  .route("/admin/ops", adminOpsRoutes)
-  .route("/admin/impersonation", adminImpersonationRoutes)
+  .route("/admin", createAdminStaffRoutes(routeDeps))
+  .route("/admin", createAdminWorkspaceRoutes(routeDeps))
+  .route("/admin/approvals", createAdminApprovalRoutes(routeDeps))
+  .route("/admin/users", createAdminUserRoutes(routeDeps))
+  .route("/admin/orgs", createAdminOrgRoutes(routeDeps))
+  .route("/admin/ops", createAdminOpsRoutes(routeDeps))
+  .route("/admin/impersonation", createAdminImpersonationRoutes(routeDeps))
   .route("/admin/audit-log", createAuditLogRoutes(routeDeps))
   .route("/settings/tokens", createApiTokenRoutes(routeDeps))
-  .route("/settings/webhooks", webhooksRoutes)
+  .route("/settings/webhooks", createWebhooksRoutes(routeDeps))
   .route("/settings/organization", organizationSettingsRoutes)
   .route("/consents", createConsentRoutes(routeDeps))
   .route("/billing", createBillingRoutes(routeDeps))
