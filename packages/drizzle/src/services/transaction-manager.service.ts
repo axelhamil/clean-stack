@@ -32,7 +32,7 @@ class EventsWithoutOutbox extends Error {
   }
 }
 
-type EventsByFlushHandler = Map<Option<FlushHandler>, IDomainEvent[]>;
+type EventsByFlushHandler = Map<FlushHandler | undefined, IDomainEvent[]>;
 
 type Doom = { kind: "failed"; result: unknown } | { kind: "thrown"; error: unknown };
 
@@ -137,15 +137,16 @@ export class TransactionService implements IUnitOfWork {
     const drained = EventCollector.drain();
     if (drained.length === 0) return;
 
-    pending.set(this.flushHandler, [...(pending.get(this.flushHandler) ?? []), ...drained]);
+    const key = this.flushHandler.toUndefined();
+    pending.set(key, [...(pending.get(key) ?? []), ...drained]);
   }
 }
 
 async function flush(pending: EventsByFlushHandler, tx: Transaction): Promise<void> {
   for (const [flushHandler, events] of pending) {
     if (events.length === 0) continue;
-    if (flushHandler.isNone()) throw new EventsWithoutOutbox(events);
+    if (!flushHandler) throw new EventsWithoutOutbox(events);
 
-    await flushHandler.unwrap()(events, tx);
+    await flushHandler(events, tx);
   }
 }
