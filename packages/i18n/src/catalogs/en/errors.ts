@@ -86,6 +86,7 @@ export default {
     ORGANIZATION_ALREADY_EXISTS: "An organization with that name already exists.",
     ORGANIZATION_SLUG_ALREADY_TAKEN: "That organization address is already taken.",
     ORGANIZATION_NOT_FOUND: "Organization not found.",
+    API_TOKEN_ORGANIZATION_NOT_FOUND: "Switch to this organization before creating a token for it.",
     USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION: "That user is not a member of this organization.",
     YOU_ARE_NOT_ALLOWED_TO_UPDATE_THIS_ORGANIZATION:
       "You don't have permission to update this organization.",
@@ -175,6 +176,8 @@ export default {
     ADMIN_APPROVAL_PARAMS_INVALID: "The stored request is no longer valid.",
     ADMIN_USER_SELF_BAN_FORBIDDEN: "You cannot suspend your own account.",
     ADMIN_IMPERSONATION_FORBIDDEN: "You cannot view the product as this account.",
+    ADMIN_IMPERSONATION_SELF_FORBIDDEN:
+      "You are already signed in as yourself. Pick another account to view the product as.",
     ADMIN_STOP_IMPERSONATION_FORBIDDEN: "The impersonation could not be stopped.",
     ADMIN_STAFF_MFA_FORBIDDEN: "Turn on two-factor authentication to use the staff area.",
     ADMIN_STAFF_PERMISSION_FORBIDDEN: "Your staff role does not allow this action.",

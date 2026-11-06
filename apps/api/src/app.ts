@@ -1,10 +1,8 @@
-import { Option } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
 import { auth } from "./auth";
-import { findUserById } from "./auth-queries";
 import { di } from "./container";
 import { adminImpersonationRoutes } from "./modules/admin/admin-impersonation.routes";
 import { adminOrgRoutes } from "./modules/admin/admin-orgs.routes";
@@ -232,15 +230,7 @@ app.route(
   "/api/token-scanning",
   createApiTokenScanningRoutes({
     githubKeyVerifier: di.GithubKeyVerifier,
-    apiTokenRepository: di.IApiTokenRepository,
-    transactionService: di.ITransactionService,
-    outboxRepository: di.IOutboxRepository,
-    emailService: di.IEmailService,
-    instrumentation: di.IInstrumentation,
-    findUserById: async (id) => Option.fromNullable(await findUserById(id)),
-    prefix: env.API_TOKEN_PREFIX,
-    pepper: apiTokenPepper,
-    pepperPrevious: env.API_TOKEN_PEPPER_PREVIOUS,
+    tokenLeakService: di.TokenLeakService,
   }),
 );
 

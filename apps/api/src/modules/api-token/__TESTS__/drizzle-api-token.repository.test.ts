@@ -271,12 +271,20 @@ describe("DrizzleApiTokenRepository", () => {
   // -------------------------------------------------------------------------
 
   describe("revoke", () => {
-    it("happy path: returns Result.ok", async () => {
+    it("reports a write when a live token was revoked", async () => {
+      dbBehavior = async () => [{ id: "tok-1" }];
+
+      const result = await repo.revoke("tok-1", "user");
+
+      expect(result.getValue()).toBe(true);
+    });
+
+    it("reports no write when the token was already revoked", async () => {
       dbBehavior = async () => [];
 
       const result = await repo.revoke("tok-1", "user");
 
-      expect(result.isSuccess).toBe(true);
+      expect(result.getValue()).toBe(false);
     });
 
     it("failure path: DB throws → Result.fail", async () => {

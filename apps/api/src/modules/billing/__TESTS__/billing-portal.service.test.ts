@@ -18,7 +18,11 @@ function makeStore(customer: Result<Option<string>, BillingError>): ISubscriptio
 }
 
 function makeGateway(): IBillingPortalGateway {
-  return { createSessionUrl: mock(async () => "https://billing.stripe.test/session") };
+  return {
+    createSessionUrl: mock(async () =>
+      Result.ok<string, BillingError>("https://billing.stripe.test/session"),
+    ),
+  };
 }
 
 describe("BillingPortalService", () => {
@@ -44,6 +48,22 @@ describe("BillingPortalService", () => {
 
       expect(result.getError().code).toBe("BILLING_NOT_FOUND");
       expect(gateway.createSessionUrl).not.toHaveBeenCalled();
+    });
+
+    it("fails with BILLING_PROVIDER_FAILURE when Stripe refuses the session", async () => {
+      const gateway: IBillingPortalGateway = {
+        createSessionUrl: mock(async () =>
+          Result.fail<string, BillingError>({
+            code: "BILLING_PROVIDER_FAILURE",
+            message: "stripe down",
+          }),
+        ),
+      };
+      const svc = new BillingPortalService(makeStore(Result.ok(Option.some("cus_1"))), gateway);
+
+      const result = await svc.openPortal("org1", "https://app.test/settings/billing");
+
+      expect(result.getError().code).toBe("BILLING_PROVIDER_FAILURE");
     });
 
     it("fails with BILLING_PROVIDER_FAILURE when the store errors", async () => {

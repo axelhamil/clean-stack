@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import { z } from "zod";
 import type {
   ApiTokenError,
   ApiTokenRecord,
@@ -76,6 +77,15 @@ const { Hono } = await import("hono");
 const { createErrorHandler } = await import("../../../shared/middleware/error.middleware");
 const { NoOpInstrumentation } = await import("../../../shared/services/noop-instrumentation");
 
+const tokenJson = z.looseObject({
+  id: z.string(),
+  tokenHmac: z.unknown().optional(),
+  pepperVersion: z.unknown().optional(),
+});
+const createdBody = z.object({ token: z.string(), record: tokenJson });
+const listBody = z.object({ items: z.array(tokenJson) });
+const errorBody = z.object({ error: z.object({ code: z.string() }) });
+
 function makeApp() {
   const app = new Hono<{ Variables: { requestId: string } }>();
   app.use("*", async (c, next) => {
@@ -102,12 +112,30 @@ describe("POST /settings/tokens: create", () => {
       }),
     });
     expect(res.status).toBe(201);
-    // biome-ignore lint/suspicious/noExplicitAny: test assertion
-    const body = (await res.json()) as any;
+    const body = createdBody.parse(await res.json());
     expect(body.token).toBe(RAW);
     expect(body.record.id).toBe("tok-1");
     expect(body.record.tokenHmac).toBeUndefined();
     expect(body.record.pepperVersion).toBeUndefined();
+  });
+
+  it("answers not found when the token targets an organization other than the active one", async () => {
+    currentSession = { activeOrganizationId: "org-active" };
+    mockCreate.mockClear();
+    const app = makeApp();
+    const res = await app.request("/settings/tokens", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "ci",
+        scopes: ["read:profile"],
+        organizationId: "org-other",
+        expiresInDays: null,
+      }),
+    });
+    expect(res.status).toBe(404);
+    expect(errorBody.parse(await res.json()).error.code).toBe("API_TOKEN_ORGANIZATION_NOT_FOUND");
+    expect(mockCreate).not.toHaveBeenCalled();
   });
 
   it("returns 403 when the session is impersonated", async () => {
@@ -135,12 +163,11 @@ describe("GET /settings/tokens: list", () => {
     const app = makeApp();
     const res = await app.request("/settings/tokens", { method: "GET" });
     expect(res.status).toBe(200);
-    // biome-ignore lint/suspicious/noExplicitAny: test assertion
-    const body = (await res.json()) as any;
-    expect(Array.isArray(body.items)).toBe(true);
-    const item = body.items[0];
-    expect(item.tokenHmac).toBeUndefined();
-    expect(item.pepperVersion).toBeUndefined();
+    const body = listBody.parse(await res.json());
+    const [item] = body.items;
+    expect(item).toBeDefined();
+    expect(item?.tokenHmac).toBeUndefined();
+    expect(item?.pepperVersion).toBeUndefined();
     expect(JSON.stringify(body)).not.toContain(RECORD.tokenHmac);
     expect(JSON.stringify(body)).not.toContain(RAW);
   });

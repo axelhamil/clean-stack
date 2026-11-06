@@ -1,10 +1,11 @@
+import { z } from "zod";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
 
-type GitHubPublicKey = {
-  key_identifier: string;
-  key: string;
-  is_current: boolean;
-};
+const publicKeysSchema = z.object({
+  public_keys: z.array(
+    z.object({ key_identifier: z.string(), key: z.string(), is_current: z.boolean() }),
+  ),
+});
 
 // GitHub ECDSA P-256 signatures arrive DER-encoded (ASN.1 SEQUENCE of two INTEGERs),
 // but WebCrypto's subtle.verify for ECDSA expects raw IEEE P1363 format: r‖s, each
@@ -114,14 +115,12 @@ export class GithubKeyVerifier {
         }),
     );
 
-    if (!res.ok) {
-      const err = new Error(`GitHub key fetch failed: ${res.status}`);
-      this.instrumentation.capture(err);
-      throw err;
-    }
+    if (!res.ok) throw new Error(`GitHub key fetch failed: ${res.status}`);
 
-    const data = (await res.json()) as { public_keys: GitHubPublicKey[] };
-    for (const entry of data.public_keys) {
+    const data = publicKeysSchema.safeParse(await res.json());
+    if (!data.success) throw new Error("GitHub key payload is not a list of public keys");
+
+    for (const entry of data.data.public_keys) {
       if (!this.keys.has(entry.key_identifier)) {
         const key = await importPemKey(entry.key);
         this.keys.set(entry.key_identifier, key);

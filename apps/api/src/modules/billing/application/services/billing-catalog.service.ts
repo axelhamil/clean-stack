@@ -53,37 +53,37 @@ export class BillingCatalogService {
     return this.instrumentation.startSpan(
       { name: "BillingCatalogService > getCatalog" },
       async () => {
-        try {
-          const prices = await this.source.listActivePrices();
-          const paid: PlanCatalogItem[] = prices
-            .filter((p) => isTier(p.tier) && p.tier !== "free")
-            .map((p) => {
-              const tier = p.tier as Tier;
-              const ent = ENTITLEMENTS[tier];
-              return {
-                tier,
-                name: p.productName,
-                priceId: p.priceId,
-                unitAmount: p.unitAmount,
-                currency: p.currency,
-                interval: p.interval.isSome() ? p.interval.unwrap() : null,
-                marketingFeatures: p.marketingFeatures,
-                rank: ent.rank,
-                features: ent.features,
-                maxMembers: ent.maxMembers,
-              };
-            });
+        const prices = await this.source.listActivePrices();
+        // Adapter already captured to telemetry (§8). Degrade to free-only;
+        // do not cache so the next call retries Stripe when it recovers.
+        if (prices.isFailure) return [this.buildFreeEntry()];
 
-          const items = [this.buildFreeEntry(paid[0]?.currency), ...paid].sort(
-            (a, b) => a.rank - b.rank,
-          );
-          this.cache = { at: this.now(), items };
-          return items;
-        } catch {
-          // Adapter already captured to telemetry (§8). Degrade to free-only;
-          // do not cache so the next call retries Stripe when it recovers.
-          return [this.buildFreeEntry()];
-        }
+        const paid: PlanCatalogItem[] = prices.getValue().flatMap((p) => {
+          const tier = p.tier;
+          if (!isTier(tier) || tier === "free") return [];
+
+          const ent = ENTITLEMENTS[tier];
+          return [
+            {
+              tier,
+              name: p.productName,
+              priceId: p.priceId,
+              unitAmount: p.unitAmount,
+              currency: p.currency,
+              interval: p.interval.isSome() ? p.interval.unwrap() : null,
+              marketingFeatures: p.marketingFeatures,
+              rank: ent.rank,
+              features: ent.features,
+              maxMembers: ent.maxMembers,
+            },
+          ];
+        });
+
+        const items = [this.buildFreeEntry(paid[0]?.currency), ...paid].sort(
+          (a, b) => a.rank - b.rank,
+        );
+        this.cache = { at: this.now(), items };
+        return items;
       },
     );
   }

@@ -30,9 +30,6 @@ export const adminImpersonationRoutes = new Hono<{ Variables: AuthVariables }>()
     async (c) => {
       const actor = c.get("user");
       const targetId = c.req.param("id");
-      if (actor.id === targetId) {
-        throw new HTTPException(400, { message: "ADMIN_IMPERSONATION_SELF_FORBIDDEN" });
-      }
       const { reason, ticketRef } = c.req.valid("json");
 
       const started = await di.AdminModerationService.startImpersonation(

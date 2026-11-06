@@ -5,6 +5,7 @@ import {
   and,
   asc,
   count,
+  dbNow,
   desc,
   eq,
   gt,
@@ -12,6 +13,7 @@ import {
   lt,
   or,
   resolveExecutor,
+  secondsFromNow,
   sql,
   staffSchema,
 } from "@packages/drizzle";
@@ -44,7 +46,6 @@ type Executor = ReturnType<typeof resolveExecutor>;
 const fail = createDbFailure("ADMIN_APPROVAL_PROVIDER_FAILURE");
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 const { adminApproval: table } = staffSchema;
-const DB_NOW = sql`now()`;
 const NEXT_VERSION = sql`${table.version} + 1`;
 
 function isStatus(value: string): value is ApprovalStatus {
@@ -84,13 +85,13 @@ function firstOf(rows: (typeof table.$inferSelect)[]): Option<ApprovalRecord> {
   return Option.fromNullable(rows[0]).flatMap(recordOf);
 }
 
-const pendingAndLive = and(eq(table.status, "pending"), gt(table.expiresAt, DB_NOW));
+const pendingAndLive = and(eq(table.status, "pending"), gt(table.expiresAt, dbNow));
 const pendingAndDue = requireFilter(
-  and(eq(table.status, "pending"), lt(table.expiresAt, DB_NOW)),
+  and(eq(table.status, "pending"), lt(table.expiresAt, dbNow)),
   "sweep-admin-approvals",
 );
 const CREATE_ATTEMPTS = 3;
-const EXPIRED = { status: "expired", decidedAt: DB_NOW, version: NEXT_VERSION };
+const EXPIRED = { status: "expired", decidedAt: dbNow, version: NEXT_VERSION };
 
 export class DrizzleApprovalStore implements IApprovalStore {
   constructor(
@@ -111,7 +112,7 @@ export class DrizzleApprovalStore implements IApprovalStore {
                 subjectId: input.subjectId,
                 params: input.params,
                 requestedBy: input.requestedBy,
-                expiresAt: sql`now() + make_interval(hours => ${input.ttlHours}::int)`,
+                expiresAt: secondsFromNow(input.ttlHours * 3600),
               })
               .onConflictDoNothing({
                 target: [table.action, table.subjectId],
@@ -195,7 +196,7 @@ export class DrizzleApprovalStore implements IApprovalStore {
             status: input.status,
             decidedBy: input.decidedBy,
             decisionNote: input.note,
-            decidedAt: DB_NOW,
+            decidedAt: dbNow,
             version: NEXT_VERSION,
           })
           .where(and(eq(table.id, input.id), pendingAndLive))
@@ -214,7 +215,7 @@ export class DrizzleApprovalStore implements IApprovalStore {
       const rows = await this.query(
         exec
           .update(table)
-          .set({ status: "cancelled", decidedAt: DB_NOW, version: NEXT_VERSION })
+          .set({ status: "cancelled", decidedAt: dbNow, version: NEXT_VERSION })
           .where(and(eq(table.id, id), eq(table.requestedBy, requestedBy), pendingAndLive))
           .returning(),
       );
@@ -247,7 +248,7 @@ export class DrizzleApprovalStore implements IApprovalStore {
             decidedBy: input.decidedBy,
             decisionNote: input.note,
             failureReason: input.reason,
-            decidedAt: DB_NOW,
+            decidedAt: dbNow,
             version: NEXT_VERSION,
           })
           .where(and(eq(table.id, input.id), eq(table.status, "pending")))
@@ -304,7 +305,7 @@ export class DrizzleApprovalStore implements IApprovalStore {
     return this.traced("closeForDeletedUser", "approval closure failed", async (exec) => {
       const rows = await exec
         .update(table)
-        .set({ status: "cancelled", decidedAt: DB_NOW, version: NEXT_VERSION })
+        .set({ status: "cancelled", decidedAt: dbNow, version: NEXT_VERSION })
         .where(
           and(
             eq(table.status, "pending"),

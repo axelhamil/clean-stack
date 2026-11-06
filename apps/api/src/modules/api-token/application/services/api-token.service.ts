@@ -132,10 +132,14 @@ export class ApiTokenService {
         });
       }
 
+      if (record.revokedAt.isSome()) return Result.ok<ApiTokenError>();
+
       try {
         return await this.uow.run(async () => {
           const revokeResult = await this.repo.revoke(id, "user");
-          if (revokeResult.isFailure) return revokeResult;
+          if (revokeResult.isFailure)
+            return Result.fail<void, ApiTokenError>(revokeResult.getError());
+          if (!revokeResult.getValue()) return Result.ok<ApiTokenError>();
 
           await emitEvent(
             this.outbox,

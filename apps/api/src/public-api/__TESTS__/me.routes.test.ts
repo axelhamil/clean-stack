@@ -4,7 +4,9 @@ import { EventTypes } from "@packages/events";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
-import * as realAuthQueries from "../../auth-queries";
+import { createErrorHandler } from "../../shared/middleware/error.middleware";
+import type { UserAccountError } from "../../shared/ports/user-account.port";
+import { NoOpInstrumentation } from "../../shared/services/noop-instrumentation";
 
 const { unitOfWork, outcome } = mockUnitOfWork();
 
@@ -13,8 +15,9 @@ const mockEnqueue = mock(async (_events: IDomainEvent[], _meta: unknown) => {
   enqueueTransactions.push(UnitOfWorkContext.transaction());
 });
 const writeTransactions: unknown[] = [];
-const mockUpdateUserName = mock(async (_userId: string, _name: string) => {
+const mockSetName = mock(async (_userId: string, _name: string) => {
   writeTransactions.push(UnitOfWorkContext.transaction());
+  return Result.ok<UserAccountError>();
 });
 
 mock.module("../../container", () => ({
@@ -22,12 +25,8 @@ mock.module("../../container", () => ({
     PolicyAcceptanceService: { hasAcceptedCurrent: mock(async () => Result.ok(true)) },
     IOutboxRepository: { enqueue: mockEnqueue },
     ITransactionService: unitOfWork,
+    IUserAccountStore: { setName: mockSetName },
   },
-}));
-
-mock.module("../../auth-queries", () => ({
-  ...realAuthQueries,
-  updateUserName: mockUpdateUserName,
 }));
 
 const { mePublicRoutes } = await import("../v1/me.routes");
@@ -39,11 +38,12 @@ const injectTokenContext = createMiddleware(async (c, next) => {
 });
 
 const app = new Hono().use("*", injectTokenContext).route("/", mePublicRoutes);
+app.onError(createErrorHandler(new NoOpInstrumentation()));
 
 describe("PATCH /api/v1/me", () => {
   beforeEach(() => {
     mockEnqueue.mockClear();
-    mockUpdateUserName.mockClear();
+    mockSetName.mockClear();
     writeTransactions.length = 0;
     enqueueTransactions.length = 0;
   });
@@ -64,5 +64,24 @@ describe("PATCH /api/v1/me", () => {
     expect(tx).toBe(writeTx);
     expect(events?.[0]?.eventType).toBe(EventTypes.USER_PROFILE_UPDATED);
     expect(events?.[0]?.payload).toEqual({ userId: "user-1", changes: { name: "New Name" } });
+  });
+
+  it("rolls the event back and fails when the name cannot be saved", async () => {
+    mockSetName.mockImplementationOnce(async () =>
+      Result.fail<void, UserAccountError>({
+        code: "USER_ACCOUNT_PROVIDER_FAILURE",
+        message: "down",
+      }),
+    );
+
+    const res = await app.request("/", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "New Name" }),
+    });
+
+    expect(res.status).toBe(502);
+    expect(outcome()).toBe("rolled_back");
+    expect(mockEnqueue).not.toHaveBeenCalled();
   });
 });

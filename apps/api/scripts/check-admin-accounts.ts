@@ -522,6 +522,21 @@ async function proveAuditorReadsOnly(): Promise<void> {
   );
 }
 
+async function proveUserListByOrganization(): Promise<void> {
+  const inside = await probes.user("listed-member");
+  const outside = await probes.user("listed-outsider");
+  const org = await seedOrg("listed", [inside.id]);
+
+  const listed = await di.IAdminUserStore.listUsers({ limit: 100, organizationId: org });
+  const ids = listed.isSuccess ? listed.getValue().map((row) => row.id) : [];
+  check("the user list keeps the organization's members", ids.includes(inside.id), ids);
+  check(
+    "the user list leaves out everyone else",
+    ids.length === 1 && !ids.includes(outside.id),
+    ids,
+  );
+}
+
 async function main(): Promise<void> {
   const { cookie, id, unconfirmedRefusal } = await confirmedCookie("manager");
   check(
@@ -537,6 +552,7 @@ async function main(): Promise<void> {
   await proveNotes(cookie);
   await proveWipes(cookie, id);
   await proveAuditorReadsOnly();
+  await proveUserListByOrganization();
   await cleanup();
 
   if (checks.failures > 0) {

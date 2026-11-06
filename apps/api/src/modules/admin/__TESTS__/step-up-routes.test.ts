@@ -28,12 +28,7 @@ mock.module("../../../shared/middleware/staff.middleware", () => ({
 const allowed = async () => Result.ok();
 mock.module("../../../container", () => ({
   di: {
-    IOutboxRepository: {},
-    ITransactionService: { run: async (work: () => Promise<unknown>) => work() },
-    IInstrumentation: {
-      startSpan: (_o: unknown, work: () => unknown) => work(),
-      capture: () => {},
-    },
+    AdminActionService: { setSsoEnforcement: allowed },
     StaffService: {
       moderateBan: async () => Result.ok(),
       banIsSensitive: async (input: { targetUserId: string; expiresIn?: number }) =>
@@ -44,12 +39,6 @@ mock.module("../../../container", () => ({
     AdminModerationService: { ban: allowed },
     StepUpService: { validUntil: async () => Result.ok(Option.none()) },
   },
-}));
-
-const realAuthQueries = await import("../../../auth-queries");
-mock.module("../../../auth-queries", () => ({
-  ...realAuthQueries,
-  setOrgSsoEnforced: async () => {},
 }));
 
 const { adminApprovalRoutes } = await import("../approvals.routes");
