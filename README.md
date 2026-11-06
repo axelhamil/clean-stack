@@ -82,7 +82,7 @@ Most SaaS templates ship a half-baked auth you'll rip out and zero opinion on wh
 | **Type safety** | Hono RPC end-to-end (`hcWithType`). No client to write, no schema to sync, refactor in API → red squiggle in App on save. |
 | **Performance** | Bun-native `Bun.serve()` (~7 ms cold). Route-level code-splitting on the front (initial bundle ~355 KB, route chunks 1 to 43 KB) + `defaultPreload: "intent"`: perceived latency near zero. |
 | **AI-pair ready** | `CLAUDE.md` at the root + one per app and per package. Your agent already knows the rules: Result/Option, no `throw` in domain, capability gates, vertical-slice modules. |
-| **Zero-warning pipeline** | Husky + lint-staged + commitlint + a pre-push chain (Biome, boundaries, build, type-check, tests, jscpd, knip) that CI replays on every PR. Conventional Commits enforced; `dev`→`main` merge triggers semantic-release. No `--no-verify` shortcut. |
+| **Zero-warning pipeline** | Husky + lint-staged + commitlint + a pre-push chain (Biome, boundaries, build, type-check, tests, jscpd, knip) that CI replays on every PR. Conventional Commits enforced; release-please keeps a release PR on `dev`, and merging it tags and moves `main`. No `--no-verify` shortcut. |
 
 ---
 
@@ -152,7 +152,7 @@ Everything wired today, and the short list of what's left. Prefer prose? [`docs/
 - Health probes (`/livez` `/readyz` `/startupz`) + graceful shutdown · Sentry error tracking (RGPD-scrubbed, NoOp without DSN)
 - Postgres PITR with pgBackRest to R2 and restore drills · Coolify reference deploy on a VPS (config-as-code, deploy by digest, hardened host)
 - `pnpm bootstrap` clone-ability · Docker dev (native hot-reload **or** fully containerized `compose watch`) · Turborepo
-- Zero-warning pipeline (Biome · knip · jscpd · type-check · commitlint · semantic-release)
+- Zero-warning pipeline (Biome · knip · jscpd · type-check · commitlint · release-please)
 - WCAG 2.1 AA gate on every PR: `@axe-core/playwright` over 11 pages in light and dark, plus landmark, keyboard, focus-trap and reduced-motion checks
 
 ### Roadmap
@@ -322,7 +322,7 @@ The api ships an **always-on event-driven rail** (transactional outbox + Postgre
 | **API ↔ App** | Hono RPC (`hcWithType`): end-to-end types |
 | **i18n** | `i18next` + `react-i18next`: typed `.ts` catalogs (`@packages/i18n`), locale outside the URL |
 | **DDD** | `@packages/ddd-kit` (Result, Option, Aggregate, ScopedRepository, …) |
-| **Tooling** | pnpm 12 · Turborepo · Biome 2 · Husky · semantic-release · knip · jscpd |
+| **Tooling** | pnpm 12 · Turborepo · Biome 2 · Husky · release-please · knip · jscpd |
 
 ---
 
