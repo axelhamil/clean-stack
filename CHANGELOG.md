@@ -5,6 +5,29 @@
 * **infra:** back up postgres with pgbackrest and harden the vps host ([8f29788](https://github.com/axelhamil/clean-stack/commit/8f297885b0bf24ba9dd7a0e72f84935b2634ad9f))
 * **infra:** deploy to a vps through coolify instead of railway ([fac42c4](https://github.com/axelhamil/clean-stack/commit/fac42c4accfef9055880b1e0606fa200a4931dad))
 
+## [2.2.1](https://github.com/axelhamil/clean-stack/compare/v2.2.0...v2.2.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* **api:** keep an email batch whole and its claim off a seq scan ([2de1bfd](https://github.com/axelhamil/clean-stack/commit/2de1bfd1c61ad4a6cb5d453aba34d46edf2613f0))
+* **api:** replay a failed email chunk with the same idempotency key ([6ed4432](https://github.com/axelhamil/clean-stack/commit/6ed4432585da41cca3e624d744fc2dff01efa7eb))
+* **api:** replay a failed email chunk with the same idempotency key ([cbacd98](https://github.com/axelhamil/clean-stack/commit/cbacd980d345a473b39d42454d6cf7a87da6d93d))
+* **ci:** drop the turbo cache and scope the token to read ([3e04bb8](https://github.com/axelhamil/clean-stack/commit/3e04bb88c102210f418b0787808675d66f454ac1))
+* **ci:** keep schedules, deploys and the pr policy right with dev as default ([7924e77](https://github.com/axelhamil/clean-stack/commit/7924e7726b7a62cad10e40a6df2c35b3ff6143c6))
+* **deploy:** bake the analytics script url into the app image ([d729396](https://github.com/axelhamil/clean-stack/commit/d729396f3884bccfbc63512340cd2334ed53e5a0))
+* **deploy:** poll only the scheduled tasks a deploy waits on ([0df9bb9](https://github.com/axelhamil/clean-stack/commit/0df9bb9253177fec06d767468733543876dfe556))
+* **deploy:** schedule rgpd and notification jobs, bake analytics url ([efbecb4](https://github.com/axelhamil/clean-stack/commit/efbecb449146c5b21fe18a76ae58a1437c477348))
+* **deploy:** schedule the rgpd sweep and the notification email flush ([eeda1e6](https://github.com/axelhamil/clean-stack/commit/eeda1e628c348172eddc84d6d92975c65793f4e8))
+* **notifications:** hold the flush single-flight for its whole transaction ([b40bdd9](https://github.com/axelhamil/clean-stack/commit/b40bdd94c87c677788c37b0ee88053ac1e4dbab8))
+* **notifications:** keep the flush single-flight for its whole transaction ([c86f958](https://github.com/axelhamil/clean-stack/commit/c86f958b89efe3912bc8add5b6d1e49d5e7719f6))
+* **rgpd:** fail the deletion sweep when its batch cannot be loaded ([314932d](https://github.com/axelhamil/clean-stack/commit/314932d04cd0f99b248ff4840304ad86a80ea2b2))
+
+
+### Refactor
+
+* **drizzle:** share the transaction scoped advisory lock ([3ecc18d](https://github.com/axelhamil/clean-stack/commit/3ecc18d00e3ab254703b37b4aedcf7bbcb4f1c48))
+
 ## [2.1.0](https://github.com/axelhamil/clean-stack/compare/v2.0.0...v2.1.0) (2026-11-02)
 
 ### Features
