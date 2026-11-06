@@ -2,6 +2,7 @@ import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import {
   and,
   authSchema,
+  dbOperationFailure,
   desc,
   eq,
   isNull,
@@ -9,7 +10,6 @@ import {
   resolveExecutor,
   staffSchema,
 } from "@packages/drizzle";
-import { dbOperationFailure } from "../../../../shared/db-failure";
 import type {
   IStaffNoteStore,
   NewStaffNote,

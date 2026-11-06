@@ -1,8 +1,5 @@
+import { encodeTimeIdCursor, timeIdCursorSchema } from "@packages/http/time-id-cursor";
 import { z } from "zod";
-import {
-  encodeTimeIdCursor,
-  timeIdCursorSchema,
-} from "../../../../shared/pagination/time-id-cursor";
 import { APPROVAL_STATUSES, type ApprovalRecord } from "../ports/approval-store.port";
 
 export const listApprovalsQuerySchema = z.object({

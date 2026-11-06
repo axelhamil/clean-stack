@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Result } from "@packages/ddd-kit";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { Hono } from "hono";
-import { mockInstrumentation } from "../../../__TESTS__/mock-instrumentation";
 import { createErrorHandler } from "../../../shared/middleware/error.middleware";
 import { ACCOUNT_DELETE_POLICY } from "../../../shared/middleware/rate-limit.policies";
 import type { RateLimitDecision, RateLimitError } from "../../../shared/ports/rate-limiter.port";

@@ -11,8 +11,8 @@ import {
   Result,
 } from "@packages/ddd-kit";
 import { type EventType, EventTypes } from "@packages/events";
-import { emitEvent } from "../../../../shared/event-emitter";
-import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
+import { emitEvent } from "@packages/outbox/event-emitter";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import type { IStaffStore, StaffStoreError } from "../../../../shared/ports/staff-store.port";
 import { type StaffEnv, staffAccessOf } from "../../../../shared/staff-access";
 import {

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
 import type { Locale } from "@packages/i18n";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
+import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
-import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import type { ProfileError } from "../../../shared/ports/profile.port";
 
 const { unitOfWork, outcome } = mockUnitOfWork();

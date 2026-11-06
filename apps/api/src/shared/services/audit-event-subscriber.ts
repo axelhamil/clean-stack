@@ -9,10 +9,10 @@ import {
   sql,
 } from "@packages/drizzle";
 import { retentionFor } from "@packages/events";
-import type { BuiltInEventHandler } from "../event-handlers";
-import type { DeliveredEvent } from "../ports/outbox.port";
+import { readActorId } from "@packages/outbox/event-actor";
+import type { BuiltInEventHandler } from "@packages/outbox/event-handlers";
+import type { DeliveredEvent } from "@packages/outbox/outbox.port";
 import { computeAuditHash, GENESIS_HASH } from "./audit-hash";
-import { readActorId } from "./event-actor";
 
 const al = auditLogSchema.auditLog;
 const dbAttrs = { "db.system.name": "postgresql" } as const;

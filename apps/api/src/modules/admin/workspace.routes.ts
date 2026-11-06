@@ -1,10 +1,10 @@
 import { staffViewSchema } from "@packages/access-control";
 import { AppErrorException } from "@packages/ddd-kit";
+import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { requireStaff } from "../../shared/middleware/staff.middleware";
-import { zV } from "../../shared/validator";
 
 const SECTION_FAILED = { status: "failed" as const };
 

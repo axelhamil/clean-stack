@@ -26,6 +26,7 @@ export type { AnyPgColumn, AnyPgTable, PgUpdateSetSource } from "drizzle-orm/pg-
 export { alias } from "drizzle-orm/pg-core";
 export { lockForTransaction, tryLockForTransaction } from "./advisory-lock";
 export { closeDb, type DbClient, db, type Transaction } from "./config";
+export { dbOperationFailure } from "./db-failure";
 export {
   claimedSet,
   dbClockNow,

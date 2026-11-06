@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { mockPort } from "@packages/test/bun";
-import { mockInstrumentation } from "./mock-instrumentation";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 
 interface Clock {
   now(): number;

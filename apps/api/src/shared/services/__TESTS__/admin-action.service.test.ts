@@ -1,14 +1,14 @@
 import { describe, expect, it, mock } from "bun:test";
 import { UnitOfWorkContext } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import { mockInstrumentation } from "../../../__TESTS__/mock-instrumentation";
 
 const emitted: { type: string; payload: Record<string, unknown> }[] = [];
 
-const realEventEmitter = await import("../../event-emitter");
+const realEventEmitter = await import("@packages/outbox/event-emitter");
 
-mock.module("../../event-emitter", () => ({
+mock.module("@packages/outbox/event-emitter", () => ({
   ...realEventEmitter,
   emitEvent: mock(
     async (

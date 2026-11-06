@@ -6,7 +6,7 @@ Domain primitives and the ports every backend package shares. Where and when to 
 
 ```
 src/
-  primitives/    result, option, uuid (uuidv7 monotonic, UUID, randomUuidV4)
+  primitives/    result, option, uuid (uuidv7 monotonic, UUID, randomUuidV4), canonical-json (`canonicalize`, key-order independent JSON for hashes and idempotency keys)
   domain/        entity, aggregate, value-object, watched-list, domain-event
   application/   repository (Base + Scoped), scope (RepoScope), transaction (IUnitOfWork), unit-of-work-context (the one ambient scope: tx + collected events), error-code (AppError), instrumentation (IInstrumentation), logger (ILogger), pagination
   events/        event-collector, event-dispatcher, in-memory-event-dispatcher, event-handler, on-event, outbox-mapping

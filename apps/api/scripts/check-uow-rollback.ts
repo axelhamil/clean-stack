@@ -29,8 +29,8 @@ import {
   TransactionService,
 } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
-import { emitEvent } from "../src/shared/event-emitter";
-import { DrizzleOutboxRepository } from "../src/shared/services/drizzle-outbox.service";
+import { DrizzleOutboxRepository } from "@packages/outbox/drizzle-outbox.repository";
+import { emitEvent } from "@packages/outbox/event-emitter";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 
 const instrumentation: IInstrumentation = new NoOpInstrumentation();
@@ -114,7 +114,7 @@ async function resetProbe(): Promise<void> {
 async function main(): Promise<void> {
   await resetProbe();
 
-  const outbox = new DrizzleOutboxRepository(instrumentation);
+  const outbox = new DrizzleOutboxRepository(instrumentation, () => undefined);
   const uow = new TransactionService(instrumentation);
 
   const renameThen = (name: string, outcome: Result<void, string>) =>

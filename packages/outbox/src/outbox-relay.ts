@@ -2,6 +2,7 @@ import {
   type HandlerOutcome,
   type IEventDispatcher,
   type IInstrumentation,
+  type ILogger,
   type IUnitOfWork,
   uuidv7,
 } from "@packages/ddd-kit";
@@ -11,17 +12,17 @@ import {
   type OutboxEventDeadPayload,
 } from "@packages/events";
 import { scrubText } from "@packages/sentry-scrub";
-import { OUTBOX_SETTLE_MARGIN_SECONDS } from "../env-bounds";
-import { failureSchedule } from "../jitter";
-import type { Logger } from "../logger";
+import { failureSchedule } from "./jitter";
 import type {
   DeliveredEvent,
   IOutboxRepository,
   OutboxDeliveries,
   OutboxPendingState,
   OutboxRecord,
-} from "../ports/outbox.port";
-import { raceWithTimeout } from "../race-with-timeout";
+} from "./outbox.port";
+import { raceWithTimeout } from "./race-with-timeout";
+
+export const OUTBOX_SETTLE_MARGIN_SECONDS = 10;
 
 export type OutboxRelayOptions = {
   eventTypes: readonly string[];
@@ -98,7 +99,7 @@ export class OutboxRelay {
     private readonly dispatcher: IEventDispatcher<DeliveredEvent>,
     private readonly options: OutboxRelayOptions,
     private readonly instrumentation: IInstrumentation,
-    private readonly logger: Logger,
+    private readonly logger: ILogger,
   ) {
     this.claimLimit = claimLimitOf(options);
   }

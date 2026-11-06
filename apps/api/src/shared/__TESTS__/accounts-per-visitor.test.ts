@@ -1,9 +1,9 @@
 import { describe, expect, it, mock } from "bun:test";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
+import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
 import { mockPort } from "@packages/test/bun";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { Hono } from "hono";
-import { mockInstrumentation } from "../../__TESTS__/mock-instrumentation";
-import type { IOutboxRepository } from "../ports/outbox.port";
-import { enqueuedEvents } from "./enqueued-events";
 
 const realHonoBun = await import("hono/bun");
 mock.module("hono/bun", () => ({

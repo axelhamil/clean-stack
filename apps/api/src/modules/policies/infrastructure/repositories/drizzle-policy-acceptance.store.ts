@@ -1,7 +1,6 @@
 import { type IInstrumentation, Result } from "@packages/ddd-kit";
-import { desc, eq, policiesSchema, resolveExecutor } from "@packages/drizzle";
+import { dbOperationFailure, desc, eq, policiesSchema, resolveExecutor } from "@packages/drizzle";
 import type { PolicyType } from "@packages/policies";
-import { dbOperationFailure } from "../../../../shared/db-failure";
 import type {
   IPolicyAcceptanceStore,
   PolicyAcceptanceRecord,

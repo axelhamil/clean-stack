@@ -27,17 +27,17 @@ import {
   TransactionService,
 } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
-import { Client } from "pg";
-import { emitEvent } from "../src/shared/event-emitter";
-import { buildPurgeFilter } from "../src/shared/internal-routes/sweep-outbox.route";
-import { purgeBatchWithTimeout, requireFilter } from "../src/shared/internal-routes/sweep-purge";
-import { sweepSpans } from "../src/shared/internal-routes/sweep-span";
-import type { OutboxRecord } from "../src/shared/ports/outbox.port";
-import { AuditEventSubscriber } from "../src/shared/services/audit-event-subscriber";
 import {
   DrizzleOutboxRepository,
   OUTBOX_CHANNEL,
-} from "../src/shared/services/drizzle-outbox.service";
+} from "@packages/outbox/drizzle-outbox.repository";
+import { emitEvent } from "@packages/outbox/event-emitter";
+import type { OutboxRecord } from "@packages/outbox/outbox.port";
+import { Client } from "pg";
+import { buildPurgeFilter } from "../src/shared/internal-routes/sweep-outbox.route";
+import { purgeBatchWithTimeout, requireFilter } from "../src/shared/internal-routes/sweep-purge";
+import { sweepSpans } from "../src/shared/internal-routes/sweep-span";
+import { AuditEventSubscriber } from "../src/shared/services/audit-event-subscriber";
 import { checkRun, recordingInstrumentation } from "./check-harness";
 
 const PROBE = `check.outbox-lease.${crypto.randomUUID()}`;
@@ -46,7 +46,7 @@ const TYPE_B = `${PROBE}.b`;
 const AGGREGATE = `check-outbox-lease-${crypto.randomUUID()}`;
 
 const { instrumentation, spans } = recordingInstrumentation();
-const outbox = new DrizzleOutboxRepository(instrumentation);
+const outbox = new DrizzleOutboxRepository(instrumentation, () => undefined);
 const uow = new TransactionService(instrumentation, async (events) => {
   await outbox.enqueue(events, { source: "check/outbox-lease" });
 });

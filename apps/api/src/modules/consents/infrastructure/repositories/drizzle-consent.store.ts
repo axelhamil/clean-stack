@@ -2,6 +2,7 @@ import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import {
   and,
   consentSchema,
+  dbOperationFailure,
   desc,
   eq,
   gt,
@@ -9,7 +10,6 @@ import {
   resolveExecutor,
   type SQL,
 } from "@packages/drizzle";
-import { dbOperationFailure } from "../../../../shared/db-failure";
 import type {
   ConsentError,
   ConsentRecordRow,

@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { Result } from "@packages/ddd-kit";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { mockPort } from "@packages/test/bun";
 import { Hono } from "hono";
 import type { PolicyConfig } from "../middleware/rate-limit.policies";
-import type { IOutboxRepository } from "../ports/outbox.port";
 
 let mockedAddress = "1.2.3.4";
 
@@ -31,7 +31,7 @@ const {
 const { normalizeHop, resolveClientIp } = await import("../middleware/rate-limit.ip");
 const { createErrorHandler } = await import("../middleware/error.middleware");
 
-import { mockInstrumentation } from "../../__TESTS__/mock-instrumentation";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import type { IRateLimiter, RateLimitDecision, RateLimitError } from "../ports/rate-limiter.port";
 
 function allowDecision(policyName = "global"): RateLimitDecision {

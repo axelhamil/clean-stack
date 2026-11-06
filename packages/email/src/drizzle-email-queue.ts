@@ -1,4 +1,4 @@
-import { type IInstrumentation, Option, Result, uuidv7 } from "@packages/ddd-kit";
+import { type IInstrumentation, type ILogger, Option, Result, uuidv7 } from "@packages/ddd-kit";
 import {
   and,
   claimedSet,
@@ -23,7 +23,6 @@ import {
   sql,
 } from "@packages/drizzle";
 import { isLocale } from "@packages/i18n";
-import { logger } from "../logger";
 import type {
   EmailClaimRequest,
   EmailFailure,
@@ -32,7 +31,7 @@ import type {
   EmailMessageRecord,
   EmailQueueError,
   IEmailQueue,
-} from "../ports/email-queue.port";
+} from "./email-queue.port";
 
 const em = emailSchema.emailMessage;
 const dbAttrs = { "db.system.name": "postgresql" } as const;
@@ -143,7 +142,10 @@ function toRecord(
 }
 
 export class DrizzleEmailQueue implements IEmailQueue {
-  constructor(private readonly instrumentation: IInstrumentation) {}
+  constructor(
+    private readonly instrumentation: IInstrumentation,
+    private readonly logger: ILogger,
+  ) {}
 
   async enqueue(rows: EmailMessageInsert[]): Promise<Result<{ written: number }, EmailQueueError>> {
     const exec = resolveExecutor();
@@ -175,7 +177,7 @@ export class DrizzleEmailQueue implements IEmailQueue {
         );
 
         if (written.length < values.length) {
-          logger.warn(
+          this.logger.warn(
             { requested: values.length, written: written.length },
             "email enqueue suppressed duplicate rows: idempotency keys already present",
           );

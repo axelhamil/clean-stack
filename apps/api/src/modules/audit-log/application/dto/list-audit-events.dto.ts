@@ -1,5 +1,5 @@
+import { timeIdCursorSchema } from "@packages/http/time-id-cursor";
 import { z } from "zod";
-import { timeIdCursorSchema } from "../../../../shared/pagination/time-id-cursor";
 
 export const listAuditEventsQuerySchema = z.object({
   actorId: z.string().optional(),

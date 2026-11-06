@@ -331,9 +331,6 @@ importers:
       '@better-auth/utils':
         specifier: 0.5.1
         version: 0.5.1
-      '@hono/zod-validator':
-        specifier: ^0.9.1
-        version: 0.9.1(hono@4.13.14)(zod@4.6.7)
       '@noble/ciphers':
         specifier: ^2.4.0
         version: 2.4.0
@@ -352,15 +349,24 @@ importers:
       '@packages/drizzle':
         specifier: workspace:*
         version: link:../../packages/drizzle
+      '@packages/email':
+        specifier: workspace:*
+        version: link:../../packages/email
       '@packages/emails':
         specifier: workspace:*
         version: link:../../packages/emails
       '@packages/events':
         specifier: workspace:*
         version: link:../../packages/events
+      '@packages/http':
+        specifier: workspace:*
+        version: link:../../packages/http
       '@packages/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@packages/outbox':
+        specifier: workspace:*
+        version: link:../../packages/outbox
       '@packages/policies':
         specifier: workspace:*
         version: link:../../packages/policies
@@ -678,6 +684,43 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
+  packages/email:
+    dependencies:
+      '@packages/ddd-kit':
+        specifier: workspace:*
+        version: link:../ddd-kit
+      '@packages/drizzle':
+        specifier: workspace:*
+        version: link:../drizzle
+      '@packages/emails':
+        specifier: workspace:*
+        version: link:../emails
+      '@packages/events':
+        specifier: workspace:*
+        version: link:../events
+      '@packages/i18n':
+        specifier: workspace:*
+        version: link:../i18n
+      '@packages/outbox':
+        specifier: workspace:*
+        version: link:../outbox
+      resend:
+        specifier: ^6.35.0
+        version: 6.35.0(@react-email/render@2.1.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1))
+    devDependencies:
+      '@packages/test':
+        specifier: workspace:*
+        version: link:../test
+      '@packages/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/bun':
+        specifier: ^1.4.4
+        version: 1.4.4
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
   packages/emails:
     dependencies:
       '@packages/i18n':
@@ -740,6 +783,40 @@ importers:
         specifier: ^5.0.5
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(@vitest/coverage-v8@5.0.5)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
+  packages/http:
+    dependencies:
+      '@hono/zod-validator':
+        specifier: ^0.9.1
+        version: 0.9.1(hono@4.13.14)(zod@4.6.7)
+      '@packages/access-control':
+        specifier: workspace:*
+        version: link:../access-control
+      '@packages/ddd-kit':
+        specifier: workspace:*
+        version: link:../ddd-kit
+      '@packages/drizzle':
+        specifier: workspace:*
+        version: link:../drizzle
+      hono:
+        specifier: ^4.13.14
+        version: 4.13.14
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@packages/test':
+        specifier: workspace:*
+        version: link:../test
+      '@packages/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/bun':
+        specifier: ^1.4.4
+        version: 1.4.4
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
   packages/i18n:
     dependencies:
       i18next:
@@ -761,6 +838,40 @@ importers:
       vitest:
         specifier: ^5.0.5
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@26.6.5)(@vitest/coverage-v8@5.0.5)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/outbox:
+    dependencies:
+      '@packages/ddd-kit':
+        specifier: workspace:*
+        version: link:../ddd-kit
+      '@packages/drizzle':
+        specifier: workspace:*
+        version: link:../drizzle
+      '@packages/events':
+        specifier: workspace:*
+        version: link:../events
+      '@packages/sentry-scrub':
+        specifier: workspace:*
+        version: link:../sentry-scrub
+      pg:
+        specifier: ^8.23.1
+        version: 8.23.1
+    devDependencies:
+      '@packages/test':
+        specifier: workspace:*
+        version: link:../test
+      '@packages/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/bun':
+        specifier: ^1.4.4
+        version: 1.4.4
+      '@types/pg':
+        specifier: ^8.23.1
+        version: 8.23.1
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
 
   packages/policies:
     devDependencies:

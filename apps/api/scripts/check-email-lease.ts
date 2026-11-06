@@ -4,8 +4,9 @@ requireLocalDatabase("check-email-lease");
 
 import { uuidv7 } from "@packages/ddd-kit";
 import { db, emailSchema, eq, inArray, like } from "@packages/drizzle";
-import type { EmailClaimRequest, EmailMessageRecord } from "../src/shared/ports/email-queue.port";
-import { DrizzleEmailQueue } from "../src/shared/services/drizzle-email-queue.service";
+import { DrizzleEmailQueue } from "@packages/email/drizzle-email-queue";
+import type { EmailClaimRequest, EmailMessageRecord } from "@packages/email/email-queue.port";
+import { logger } from "../src/shared/logger";
 import { checkRun, probeClaims, recordingInstrumentation, withClockAhead } from "./check-harness";
 
 const PROBE = `check-email-lease-${crypto.randomUUID()}`;
@@ -13,7 +14,7 @@ const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
 
 const { instrumentation, spans } = recordingInstrumentation();
-const queue = new DrizzleEmailQueue(instrumentation);
+const queue = new DrizzleEmailQueue(instrumentation, logger);
 const em = emailSchema.emailMessage;
 
 async function cleanup(): Promise<void> {

@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./bun": "./src/bun/port-mock.ts",
     "./bun/unit-of-work": "./src/bun/unit-of-work-mock.ts",
+    "./bun/instrumentation": "./src/bun/instrumentation-mock.ts",
     "./source-scan": "./src/source-scan.ts",
     "./a11y": "./src/a11y.ts",
     "./redirect-vectors": "./src/redirect-vectors.ts",

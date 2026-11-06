@@ -12,8 +12,10 @@ import { ac, isPersonalOrg, ORG_ROLES, roles } from "@packages/access-control";
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
 import { AppErrorException, Option } from "@packages/ddd-kit";
 import { ambientTransaction, db, lockForTransaction } from "@packages/drizzle";
+import type { EmailTemplates, TemplateVariables } from "@packages/email/email.port";
 import { type EventType, EventTypes } from "@packages/events";
 import { DEFAULT_LOCALE, type Locale, toLocale } from "@packages/i18n";
+import { derivedEventId, emitEvent, emitEventBestEffort } from "@packages/outbox/event-emitter";
 import { scrubText } from "@packages/sentry-scrub";
 import {
   type BetterAuthOptions,
@@ -84,14 +86,12 @@ import { TOTP_OPTIONS } from "./shared/auth/totp-options";
 import { asUnitOfWork } from "./shared/auth/unit-of-work-adapter";
 import { hasFeature, hasSeatAvailable } from "./shared/entitlements";
 import { env, FRONT_ORIGINS } from "./shared/env";
-import { derivedEventId, emitEvent, emitEventBestEffort } from "./shared/event-emitter";
 import { logger } from "./shared/logger";
 import {
   IMPERSONATE_PATH,
   isBlockedDuringImpersonation,
 } from "./shared/middleware/impersonation-blocklist";
 import { MIN_PASSWORD_LENGTH, validatePassword } from "./shared/password-policy";
-import type { EmailTemplates, TemplateVariables } from "./shared/ports/email.port";
 import { getClientIp, getVisitorGeo } from "./shared/request-context";
 
 const isProd = env.NODE_ENV === "production";
@@ -235,6 +235,7 @@ async function emitBestEffort<TPayload>(
 ): Promise<void> {
   await emitEventBestEffort(
     di.IOutboxRepository,
+    logger,
     eventType,
     aggregateType,
     aggregateId,

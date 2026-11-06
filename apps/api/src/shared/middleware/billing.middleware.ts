@@ -1,5 +1,6 @@
 import { AppErrorException } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { emitEvent } from "@packages/outbox/event-emitter";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
 import { di } from "../../container";
@@ -12,7 +13,6 @@ import {
   type QuotaKey,
   type Tier,
 } from "../entitlements";
-import { emitEvent } from "../event-emitter";
 import { logger } from "../logger";
 
 function paymentRequired(message: string): never {

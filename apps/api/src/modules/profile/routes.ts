@@ -1,13 +1,13 @@
 import { AppErrorException, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { zV } from "@packages/http/validator";
+import { emitEvent } from "@packages/outbox/event-emitter";
 import { Hono } from "hono";
 import { di } from "../../container";
-import { emitEvent } from "../../shared/event-emitter";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
 import type { ProfileError } from "../../shared/ports/profile.port";
-import { zV } from "../../shared/validator";
 import { localeSchema } from "./profile.schema";
 
 export const profileRoutes = new Hono<{ Variables: AuthVariables }>().put(

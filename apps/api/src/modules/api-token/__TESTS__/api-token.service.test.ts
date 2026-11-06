@@ -1,11 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
+import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
 import type { ApiTokenRecord, IApiTokenRepository } from "../../../shared/ports/api-token.port";
-import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import { ApiTokenService } from "../application/services/api-token.service";
 

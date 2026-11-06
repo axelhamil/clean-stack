@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { Option } from "@packages/ddd-kit";
+import { type ILogger, Option } from "@packages/ddd-kit";
 import * as realDrizzle from "@packages/drizzle";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 
 const inserted: unknown[] = [];
 
@@ -8,9 +9,12 @@ const inserted: unknown[] = [];
 let insertReturns: ((rows: unknown[]) => unknown[]) | null = null;
 
 const warnSpy = mock(() => {});
-mock.module("../logger", () => ({
-  logger: { warn: warnSpy, info: mock(() => {}), error: mock(() => {}), debug: mock(() => {}) },
-}));
+const logger: ILogger = {
+  warn: warnSpy,
+  info: mock(() => {}),
+  error: mock(() => {}),
+  debug: mock(() => {}),
+};
 
 const fakeDb = {
   insert: () => ({
@@ -34,8 +38,7 @@ mock.module("@packages/drizzle", () => ({
   resolveExecutor: () => executor,
 }));
 
-const { DrizzleEmailQueue } = await import("../services/drizzle-email-queue.service");
-const { NoOpInstrumentation } = await import("../services/noop-instrumentation");
+const { DrizzleEmailQueue } = await import("../drizzle-email-queue");
 
 const rowFixture = (to: string) => ({
   kind: "template" as const,
@@ -56,7 +59,7 @@ describe("DrizzleEmailQueue.enqueue", () => {
   });
 
   it("assigns an id and pending status to every row", async () => {
-    const queue = new DrizzleEmailQueue(new NoOpInstrumentation());
+    const queue = new DrizzleEmailQueue(mockInstrumentation(), logger);
     const result = await queue.enqueue([
       {
         kind: "template",
@@ -76,14 +79,14 @@ describe("DrizzleEmailQueue.enqueue", () => {
   });
 
   it("reports written: 0 for an empty batch", async () => {
-    const queue = new DrizzleEmailQueue(new NoOpInstrumentation());
+    const queue = new DrizzleEmailQueue(mockInstrumentation(), logger);
     const result = await queue.enqueue([]);
     expect(result.isSuccess).toBe(true);
     expect(result.isSuccess && result.getValue().written).toBe(0);
   });
 
   it("returns a failure Result instead of throwing when the insert rejects", async () => {
-    const queue = new DrizzleEmailQueue(new NoOpInstrumentation());
+    const queue = new DrizzleEmailQueue(mockInstrumentation(), logger);
     executor = {
       insert: () => ({
         values: () => ({
@@ -115,7 +118,7 @@ describe("DrizzleEmailQueue.enqueue", () => {
 
   it("suppresses a duplicate row instead of failing the whole batch", async () => {
     insertReturns = (rows) => rows.slice(1).map(() => ({ id: "id" })); // one row dropped
-    const queue = new DrizzleEmailQueue(new NoOpInstrumentation());
+    const queue = new DrizzleEmailQueue(mockInstrumentation(), logger);
 
     const result = await queue.enqueue([rowFixture("a@x.test"), rowFixture("b@x.test")]);
 
@@ -126,7 +129,7 @@ describe("DrizzleEmailQueue.enqueue", () => {
   it("warns when fewer rows are written than requested", async () => {
     insertReturns = (rows) => rows.slice(1).map(() => ({ id: "id" }));
 
-    await new DrizzleEmailQueue(new NoOpInstrumentation()).enqueue([
+    await new DrizzleEmailQueue(mockInstrumentation(), logger).enqueue([
       rowFixture("a@x.test"),
       rowFixture("b@x.test"),
     ]);
@@ -162,7 +165,7 @@ describe("DrizzleEmailQueue.claim", () => {
       throw new Error("db down");
     });
 
-    const result = await new DrizzleEmailQueue(new NoOpInstrumentation()).claim({
+    const result = await new DrizzleEmailQueue(mockInstrumentation(), logger).claim({
       limit: 10,
       leaseSeconds: 120,
       deadReplayWindowHours: 24,
@@ -183,7 +186,7 @@ describe("DrizzleEmailQueue.markSent", () => {
       },
     };
 
-    const result = await new DrizzleEmailQueue(new NoOpInstrumentation()).markSent([], {});
+    const result = await new DrizzleEmailQueue(mockInstrumentation(), logger).markSent([], {});
 
     expect(result.isSuccess && result.getValue()).toEqual([]);
     expect(called).toBe(false);
@@ -192,7 +195,7 @@ describe("DrizzleEmailQueue.markSent", () => {
 
 describe("DrizzleEmailQueue.markFailed", () => {
   it("markFailed reports whether it wrote", async () => {
-    const queue = new DrizzleEmailQueue(new NoOpInstrumentation());
+    const queue = new DrizzleEmailQueue(mockInstrumentation(), logger);
     const failure = {
       lastError: "HTTP 503",
       status: "pending",

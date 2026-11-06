@@ -3,6 +3,7 @@ import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import {
   and,
   apiTokenSchema,
+  dbOperationFailure,
   eq,
   gt,
   inArray,
@@ -18,7 +19,6 @@ import {
 import { isLocale } from "@packages/i18n";
 import { verifyPassword as verifyHash } from "better-auth/crypto";
 import { ENDED_SESSION_COLUMNS, endedImpersonationsOf } from "../../../../shared/db/ended-sessions";
-import { dbOperationFailure } from "../../../../shared/db-failure";
 import type { Logger } from "../../../../shared/logger";
 import type {
   ExecuteWipeOutput,

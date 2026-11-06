@@ -45,7 +45,10 @@ import {
   staffSchema,
   TransactionService,
 } from "@packages/drizzle";
+import { DrizzleEmailQueue } from "@packages/email/drizzle-email-queue";
+import { QueuedEmailService } from "@packages/email/email.service";
 import { EventTypes } from "@packages/events";
+import { DrizzleOutboxRepository } from "@packages/outbox/drizzle-outbox.repository";
 import { Hono } from "hono";
 import { DrizzleStaffStore } from "../src/modules/admin/infrastructure/repositories/drizzle-staff.store";
 import { DrizzleApiTokenRepository } from "../src/modules/api-token/infrastructure/repositories/drizzle-api-token.repository";
@@ -57,10 +60,7 @@ import { generateToken, hmacToken } from "../src/shared/crypto/api-token";
 import { env } from "../src/shared/env";
 import { logger } from "../src/shared/logger";
 import { requireApiToken } from "../src/shared/middleware/api-token.middleware";
-import { DrizzleEmailQueue } from "../src/shared/services/drizzle-email-queue.service";
-import { DrizzleOutboxRepository } from "../src/shared/services/drizzle-outbox.service";
 import { DrizzleTotpVerifier } from "../src/shared/services/drizzle-totp-verifier";
-import { QueuedEmailService } from "../src/shared/services/email.service";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 
 const instrumentation: IInstrumentation = new NoOpInstrumentation();
@@ -128,8 +128,11 @@ async function cleanup(): Promise<void> {
 }
 
 function buildService(): RgpdService {
-  const outbox = new DrizzleOutboxRepository(instrumentation);
-  const email = new QueuedEmailService(new DrizzleEmailQueue(instrumentation), instrumentation);
+  const outbox = new DrizzleOutboxRepository(instrumentation, () => undefined);
+  const email = new QueuedEmailService(
+    new DrizzleEmailQueue(instrumentation, logger),
+    instrumentation,
+  );
   const uow = new TransactionService(instrumentation);
   return new RgpdService(
     new DrizzleRgpdRepository(logger, instrumentation),
@@ -228,7 +231,7 @@ async function requestWithToken(raw: string): Promise<number> {
       requireApiToken(
         {
           repo: new DrizzleApiTokenRepository(instrumentation),
-          outbox: new DrizzleOutboxRepository(instrumentation),
+          outbox: new DrizzleOutboxRepository(instrumentation, () => undefined),
           uow: new TransactionService(instrumentation),
           instrumentation,
           logger,

@@ -11,8 +11,8 @@ import {
   type UserCookieConsentGrantedPayload,
   type UserCookieConsentWithdrawnPayload,
 } from "@packages/events";
-import { emitEvent } from "../../../../shared/event-emitter";
-import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
+import { emitEvent } from "@packages/outbox/event-emitter";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import type { ConsentError, ConsentRecordRow, IConsentStore } from "../ports/consent.port";
 
 const DAY_MS = 24 * 60 * 60 * 1000;

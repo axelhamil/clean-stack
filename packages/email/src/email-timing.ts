@@ -1,0 +1,2 @@
+export const EMAIL_SEND_TIMEOUT_SECONDS = 30;
+export const EMAIL_SETTLE_MARGIN_SECONDS = 15;

@@ -8,11 +8,11 @@ import {
   uuidv7,
 } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { emitEvent } from "@packages/outbox/event-emitter";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { deriveOrgSubKey, encryptSecret, masterKeyFromHex } from "../../../../shared/aead";
 import { env } from "../../../../shared/env";
-import { emitEvent } from "../../../../shared/event-emitter";
 import { logger } from "../../../../shared/logger";
-import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import { assertPublicUrl } from "../../../../shared/ssrf-guard";
 import type {
   DeliveryPage,

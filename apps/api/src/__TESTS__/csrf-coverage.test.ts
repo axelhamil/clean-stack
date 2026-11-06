@@ -12,8 +12,8 @@ mock.module("../shared/middleware/rate-limit.ip", () => ({
   resolveClientIp: () => "198.51.100.7",
 }));
 
-const realEmitter = await import("../shared/event-emitter");
-mock.module("../shared/event-emitter", () => ({
+const realEmitter = await import("@packages/outbox/event-emitter");
+mock.module("@packages/outbox/event-emitter", () => ({
   ...realEmitter,
   emitEventBestEffort: async () => undefined,
 }));

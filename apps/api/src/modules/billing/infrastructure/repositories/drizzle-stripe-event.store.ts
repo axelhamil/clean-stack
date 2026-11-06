@@ -4,6 +4,7 @@ import {
   billingSchema,
   dbClockNow,
   dbNow,
+  dbOperationFailure,
   desc,
   eq,
   isNull,
@@ -12,7 +13,6 @@ import {
   resolveExecutor,
   secondsFromClock,
 } from "@packages/drizzle";
-import { dbOperationFailure } from "../../../../shared/db-failure";
 import type {
   IStripeEventStore,
   StripeEventDelivery,

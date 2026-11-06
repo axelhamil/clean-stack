@@ -1,8 +1,8 @@
 import type { IInstrumentation } from "@packages/ddd-kit";
 import { db } from "@packages/drizzle";
+import { PgListener, type PgListenerOptions } from "@packages/outbox/pg-listener";
 import type { Logger } from "../logger";
 import { ensureNotificationTrigger, NOTIFICATION_NOTIFY_CHANNEL } from "./notification-trigger";
-import { PgListener, type PgListenerOptions } from "./pg-listener";
 
 export const MAX_STREAMS_PER_USER = 5;
 

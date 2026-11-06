@@ -1,13 +1,13 @@
 // `/internal/*`: gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
 import { AppErrorException } from "@packages/ddd-kit";
+import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
 import { di } from "../../container";
 import { env } from "../../shared/env";
 import { internalLayers } from "../../shared/internal-routes/internal-layers";
 import { type SweepBeat, withSweepHeartbeat } from "../../shared/internal-routes/sweep-heartbeat";
 import { sweepSpans } from "../../shared/internal-routes/sweep-span";
-import { zV } from "../../shared/validator";
 import { sweepBodySchema } from "./application/dto/process-pending-deletions.dto";
 import type { ProcessPendingDeletionsOutput } from "./application/services/rgpd.service";
 

@@ -2,10 +2,19 @@ import { timingSafeEqual } from "node:crypto";
 import { base32 } from "@better-auth/utils/base32";
 import { createOTP } from "@better-auth/utils/otp";
 import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
-import { and, eq, isNull, lt, or, resolveExecutor, schema, staffSchema } from "@packages/drizzle";
+import {
+  and,
+  dbOperationFailure,
+  eq,
+  isNull,
+  lt,
+  or,
+  resolveExecutor,
+  schema,
+  staffSchema,
+} from "@packages/drizzle";
 import { type SecretConfig, symmetricDecrypt } from "better-auth/crypto";
 import { TOTP_OPTIONS } from "../auth/totp-options";
-import { dbOperationFailure } from "../db-failure";
 import type { ITotpVerifier, TotpOutcome, TotpVerifierError } from "../ports/totp-verifier.port";
 
 const IMPORTED_SECRET_PREFIX = "base32:";

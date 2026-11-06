@@ -1,10 +1,10 @@
 import { AppErrorException } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { emitEventBestEffort } from "@packages/outbox/event-emitter";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { createMiddleware } from "hono/factory";
-import { emitEventBestEffort } from "../event-emitter";
 import { logger } from "../logger";
 import type { ICaptchaService } from "../ports/captcha.port";
-import type { IOutboxRepository } from "../ports/outbox.port";
 import type { IRateLimiter, IRateLimitUsage, WindowConfig } from "../ports/rate-limiter.port";
 import { resolveClientIp } from "./rate-limit.ip";
 import type { PolicyConfig } from "./rate-limit.policies";
@@ -106,6 +106,7 @@ export function requireRateLimit(deps: RateLimitDeps, policy: PolicyConfig) {
         const policyName = decision.policyName.slice(0, 64);
         await emitEventBestEffort(
           deps.outbox,
+          logger,
           EventTypes.SECURITY_RATE_LIMIT_EXCEEDED,
           "rate_limit",
           `${policy.name}:${ip}`,

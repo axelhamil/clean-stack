@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Result } from "@packages/ddd-kit";
 import { mockPort } from "@packages/test/bun";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { Hono } from "hono";
-import { mockInstrumentation } from "../../__TESTS__/mock-instrumentation";
 import type { CaptchaError, ICaptchaService } from "../ports/captcha.port";
 
 let clientAddress = "1.2.3.4";

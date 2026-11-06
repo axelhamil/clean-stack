@@ -4,8 +4,9 @@ import { requireLocalDatabase } from "./require-local-database";
 requireLocalDatabase("check-marksent");
 
 import { db, emailSchema, inArray } from "@packages/drizzle";
-import type { EmailLease } from "../src/shared/ports/email-queue.port";
-import { DrizzleEmailQueue } from "../src/shared/services/drizzle-email-queue.service";
+import { DrizzleEmailQueue } from "@packages/email/drizzle-email-queue";
+import type { EmailLease } from "@packages/email/email-queue.port";
+import { logger } from "../src/shared/logger";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 
 const em = emailSchema.emailMessage;
@@ -60,7 +61,7 @@ async function main(): Promise<void> {
   await cleanup();
   await db.insert(em).values(seedRows([...ids, ...allNullIds, staleId]));
 
-  const queue = new DrizzleEmailQueue(new NoOpInstrumentation());
+  const queue = new DrizzleEmailQueue(new NoOpInstrumentation(), logger);
   const result = await queue.markSent(leasesOf(ids), {
     "check-marksent-a": "p1",
     "check-marksent-b": "p2",

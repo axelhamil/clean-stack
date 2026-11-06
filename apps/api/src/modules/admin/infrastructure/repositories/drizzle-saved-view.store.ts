@@ -1,7 +1,15 @@
 import { type StaffView, type StaffViewScreen, storedStaffView } from "@packages/access-control";
 import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
-import { and, asc, dbNow, eq, inArray, resolveExecutor, staffSchema } from "@packages/drizzle";
-import { dbOperationFailure } from "../../../../shared/db-failure";
+import {
+  and,
+  asc,
+  dbNow,
+  dbOperationFailure,
+  eq,
+  inArray,
+  resolveExecutor,
+  staffSchema,
+} from "@packages/drizzle";
 import type {
   DeletedSavedView,
   ISavedViewStore,

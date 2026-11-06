@@ -1,12 +1,12 @@
 import { EventTypes } from "@packages/events";
+import { emitEventBestEffort } from "@packages/outbox/event-emitter";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { z } from "zod";
-import { emitEventBestEffort } from "../event-emitter";
 import { logger } from "../logger";
 import { resolveClientIp } from "../middleware/rate-limit.ip";
-import type { IOutboxRepository } from "../ports/outbox.port";
 
 const BODY_LIMIT_BYTES = 64 * 1024;
 
@@ -205,6 +205,7 @@ async function emitCspEvent(
 ): Promise<void> {
   await emitEventBestEffort(
     outbox,
+    logger,
     EventTypes.SECURITY_CSP_VIOLATION,
     "csp_report",
     ip,

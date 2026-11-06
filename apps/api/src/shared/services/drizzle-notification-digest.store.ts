@@ -4,6 +4,7 @@ import {
   and,
   authSchema,
   count,
+  dbOperationFailure,
   eq,
   inArray,
   isNull,
@@ -14,7 +15,6 @@ import {
   tryLockForTransaction,
 } from "@packages/drizzle";
 import { NOTIFICATION_MAP } from "@packages/events";
-import { dbOperationFailure } from "../db-failure";
 import type {
   DueNotification,
   INotificationDigestStore,

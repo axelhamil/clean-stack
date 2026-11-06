@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
-import { mockInstrumentation } from "../../__TESTS__/mock-instrumentation";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { SiteverifyCaptchaService } from "../services/siteverify-captcha.service";
 
 const VERIFY_URL = "https://captcha.example/siteverify";

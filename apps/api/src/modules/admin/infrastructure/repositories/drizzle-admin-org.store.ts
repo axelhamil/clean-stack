@@ -10,8 +10,8 @@ import {
   or,
   resolveExecutor,
 } from "@packages/drizzle";
+import { afterTimeIdCursor, exactInstant } from "@packages/http/time-id-cursor";
 import { createDbFailure } from "../../../../shared/db-failure";
-import { afterTimeIdCursor, exactInstant } from "../../../../shared/pagination/time-id-cursor";
 import type { ListOrgsInput } from "../../application/dto/list-orgs.dto";
 import type {
   AdminOrgListRow,

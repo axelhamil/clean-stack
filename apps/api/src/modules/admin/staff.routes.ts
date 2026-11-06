@@ -1,4 +1,5 @@
 import { AppErrorException, Option } from "@packages/ddd-kit";
+import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
 import { di } from "../../container";
 import { env } from "../../shared/env";
@@ -9,7 +10,6 @@ import {
   requireStaffPermission,
   requireStepUp,
 } from "../../shared/middleware/staff.middleware";
-import { zV } from "../../shared/validator";
 import { setStaffRoleBodySchema } from "./application/dto/set-staff-role.dto";
 import { setStaffOverrideBodySchema } from "./application/dto/staff-override.dto";
 import { stepUpBodySchema } from "./application/dto/step-up.dto";

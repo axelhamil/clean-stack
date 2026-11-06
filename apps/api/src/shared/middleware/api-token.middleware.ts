@@ -1,5 +1,7 @@
 import type { IInstrumentation, ILogger, IUnitOfWork } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { emitEvent } from "@packages/outbox/event-emitter";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import type { MiddlewareHandler } from "hono";
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
@@ -7,9 +9,7 @@ import type { SessionUser } from "../../auth";
 import { findUserById } from "../../auth-queries";
 import type { ApiScope } from "../../modules/api-token/application/dto/create-token.dto";
 import { hmacToken, parseToken } from "../crypto/api-token";
-import { emitEvent } from "../event-emitter";
 import type { IApiTokenRepository } from "../ports/api-token.port";
-import type { IOutboxRepository } from "../ports/outbox.port";
 import { getRequestId } from "../request-context";
 
 export interface ApiTokenVariables {

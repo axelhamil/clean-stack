@@ -13,9 +13,9 @@ import {
   or,
   resolveExecutor,
 } from "@packages/drizzle";
+import { afterTimeIdCursor, exactInstant } from "@packages/http/time-id-cursor";
 import { ENDED_SESSION_COLUMNS, endedSessionsOf } from "../../../../shared/db/ended-sessions";
 import { createDbFailure } from "../../../../shared/db-failure";
-import { afterTimeIdCursor, exactInstant } from "../../../../shared/pagination/time-id-cursor";
 import type { EndedSessions } from "../../../../shared/ports/staff-store.port";
 import type { ListUsersInput } from "../../application/dto/list-users.dto";
 import type {

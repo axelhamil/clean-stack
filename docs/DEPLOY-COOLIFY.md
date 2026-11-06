@@ -190,7 +190,7 @@ curl -i -X OPTIONS -H "Origin: https://app.<domain>" -H "Access-Control-Request-
 
 **API token pepper rotation** (annually or on suspected exposure): set `API_TOKEN_PEPPER` to a new `openssl rand -hex 32`, `API_TOKEN_PEPPER_PREVIOUS` to the old one, bump `API_TOKEN_PEPPER_VERSION`, redeploy. Rows migrate lazily on use; once `select pepper_version, count(*) from api_token where revoked_at is null group by 1` shows no old version, clear `API_TOKEN_PEPPER_PREVIOUS` and redeploy.
 
-**External services.** R2: a bucket in the EU jurisdiction, public access off, lifecycle rules `tmp/` 30 days and `backups/` 365 days, an API token scoped to the bucket (Object Read and Write); `S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com`, `S3_PUBLIC_URL=https://<bucket>.<account>.r2.cloudflarestorage.com`. Resend: verified domain (SPF, DKIM, DMARC), EU region, a `sending_access` key, and the template ids of `email-delivery-worker.service.ts` filled in. Sentry: an EU organization (`*.eu.sentry.io` DSN), one project per app.
+**External services.** R2: a bucket in the EU jurisdiction, public access off, lifecycle rules `tmp/` 30 days and `backups/` 365 days, an API token scoped to the bucket (Object Read and Write); `S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com`, `S3_PUBLIC_URL=https://<bucket>.<account>.r2.cloudflarestorage.com`. Resend: verified domain (SPF, DKIM, DMARC), EU region, a `sending_access` key, and the template ids of `packages/email/src/email-delivery-worker.ts` filled in. Sentry: an EU organization (`*.eu.sentry.io` DSN), one project per app.
 
 ---
 

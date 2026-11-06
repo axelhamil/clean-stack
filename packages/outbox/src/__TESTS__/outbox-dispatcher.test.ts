@@ -1,15 +1,17 @@
 import { describe, expect, test } from "bun:test";
-import { Option, onEvent, Result } from "@packages/ddd-kit";
+import { type ILogger, Option, onEvent, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import { mockInstrumentation } from "../../../__TESTS__/mock-instrumentation";
-import { type BuiltInEventHandler, buildEventDispatcher } from "../../event-handlers";
-import { logger } from "../../logger";
-import type { IOutboxRepository, OutboxRecord } from "../../ports/outbox.port";
-import { OutboxDispatcher } from "../outbox-dispatcher.service";
+
+const logger = mockPort<ILogger>();
+
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
+import { type BuiltInEventHandler, buildEventDispatcher } from "../event-handlers";
+import type { IOutboxRepository, OutboxRecord } from "../outbox.port";
+import { OutboxDispatcher } from "../outbox-dispatcher";
 import { OutboxRelay } from "../outbox-relay";
-import { FakePgListenClient } from "./fake-pg-listen-client";
+import { FakePgListenClient } from "../testing/fake-pg-listen-client";
 
 const TYPE = EventTypes.USER_CREATED;
 

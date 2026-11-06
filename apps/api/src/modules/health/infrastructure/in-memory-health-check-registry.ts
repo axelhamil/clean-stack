@@ -1,4 +1,5 @@
 import type { IInstrumentation } from "@packages/ddd-kit";
+import { raceWithTimeout } from "@packages/outbox/race-with-timeout";
 import type {
   AggregatedHealthCheck,
   AggregatedReport,
@@ -8,7 +9,6 @@ import type {
   HealthStatus,
   IHealthCheckRegistry,
 } from "../../../shared/ports/health.port";
-import { raceWithTimeout } from "../../../shared/race-with-timeout";
 
 const CHECK_TIMEOUT_MS = 5_000;
 const CACHE_TTL_PASS_MS = 30_000;

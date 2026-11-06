@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { mockPort } from "@packages/test/bun";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import type { IOutboxRepository } from "../ports/outbox.port";
 
 const realHonoBun = await import("hono/bun");
 mock.module("hono/bun", () => ({

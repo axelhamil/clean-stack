@@ -1,11 +1,11 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
+import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
 import { POLICY_TYPES, POLICY_VERSIONS } from "@packages/policies";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
-import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type {
   IPolicyAcceptanceStore,

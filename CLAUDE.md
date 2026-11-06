@@ -20,12 +20,14 @@ One guide per app and per package that carries rules of its own. Read the one yo
 | Admin | `apps/admin/CLAUDE.md` | what the staff back office does differently: nav from server permissions, no auth screen, denied page, stricter CSP |
 | `packages/ddd-kit` | `packages/ddd-kit/CLAUDE.md` | `Result`, `Option`, aggregates, value objects, repository and unit-of-work contracts |
 | `packages/drizzle` | `packages/drizzle/CLAUDE.md` | schema, migrations, query rules, transaction service |
+| `packages/http` | `packages/http/CLAUDE.md` | request validator, cursor pagination, route-guard contract the host implements |
+| `packages/outbox` | `packages/outbox/CLAUDE.md` | outbox port, emit helpers, relay, dispatcher, lease model shared by every delivery worker |
 | `packages/access-control` | `packages/access-control/CLAUDE.md` | capability model shared by server, route gates and UI |
 | `packages/events` | `packages/events/CLAUDE.md` | event catalog, payload contract, retention, visibility, notification map |
 | `packages/i18n` | `packages/i18n/CLAUDE.md` | catalogs, locale parity, typed keys |
 | `packages/ui` | `packages/ui/CLAUDE.md` | shadcn primitives, theme tokens, composition components |
 | `packages/web-kit` | `packages/web-kit/CLAUDE.md` | what every React app shares: api client, query client, i18n boot, theme, auth broadcast |
-| Other packages | skills below | `cookie-consent`, `policies`, `emails` are driven by the matching skill; `sentry-scrub` (see `docs/OBSERVABILITY.md`), `test`, `typescript-config` carry no rules |
+| Other packages | skills below | `cookie-consent`, `policies`, `emails`, `email` are driven by the matching skill; `sentry-scrub` (see `docs/OBSERVABILITY.md`), `test`, `typescript-config` carry no rules |
 
 `.claude/skills/` holds the subsystem playbooks (`auth-server`, `events-outbox`, `storage-uploads`, `billing-entitlements`, `compliance-consent`, `email-delivery`) and `feature-slice` for implementing a story end to end.
 

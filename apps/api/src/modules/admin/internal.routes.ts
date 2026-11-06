@@ -3,6 +3,7 @@
 // deletes impersonation sessions past their expiry; each announces one event per row in the batch's unit of work.
 
 import { type AppError, AppErrorException, type Result } from "@packages/ddd-kit";
+import { zV } from "@packages/http/validator";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
@@ -10,7 +11,6 @@ import { di } from "../../container";
 import { internalLayers } from "../../shared/internal-routes/internal-layers";
 import { runSweepRequest } from "../../shared/internal-routes/sweep-route";
 import { type SweepBody, sweepBodySchema } from "../../shared/internal-routes/sweep-runner";
-import { zV } from "../../shared/validator";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
 

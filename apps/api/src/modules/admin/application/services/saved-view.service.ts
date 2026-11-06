@@ -7,8 +7,8 @@ import {
 } from "@packages/access-control";
 import { type AppError, type IUnitOfWork, Result, uuidv7 } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
-import { emitEvent } from "../../../../shared/event-emitter";
-import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
+import { emitEvent } from "@packages/outbox/event-emitter";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import type {
   ISavedViewStore,
   SavedViewRow,

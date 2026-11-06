@@ -1,5 +1,5 @@
+import { raceWithTimeout } from "@packages/outbox/race-with-timeout";
 import type { Logger } from "pino";
-import { raceWithTimeout } from "./race-with-timeout";
 
 let shuttingDown = false;
 let started = false;

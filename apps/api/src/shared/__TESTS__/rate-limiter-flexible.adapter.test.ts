@@ -18,9 +18,9 @@
 
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { rateLimitSchema } from "@packages/drizzle";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 // Import the real lib before mock.module (the mock.module callback is synchronous).
 import * as realRateLimiterFlexible from "rate-limiter-flexible";
-import { mockInstrumentation } from "../../__TESTS__/mock-instrumentation";
 import type { WindowConfig } from "../ports/rate-limiter.port";
 
 // The Postgres factory only hands the client through, so a bare object stands in

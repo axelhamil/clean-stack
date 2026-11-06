@@ -1,5 +1,6 @@
 import { CONSENT_COOKIE_NAME, COOKIE_CONSENT_VERSION } from "@packages/cookie-consent";
 import { AppErrorException } from "@packages/ddd-kit";
+import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { di } from "../../container";
@@ -7,7 +8,6 @@ import { env } from "../../shared/env";
 import type { AuthVariables } from "../../shared/middleware/auth.middleware";
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { resolveClientIp } from "../../shared/middleware/rate-limit.ip";
-import { zV } from "../../shared/validator";
 import { recordConsentDto } from "./application/dto/record-consent.dto";
 
 const isProd = env.NODE_ENV === "production";

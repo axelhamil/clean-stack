@@ -2,10 +2,10 @@
 
 import type { SQL } from "@packages/drizzle";
 import { and, isNotNull, lt, outboxSchema } from "@packages/drizzle";
+import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
 import { env } from "../env";
-import { zV } from "../validator";
 import { internalLayers } from "./internal-layers";
 import { requireFilter } from "./sweep-purge";
 import { runSweepRequest, tableRetentionPass } from "./sweep-route";

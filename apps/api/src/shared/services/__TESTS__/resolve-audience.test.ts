@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { DeliveredEvent } from "../../ports/outbox.port";
+import type { DeliveredEvent } from "@packages/outbox/outbox.port";
 import { resolveAudience } from "../resolve-audience";
 
 const baseEvent = (payload: unknown, organizationId?: string): DeliveredEvent => ({
