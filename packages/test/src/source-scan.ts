@@ -16,10 +16,10 @@ function endOfQuoted(source: string, start: number): number {
   while (index < source.length) {
     const char = source[index];
 
-    if (char === "\\") index += 2;
-    else if (char === quote) return index + 1;
-    else if (char === "\n") return index;
-    else index += 1;
+    if (char === quote) return index + 1;
+    if (char === "\n") return index;
+
+    index += char === "\\" ? 2 : 1;
   }
 
   return source.length;
@@ -32,17 +32,17 @@ function endOfRegex(source: string, start: number): number {
   while (index < source.length && source[index] !== "\n") {
     const char = source[index];
 
-    if (char === "\\") index += 1;
-    else if (char === "[") inClass = true;
-    else if (char === "]") inClass = false;
-    else if (char === "/" && !inClass) {
+    if (char === "/" && !inClass) {
       index += 1;
       while (/[a-z]/.test(source[index] ?? "")) index += 1;
 
       return index;
     }
 
-    index += 1;
+    if (char === "[") inClass = true;
+    if (char === "]") inClass = false;
+
+    index += char === "\\" ? 2 : 1;
   }
 
   return index;
@@ -67,15 +67,18 @@ function lex(source: string): CodeViews {
     while (cursor < source.length) {
       const char = source[cursor];
 
-      if (char === "\\") cursor += 2;
-      else if (char === "`") {
+      if (char === "`") {
         emit(source.slice(start, cursor + 1), `${source[start]}\``);
         return cursor + 1;
-      } else if (char === "$" && source[cursor + 1] === "{") {
+      }
+
+      if (char === "$" && source[cursor + 1] === "{") {
         emit(source.slice(start, cursor + 2), `${source[start]}\${`);
         templateBraces.push(0);
         return cursor + 2;
-      } else cursor += 1;
+      }
+
+      cursor += char === "\\" ? 2 : 1;
     }
 
     emit(source.slice(start), source[start]);
@@ -90,28 +93,44 @@ function lex(source: string): CodeViews {
     if (char === "/" && next === "/") {
       const end = source.indexOf("\n", index);
       index = end === -1 ? source.length : end;
-    } else if (char === "/" && next === "*") {
+      continue;
+    }
+
+    if (char === "/" && next === "*") {
       const end = source.indexOf("*/", index + 2);
       index = end === -1 ? source.length : end + 2;
-    } else if (char === "/" && (previous === "" || REGEX_PRECEDERS.has(previous))) {
+      continue;
+    }
+
+    if (char === "/" && (previous === "" || REGEX_PRECEDERS.has(previous))) {
       const end = endOfRegex(source, index);
       emit(source.slice(index, end), "//");
       index = end;
-    } else if (char === '"' || char === "'") {
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
       const end = endOfQuoted(source, index);
       emit(source.slice(index, end), `${char}${char}`);
       index = end;
-    } else if (char === "`") {
+      continue;
+    }
+
+    if (char === "`") {
       index = readTemplateChunk(index);
-    } else if (char === "}" && depth === 0) {
+      continue;
+    }
+
+    if (char === "}" && depth === 0) {
       templateBraces.pop();
       index = readTemplateChunk(index);
-    } else {
-      if (depth !== undefined && char === "{") templateBraces.push((templateBraces.pop() ?? 0) + 1);
-      if (depth !== undefined && char === "}") templateBraces.push((templateBraces.pop() ?? 1) - 1);
-      emit(char);
-      index += 1;
+      continue;
     }
+
+    if (depth !== undefined && char === "{") templateBraces.push((templateBraces.pop() ?? 0) + 1);
+    if (depth !== undefined && char === "}") templateBraces.push((templateBraces.pop() ?? 1) - 1);
+    emit(char);
+    index += 1;
   }
 
   return { code: code.join(""), blanked: blanked.join("") };

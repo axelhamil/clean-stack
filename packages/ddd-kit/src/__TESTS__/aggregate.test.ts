@@ -109,20 +109,20 @@ describe("Aggregate", () => {
         age: 25,
       });
 
-      expect(aggregate.domainEvents).toHaveLength(0);
+      expect(aggregate.getDomainEvents()).toHaveLength(0);
     });
 
     it("should have events when created with addEvent in factory", () => {
       const aggregate = TestAggregate.create({ name: "John", age: 30 });
 
-      expect(aggregate.domainEvents).toHaveLength(1);
-      expect(aggregate.domainEvents[0]).toBeInstanceOf(UserCreated);
+      expect(aggregate.getDomainEvents()).toHaveLength(1);
+      expect(aggregate.getDomainEvents()[0]).toBeInstanceOf(UserCreated);
     });
 
     it("should return a copy of events (immutable)", () => {
       const aggregate = TestAggregate.create({ name: "John", age: 30 });
-      const events1 = aggregate.domainEvents;
-      const events2 = aggregate.domainEvents;
+      const events1 = aggregate.getDomainEvents();
+      const events2 = aggregate.getDomainEvents();
 
       expect(events1).not.toBe(events2);
       expect(events1).toEqual(events2);
@@ -133,17 +133,17 @@ describe("Aggregate", () => {
     it("should add event to collection", () => {
       const aggregate = TestAggregate.create({ name: "John", age: 30 });
 
-      expect(aggregate.domainEvents).toHaveLength(1);
-      expect(aggregate.domainEvents[0]).toBeInstanceOf(UserCreated);
+      expect(aggregate.getDomainEvents()).toHaveLength(1);
+      expect(aggregate.getDomainEvents()[0]).toBeInstanceOf(UserCreated);
     });
 
     it("should accumulate multiple events", () => {
       const aggregate = TestAggregate.create({ name: "John", age: 30 });
       aggregate.changeName("Jane");
 
-      expect(aggregate.domainEvents).toHaveLength(2);
-      expect(aggregate.domainEvents[0]).toBeInstanceOf(UserCreated);
-      expect(aggregate.domainEvents[1]).toBeInstanceOf(UserNameChanged);
+      expect(aggregate.getDomainEvents()).toHaveLength(2);
+      expect(aggregate.getDomainEvents()[0]).toBeInstanceOf(UserCreated);
+      expect(aggregate.getDomainEvents()[1]).toBeInstanceOf(UserNameChanged);
     });
   });
 
@@ -160,7 +160,7 @@ describe("Aggregate", () => {
 
       aggregate.addMultipleEvents(events);
 
-      expect(aggregate.domainEvents).toHaveLength(2);
+      expect(aggregate.getDomainEvents()).toHaveLength(2);
     });
   });
 
@@ -168,11 +168,11 @@ describe("Aggregate", () => {
     it("should remove all events from aggregate", () => {
       const aggregate = TestAggregate.create({ name: "John", age: 30 });
       aggregate.changeName("Jane");
-      expect(aggregate.domainEvents).toHaveLength(2);
+      expect(aggregate.getDomainEvents()).toHaveLength(2);
 
       aggregate.clearEvents();
 
-      expect(aggregate.domainEvents).toHaveLength(0);
+      expect(aggregate.getDomainEvents()).toHaveLength(0);
     });
   });
 
@@ -231,7 +231,7 @@ describe("Aggregate", () => {
       const aggregate = TestAggregate.create({ name: "John", age: 30 });
       aggregate.changeName("Jane");
 
-      expect(aggregate.domainEvents).toHaveLength(2);
+      expect(aggregate.getDomainEvents()).toHaveLength(2);
       expect(aggregate.name).toBe("Jane");
     });
 
@@ -240,7 +240,7 @@ describe("Aggregate", () => {
 
       aggregate.toObject();
 
-      expect(aggregate.domainEvents).toHaveLength(1);
+      expect(aggregate.getDomainEvents()).toHaveLength(1);
     });
   });
 
@@ -280,7 +280,7 @@ describe("Aggregate", () => {
       const aggregate = TestAggregate.create({ name: "John", age: 30 });
       aggregate.changeName("Jane");
 
-      const events = aggregate.domainEvents;
+      const events = aggregate.getDomainEvents();
       expect(events[0]?.eventType).toBe("UserCreated");
       expect(events[1]?.eventType).toBe("UserNameChanged");
     });
@@ -289,13 +289,13 @@ describe("Aggregate", () => {
       const id = new UUID("test-id");
       const aggregate = TestAggregate.create({ name: "John", age: 30 }, id);
 
-      expect(aggregate.domainEvents[0]?.aggregateId).toBe("test-id");
+      expect(aggregate.getDomainEvents()[0]?.aggregateId).toBe("test-id");
     });
 
     it("should set dateOccurred on events", () => {
       const aggregate = TestAggregate.create({ name: "John", age: 30 });
 
-      expect(aggregate.domainEvents[0]?.dateOccurred).toBeInstanceOf(Date);
+      expect(aggregate.getDomainEvents()[0]?.dateOccurred).toBeInstanceOf(Date);
     });
   });
 });

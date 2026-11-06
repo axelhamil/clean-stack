@@ -10,109 +10,85 @@ export const UserCreatedPayload = UserRef.extend({
   email: Email,
   name: z.string(),
 });
-export type UserCreatedPayload = z.infer<typeof UserCreatedPayload>;
 
 export const UserSignedInPayload = UserRef.extend({
   sessionId: z.string(),
   ipAddress: z.string().optional(),
   userAgent: z.string().optional(),
 });
-export type UserSignedInPayload = z.infer<typeof UserSignedInPayload>;
 
 export const UserSignedOutPayload = UserRef.extend({
   sessionId: z.string(),
   actorUserId: z.string().nullable(),
 });
-export type UserSignedOutPayload = z.infer<typeof UserSignedOutPayload>;
 
 export const UserEmailVerifiedPayload = UserRef.extend({
   email: Email,
 });
-export type UserEmailVerifiedPayload = z.infer<typeof UserEmailVerifiedPayload>;
 
 export const UserPasswordResetRequestedPayload = UserRef.extend({
   email: Email,
 });
-export type UserPasswordResetRequestedPayload = z.infer<typeof UserPasswordResetRequestedPayload>;
 
 export const UserPasswordChangedPayload = UserRef;
-export type UserPasswordChangedPayload = z.infer<typeof UserPasswordChangedPayload>;
 
 export const UserMagicLinkRequestedPayload = z.object({
   email: Email,
 });
-export type UserMagicLinkRequestedPayload = z.infer<typeof UserMagicLinkRequestedPayload>;
 
 export const UserMfaEnabledPayload = UserRef;
-export type UserMfaEnabledPayload = z.infer<typeof UserMfaEnabledPayload>;
 
 export const UserMfaDisabledPayload = UserRef;
-export type UserMfaDisabledPayload = z.infer<typeof UserMfaDisabledPayload>;
 
 export const UserMfaBackupCodesRegeneratedPayload = UserRef;
-export type UserMfaBackupCodesRegeneratedPayload = z.infer<
-  typeof UserMfaBackupCodesRegeneratedPayload
->;
 
 export const UserMfaBackupCodeUsedPayload = UserRef.extend({
   email: Email,
 });
-export type UserMfaBackupCodeUsedPayload = z.infer<typeof UserMfaBackupCodeUsedPayload>;
 
 export const UserPasskeyAddedPayload = UserRef.extend({
   passkeyId: z.string(),
   deviceType: z.string().optional(),
 });
-export type UserPasskeyAddedPayload = z.infer<typeof UserPasskeyAddedPayload>;
 
 export const UserPasskeyRemovedPayload = UserRef.extend({
   passkeyId: z.string(),
 });
-export type UserPasskeyRemovedPayload = z.infer<typeof UserPasskeyRemovedPayload>;
 
 export const UserAccountLinkedPayload = UserRef.extend({
   providerId: z.string(),
   accountId: z.string(),
 });
-export type UserAccountLinkedPayload = z.infer<typeof UserAccountLinkedPayload>;
 
 export const UserAccountUnlinkedPayload = UserRef.extend({
   providerId: z.string(),
   accountId: z.string(),
 });
-export type UserAccountUnlinkedPayload = z.infer<typeof UserAccountUnlinkedPayload>;
 
 export const UserDeletionRequestedPayload = UserRef.extend({
   pendingDeletionUntil: z.coerce.date(),
 });
-export type UserDeletionRequestedPayload = z.infer<typeof UserDeletionRequestedPayload>;
 
 export const UserDeletionCancelledPayload = UserRef;
-export type UserDeletionCancelledPayload = z.infer<typeof UserDeletionCancelledPayload>;
 
 export const UserDeletedPayload = UserRef.extend({
   deletedAt: z.coerce.date(),
 });
-export type UserDeletedPayload = z.infer<typeof UserDeletedPayload>;
 
 export const UserProfileUpdatedPayload = UserRef.extend({
   changes: z.record(z.string(), z.unknown()),
 });
-export type UserProfileUpdatedPayload = z.infer<typeof UserProfileUpdatedPayload>;
 
 export const UserEmailChangeRequestedPayload = UserRef.extend({
   newEmail: Email,
 });
-export type UserEmailChangeRequestedPayload = z.infer<typeof UserEmailChangeRequestedPayload>;
 
 export const UserExportRequestedPayload = UserRef;
-export type UserExportRequestedPayload = z.infer<typeof UserExportRequestedPayload>;
 
 export const UserExportCompletedPayload = UserRef.extend({
   storageKey: z.string(),
   expiresAt: z.coerce.date(),
 });
-export type UserExportCompletedPayload = z.infer<typeof UserExportCompletedPayload>;
 
 // Subject and actor are the same person: the route carries `denyImpersonated`,
 // so no admin can trigger this on someone else's behalf. `userId` alone
@@ -121,25 +97,21 @@ export const UserLocaleChangedPayload = UserRef.extend({
   locale: z.enum(LOCALES),
   previousLocale: z.enum(LOCALES).nullable(),
 });
-export type UserLocaleChangedPayload = z.infer<typeof UserLocaleChangedPayload>;
 
 export const OrgCreatedPayload = OrgRef.extend({
   ownerUserId: z.string(),
   slug: z.string(),
   name: z.string(),
 });
-export type OrgCreatedPayload = z.infer<typeof OrgCreatedPayload>;
 
 export const OrgUpdatedPayload = OrgRef.extend({
   actorUserId: z.string(),
   changes: z.record(z.string(), z.unknown()),
 });
-export type OrgUpdatedPayload = z.infer<typeof OrgUpdatedPayload>;
 
 export const OrgDeletedPayload = OrgRef.extend({
   actorUserId: z.string().nullable(),
 });
-export type OrgDeletedPayload = z.infer<typeof OrgDeletedPayload>;
 
 export const OrgMemberInvitedPayload = OrgRef.extend({
   invitationId: z.string(),
@@ -147,26 +119,22 @@ export const OrgMemberInvitedPayload = OrgRef.extend({
   role: z.string(),
   inviterUserId: z.string(),
 });
-export type OrgMemberInvitedPayload = z.infer<typeof OrgMemberInvitedPayload>;
 
 export const OrgMemberJoinedPayload = OrgRef.extend({
   userId: z.string(),
   role: z.string(),
   actorUserId: z.string().optional(),
 });
-export type OrgMemberJoinedPayload = z.infer<typeof OrgMemberJoinedPayload>;
 
 export const OrgInvitationCancelledPayload = OrgRef.extend({
   actorUserId: z.string(),
   invitationId: z.string(),
 });
-export type OrgInvitationCancelledPayload = z.infer<typeof OrgInvitationCancelledPayload>;
 
 export const OrgMemberRemovedPayload = OrgRef.extend({
   actorUserId: z.string(),
   userId: z.string(),
 });
-export type OrgMemberRemovedPayload = z.infer<typeof OrgMemberRemovedPayload>;
 
 export const OrgMemberRoleChangedPayload = OrgRef.extend({
   actorUserId: z.string(),
@@ -174,7 +142,6 @@ export const OrgMemberRoleChangedPayload = OrgRef.extend({
   previousRole: z.string(),
   newRole: z.string(),
 });
-export type OrgMemberRoleChangedPayload = z.infer<typeof OrgMemberRoleChangedPayload>;
 
 export const UploadRequestedPayload = z.object({
   userId: z.string(),
@@ -182,7 +149,6 @@ export const UploadRequestedPayload = z.object({
   contentType: z.string(),
   size: z.number().int().nonnegative(),
 });
-export type UploadRequestedPayload = z.infer<typeof UploadRequestedPayload>;
 
 export const UploadConfirmedPayload = z.object({
   userId: z.string(),
@@ -190,13 +156,11 @@ export const UploadConfirmedPayload = z.object({
   size: z.number().int().nonnegative(),
   contentType: z.string(),
 });
-export type UploadConfirmedPayload = z.infer<typeof UploadConfirmedPayload>;
 
 export const UploadDeletedPayload = z.object({
   userId: z.string(),
   key: z.string(),
 });
-export type UploadDeletedPayload = z.infer<typeof UploadDeletedPayload>;
 
 export const WebhookEndpointCreatedPayload = OrgRef.extend({
   endpointId: z.string(),
@@ -205,34 +169,27 @@ export const WebhookEndpointCreatedPayload = OrgRef.extend({
   eventTypes: z.array(z.string()),
   enabled: z.boolean(),
 });
-export type WebhookEndpointCreatedPayload = z.infer<typeof WebhookEndpointCreatedPayload>;
 
 export const WebhookEndpointUpdatedPayload = OrgRef.extend({
   endpointId: z.string(),
   actorUserId: z.string(),
   changes: z.record(z.string(), z.unknown()),
 });
-export type WebhookEndpointUpdatedPayload = z.infer<typeof WebhookEndpointUpdatedPayload>;
 
 export const WebhookEndpointDeletedPayload = OrgRef.extend({
   endpointId: z.string(),
   actorUserId: z.string(),
 });
-export type WebhookEndpointDeletedPayload = z.infer<typeof WebhookEndpointDeletedPayload>;
 
 export const WebhookTestPayload = OrgRef.extend({
   endpointId: z.string(),
   actorUserId: z.string(),
 });
-export type WebhookTestPayload = z.infer<typeof WebhookTestPayload>;
 
 export const WebhookEndpointSecretRotatedPayload = OrgRef.extend({
   endpointId: z.string(),
   actorUserId: z.string(),
 });
-export type WebhookEndpointSecretRotatedPayload = z.infer<
-  typeof WebhookEndpointSecretRotatedPayload
->;
 
 export const WebhookEndpointDisabledPayload = OrgRef.extend({
   endpointId: z.string(),
@@ -240,7 +197,6 @@ export const WebhookEndpointDisabledPayload = OrgRef.extend({
   reason: z.enum(["delivery_failures"]),
   consecutiveFailures: z.number().int().nonnegative(),
 });
-export type WebhookEndpointDisabledPayload = z.infer<typeof WebhookEndpointDisabledPayload>;
 
 export const WebhookDeliveryExhaustedPayload = OrgRef.extend({
   endpointId: z.string(),
@@ -249,7 +205,6 @@ export const WebhookDeliveryExhaustedPayload = OrgRef.extend({
   attempts: z.number().int().nonnegative(),
   actorUserId: z.string().nullable(),
 });
-export type WebhookDeliveryExhaustedPayload = z.infer<typeof WebhookDeliveryExhaustedPayload>;
 
 export const WebhookDeliveryReplayedPayload = OrgRef.extend({
   endpointId: z.string(),
@@ -257,7 +212,6 @@ export const WebhookDeliveryReplayedPayload = OrgRef.extend({
   replayedDeliveryId: z.string(),
   actorUserId: z.string(),
 });
-export type WebhookDeliveryReplayedPayload = z.infer<typeof WebhookDeliveryReplayedPayload>;
 
 export const EmailDeliveryExhaustedPayload = z.object({
   messageId: z.string(),
@@ -267,7 +221,6 @@ export const EmailDeliveryExhaustedPayload = z.object({
   lastError: z.string(),
   actorUserId: z.string().nullable(),
 });
-export type EmailDeliveryExhaustedPayload = z.infer<typeof EmailDeliveryExhaustedPayload>;
 
 export const OUTBOX_LAST_ERROR_MAX_LENGTH = 1_000;
 
@@ -287,7 +240,6 @@ export const UserPolicyAcceptedPayload = UserRef.extend({
   policyVersion: z.string(),
   ipAddress: z.string().optional(),
 });
-export type UserPolicyAcceptedPayload = z.infer<typeof UserPolicyAcceptedPayload>;
 
 // userId is optional: guest consents have no userId, only subjectId (anonymous cookie-based id).
 // extractActor falls back to system/anonymous for guests, accepted per §7 (no identified user).
@@ -313,7 +265,6 @@ export const UserCookieConsentLinkedPayload = UserRef.extend({
   subjectId: z.string(),
   consentRecordIds: z.array(z.string()).min(1),
 });
-export type UserCookieConsentLinkedPayload = z.infer<typeof UserCookieConsentLinkedPayload>;
 
 export const SecurityRateLimitExceededPayload = z.object({
   actorUserId: z.string().nullable(),
@@ -322,7 +273,6 @@ export const SecurityRateLimitExceededPayload = z.object({
   path: z.string().max(512),
   method: z.string().max(16),
 });
-export type SecurityRateLimitExceededPayload = z.infer<typeof SecurityRateLimitExceededPayload>;
 
 export const SecurityCspViolationPayload = z.object({
   // Always null: CSP reports are browser-sent before any authenticated session, so no actor is known.
@@ -338,7 +288,6 @@ export const SecurityCspViolationPayload = z.object({
   lineNumber: z.number().int().min(0).optional(),
   columnNumber: z.number().int().min(0).optional(),
 });
-export type SecurityCspViolationPayload = z.infer<typeof SecurityCspViolationPayload>;
 
 export const SecurityCsrfRejectedPayload = z.object({
   actorUserId: z.string().nullable(),
@@ -348,7 +297,6 @@ export const SecurityCsrfRejectedPayload = z.object({
   origin: z.string().max(2048).nullable(),
   reason: z.enum(["missing_origin", "origin_mismatch"]),
 });
-export type SecurityCsrfRejectedPayload = z.infer<typeof SecurityCsrfRejectedPayload>;
 
 export const SecurityPasswordBreachedPayload = z.object({
   actorUserId: z.string().nullable(),
@@ -356,7 +304,6 @@ export const SecurityPasswordBreachedPayload = z.object({
   ip: z.string().max(45).nullable(),
   path: z.string().max(512),
 });
-export type SecurityPasswordBreachedPayload = z.infer<typeof SecurityPasswordBreachedPayload>;
 
 export const SecuritySignupRejectedPayload = z.object({
   actorUserId: z.string().nullable(),
@@ -364,7 +311,6 @@ export const SecuritySignupRejectedPayload = z.object({
   ip: z.string().max(45).nullable(),
   reason: z.enum(["disposable_email"]),
 });
-export type SecuritySignupRejectedPayload = z.infer<typeof SecuritySignupRejectedPayload>;
 
 export const SecurityImpossibleTravelDetectedPayload = z.object({
   userId: z.string(),
@@ -375,9 +321,6 @@ export const SecurityImpossibleTravelDetectedPayload = z.object({
   ip: z.string().max(45).nullable(),
   elapsedSeconds: z.number().int().nonnegative(),
 });
-export type SecurityImpossibleTravelDetectedPayload = z.infer<
-  typeof SecurityImpossibleTravelDetectedPayload
->;
 
 export const SecurityGeoDeniedPayload = z.object({
   actorUserId: z.string().nullable(),
@@ -387,7 +330,6 @@ export const SecurityGeoDeniedPayload = z.object({
   asn: z.string().max(10).nullable(),
   reason: z.enum(["country", "asn"]),
 });
-export type SecurityGeoDeniedPayload = z.infer<typeof SecurityGeoDeniedPayload>;
 
 export const SecurityOperatorAuditAccessedPayload = z.object({
   actorUserId: z.string(),
@@ -402,9 +344,6 @@ export const SecurityOperatorAuditAccessedPayload = z.object({
     })
     .optional(),
 });
-export type SecurityOperatorAuditAccessedPayload = z.infer<
-  typeof SecurityOperatorAuditAccessedPayload
->;
 
 export const BillingSubscriptionCreatedPayload = OrgRef.extend({
   subscriptionId: z.string(),
@@ -413,10 +352,8 @@ export const BillingSubscriptionCreatedPayload = OrgRef.extend({
   actorUserId: z.string().nullable(),
   currentPeriodEnd: z.coerce.date().nullable(),
 });
-export type BillingSubscriptionCreatedPayload = z.infer<typeof BillingSubscriptionCreatedPayload>;
 
 export const BillingSubscriptionUpdatedPayload = BillingSubscriptionCreatedPayload;
-export type BillingSubscriptionUpdatedPayload = z.infer<typeof BillingSubscriptionUpdatedPayload>;
 
 export const BillingSubscriptionCancelledPayload = OrgRef.extend({
   subscriptionId: z.string(),
@@ -424,16 +361,12 @@ export const BillingSubscriptionCancelledPayload = OrgRef.extend({
   status: z.string(),
   actorUserId: z.string().nullable(),
 });
-export type BillingSubscriptionCancelledPayload = z.infer<
-  typeof BillingSubscriptionCancelledPayload
->;
 
 export const BillingPaymentFailedPayload = OrgRef.extend({
   subscriptionId: z.string(),
   invoiceId: z.string(),
   actorUserId: z.string().nullable(),
 });
-export type BillingPaymentFailedPayload = z.infer<typeof BillingPaymentFailedPayload>;
 
 export const BillingQuotaExceededPayload = OrgRef.extend({
   resource: z.string(),
@@ -442,7 +375,6 @@ export const BillingQuotaExceededPayload = OrgRef.extend({
   tier: z.string(),
   actorUserId: z.string(),
 });
-export type BillingQuotaExceededPayload = z.infer<typeof BillingQuotaExceededPayload>;
 
 const ActorRef = z.object({ actorUserId: z.string() });
 
@@ -452,7 +384,6 @@ export const AdminImpersonationStartedPayload = ActorRef.extend(UserRef.shape).e
   ip: z.string().nullable(),
   expiresAt: z.string(),
 });
-export type AdminImpersonationStartedPayload = z.infer<typeof AdminImpersonationStartedPayload>;
 
 export const AdminImpersonationStoppedPayload = ActorRef.extend(UserRef.shape).extend({
   durationMs: z.number().int().nonnegative(),
@@ -464,38 +395,31 @@ export const AdminUserBannedPayload = ActorRef.extend(UserRef.shape).extend({
   reason: z.string().min(1),
   expiresAt: z.string().nullable(),
 });
-export type AdminUserBannedPayload = z.infer<typeof AdminUserBannedPayload>;
 
 export const AdminUserUnbannedPayload = UserRef.extend({
   actorUserId: z.string().nullable(),
 });
-export type AdminUserUnbannedPayload = z.infer<typeof AdminUserUnbannedPayload>;
 
 export const AdminUserPasswordResetPayload = ActorRef.extend(UserRef.shape);
-export type AdminUserPasswordResetPayload = z.infer<typeof AdminUserPasswordResetPayload>;
 
 export const AdminUserSessionsRevokedPayload = ActorRef.extend(UserRef.shape).extend({
   count: z.number().int().nonnegative(),
 });
-export type AdminUserSessionsRevokedPayload = z.infer<typeof AdminUserSessionsRevokedPayload>;
 
 export const AdminStaffAddedPayload = UserRef.extend({
   actorUserId: z.string().nullable(),
   role: z.string(),
   source: z.enum(["env", "console"]),
 });
-export type AdminStaffAddedPayload = z.infer<typeof AdminStaffAddedPayload>;
 
 export const AdminStaffRoleChangedPayload = ActorRef.extend(UserRef.shape).extend({
   from: z.string(),
   to: z.string(),
 });
-export type AdminStaffRoleChangedPayload = z.infer<typeof AdminStaffRoleChangedPayload>;
 
 export const AdminStaffRevokedPayload = ActorRef.extend(UserRef.shape).extend({
   role: z.string(),
 });
-export type AdminStaffRevokedPayload = z.infer<typeof AdminStaffRevokedPayload>;
 
 export const AdminStaffOverrideSetPayload = ActorRef.extend(UserRef.shape).extend({
   overrideId: z.string(),
@@ -503,27 +427,23 @@ export const AdminStaffOverrideSetPayload = ActorRef.extend(UserRef.shape).exten
   effect: z.enum(["grant", "deny"]),
   expiresAt: z.string().nullable(),
 });
-export type AdminStaffOverrideSetPayload = z.infer<typeof AdminStaffOverrideSetPayload>;
 
 export const AdminStaffOverrideRevokedPayload = ActorRef.extend(UserRef.shape).extend({
   overrideId: z.string(),
   permission: z.string(),
   effect: z.enum(["grant", "deny"]),
 });
-export type AdminStaffOverrideRevokedPayload = z.infer<typeof AdminStaffOverrideRevokedPayload>;
 
 export const AdminOpsOutboxRequeuedPayload = ActorRef.extend({
   requeued: z.number().int().positive(),
   eventIds: z.array(z.string()),
 });
-export type AdminOpsOutboxRequeuedPayload = z.infer<typeof AdminOpsOutboxRequeuedPayload>;
 
 export const AdminOpsStripeEventReplayedPayload = ActorRef.extend({
   stripeEventId: z.string(),
   stripeEventType: z.string(),
   outcome: z.enum(["succeeded", "failed"]),
 });
-export type AdminOpsStripeEventReplayedPayload = z.infer<typeof AdminOpsStripeEventReplayedPayload>;
 
 export const AdminPlanOverrideSetPayload = ActorRef.extend({
   overrideId: z.string(),
@@ -532,45 +452,38 @@ export const AdminPlanOverrideSetPayload = ActorRef.extend({
   expiresAt: z.string(),
   replacedOverrideId: z.string().nullable(),
 });
-export type AdminPlanOverrideSetPayload = z.infer<typeof AdminPlanOverrideSetPayload>;
 
 export const AdminPlanOverrideRevokedPayload = ActorRef.extend({
   overrideId: z.string(),
   organizationId: z.string(),
   tier: z.string(),
 });
-export type AdminPlanOverrideRevokedPayload = z.infer<typeof AdminPlanOverrideRevokedPayload>;
 
 export const AdminNoteAddedPayload = ActorRef.extend({
   noteId: z.string(),
   subjectType: z.enum(["user", "org"]),
   subjectId: z.string(),
 });
-export type AdminNoteAddedPayload = z.infer<typeof AdminNoteAddedPayload>;
 
 export const AdminViewSavedPayload = ActorRef.extend({
   viewId: z.string(),
   screen: z.string(),
 });
-export type AdminViewSavedPayload = z.infer<typeof AdminViewSavedPayload>;
 
 export const AdminViewDeletedPayload = ActorRef.extend({
   viewId: z.string(),
   screen: z.string(),
 });
-export type AdminViewDeletedPayload = z.infer<typeof AdminViewDeletedPayload>;
 
 export const AdminStepUpVerifiedPayload = UserRef.extend({
   validUntil: z.string(),
   ip: z.string().nullable(),
 });
-export type AdminStepUpVerifiedPayload = z.infer<typeof AdminStepUpVerifiedPayload>;
 
 export const AdminStepUpFailedPayload = UserRef.extend({
   reason: z.enum(["invalid_code", "replayed_code"]),
   ip: z.string().nullable(),
 });
-export type AdminStepUpFailedPayload = z.infer<typeof AdminStepUpFailedPayload>;
 
 const ApprovalRef = UserRef.extend({
   approvalId: z.string(),
@@ -579,31 +492,25 @@ const ApprovalRef = UserRef.extend({
 });
 
 export const AdminApprovalRequestedPayload = ActorRef.extend(ApprovalRef.shape);
-export type AdminApprovalRequestedPayload = z.infer<typeof AdminApprovalRequestedPayload>;
 
 export const AdminApprovalDecidedPayload = ActorRef.extend(ApprovalRef.shape).extend({
   outcome: z.enum(["approved", "rejected"]),
   note: z.string().min(1),
 });
-export type AdminApprovalDecidedPayload = z.infer<typeof AdminApprovalDecidedPayload>;
 
 export const AdminApprovalCancelledPayload = ApprovalRef.extend({
   actorUserId: z.string().nullable(),
 });
-export type AdminApprovalCancelledPayload = z.infer<typeof AdminApprovalCancelledPayload>;
 
 export const AdminApprovalExpiredPayload = ApprovalRef.extend({
   actorUserId: z.string().nullable(),
 });
-export type AdminApprovalExpiredPayload = z.infer<typeof AdminApprovalExpiredPayload>;
 
 export const AdminApprovalExecutedPayload = ActorRef.extend(ApprovalRef.shape);
-export type AdminApprovalExecutedPayload = z.infer<typeof AdminApprovalExecutedPayload>;
 
 export const AdminApprovalFailedPayload = ActorRef.extend(ApprovalRef.shape).extend({
   reason: z.string().min(1),
 });
-export type AdminApprovalFailedPayload = z.infer<typeof AdminApprovalFailedPayload>;
 
 export const ApiTokenCreatedPayload = z.object({
   userId: z.string(),
@@ -614,7 +521,6 @@ export const ApiTokenCreatedPayload = z.object({
   scopes: z.array(z.string()),
   expiresAt: z.coerce.date().nullable(),
 });
-export type ApiTokenCreatedPayload = z.infer<typeof ApiTokenCreatedPayload>;
 
 export const API_TOKEN_REVOKED_REASONS = ["user", "membership_lost", "leaked"] as const;
 
@@ -625,7 +531,6 @@ export const ApiTokenRevokedPayload = z.object({
   tokenId: z.string(),
   reason: z.enum(API_TOKEN_REVOKED_REASONS),
 });
-export type ApiTokenRevokedPayload = z.infer<typeof ApiTokenRevokedPayload>;
 
 export const ApiTokenUsedPayload = z.object({
   userId: z.string(),
@@ -634,7 +539,6 @@ export const ApiTokenUsedPayload = z.object({
   tokenId: z.string(),
   scopes: z.array(z.string()),
 });
-export type ApiTokenUsedPayload = z.infer<typeof ApiTokenUsedPayload>;
 
 export const NotificationPreferenceUpdatedPayload = UserRef.extend({
   category: z.string(),
@@ -642,9 +546,6 @@ export const NotificationPreferenceUpdatedPayload = UserRef.extend({
   enabled: z.boolean(),
   frequency: z.string(),
 });
-export type NotificationPreferenceUpdatedPayload = z.infer<
-  typeof NotificationPreferenceUpdatedPayload
->;
 
 export const NotificationOrgPreferenceUpdatedPayload = OrgRef.extend({
   actorUserId: z.string(),
@@ -654,9 +555,6 @@ export const NotificationOrgPreferenceUpdatedPayload = OrgRef.extend({
   frequency: z.string(),
   locked: z.boolean(),
 });
-export type NotificationOrgPreferenceUpdatedPayload = z.infer<
-  typeof NotificationOrgPreferenceUpdatedPayload
->;
 
 // Subject and actor are the same person: both routes carry `denyImpersonated`
 // and the update is scoped to rows the caller owns, so no admin or system can
@@ -673,7 +571,6 @@ export const NotificationReadPayload = UserRef.extend({
   count: z.number().int().positive(),
   notificationIds: z.array(z.string()),
 });
-export type NotificationReadPayload = z.infer<typeof NotificationReadPayload>;
 
 const SsoProviderRef = z.object({
   actorUserId: z.string(),
@@ -686,18 +583,14 @@ export const SsoProviderRegisteredPayload = SsoProviderRef.extend({
   domain: z.string(),
   issuer: z.string(),
 });
-export type SsoProviderRegisteredPayload = z.infer<typeof SsoProviderRegisteredPayload>;
 
 export const SsoProviderUpdatedPayload = SsoProviderRef.extend({
   changedFields: z.array(z.string()),
 });
-export type SsoProviderUpdatedPayload = z.infer<typeof SsoProviderUpdatedPayload>;
 
 export const SsoProviderDeletedPayload = SsoProviderRef;
-export type SsoProviderDeletedPayload = z.infer<typeof SsoProviderDeletedPayload>;
 
 export const SsoDomainVerifiedPayload = SsoProviderRef.extend({ domain: z.string() });
-export type SsoDomainVerifiedPayload = z.infer<typeof SsoDomainVerifiedPayload>;
 
 export const SsoEnforcementChangedPayload = z.object({
   actorUserId: z.string(),
@@ -705,7 +598,6 @@ export const SsoEnforcementChangedPayload = z.object({
   enforced: z.boolean(),
   viaPlatformAdmin: z.boolean(),
 });
-export type SsoEnforcementChangedPayload = z.infer<typeof SsoEnforcementChangedPayload>;
 
 export const SsoLoginSuccessPayload = UserRef.extend({
   providerId: z.string(),
@@ -713,7 +605,6 @@ export const SsoLoginSuccessPayload = UserRef.extend({
   protocol: z.enum(["saml", "oidc"]),
   jitProvisioned: z.boolean(),
 });
-export type SsoLoginSuccessPayload = z.infer<typeof SsoLoginSuccessPayload>;
 
 export const SsoLoginFailurePayload = z.object({
   actorUserId: z.string().nullable(),
@@ -722,7 +613,6 @@ export const SsoLoginFailurePayload = z.object({
   reason: z.string(),
   ip: z.string(),
 });
-export type SsoLoginFailurePayload = z.infer<typeof SsoLoginFailurePayload>;
 
 // `providerId` names the SCIM connection (`ba_scim_connection_…`). It used to be the
 // SSO provider id when a SCIM connection hung off one; the key is kept so the
@@ -734,13 +624,10 @@ const ScimConnectionRef = z.object({
 });
 
 export const ScimConnectionCreatedPayload = ScimConnectionRef;
-export type ScimConnectionCreatedPayload = z.infer<typeof ScimConnectionCreatedPayload>;
 
 export const ScimConnectionDeletedPayload = ScimConnectionRef;
-export type ScimConnectionDeletedPayload = z.infer<typeof ScimConnectionDeletedPayload>;
 
 export const ScimConnectionTokenRotatedPayload = ScimConnectionRef;
-export type ScimConnectionTokenRotatedPayload = z.infer<typeof ScimConnectionTokenRotatedPayload>;
 
 // `scimProviderId` names the SCIM connection the change came through, see
 // `ScimConnectionRef`.
@@ -753,18 +640,14 @@ const ScimUserRef = z.object({
 });
 
 export const ScimUserCreatedPayload = ScimUserRef;
-export type ScimUserCreatedPayload = z.infer<typeof ScimUserCreatedPayload>;
 
 export const ScimUserUpdatedPayload = ScimUserRef.extend({
   changedFields: z.array(z.string()),
 });
-export type ScimUserUpdatedPayload = z.infer<typeof ScimUserUpdatedPayload>;
 
 export const ScimUserDeactivatedPayload = ScimUserRef;
-export type ScimUserDeactivatedPayload = z.infer<typeof ScimUserDeactivatedPayload>;
 
 export const ScimUserDeprovisionedPayload = ScimUserRef;
-export type ScimUserDeprovisionedPayload = z.infer<typeof ScimUserDeprovisionedPayload>;
 
 export const PayloadByEventType = {
   [EventTypes.USER_CREATED]: UserCreatedPayload,

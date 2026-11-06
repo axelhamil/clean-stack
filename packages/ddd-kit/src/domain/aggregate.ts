@@ -3,7 +3,7 @@ import type { IDomainEvent } from "./domain-event";
 import { Entity } from "./entity";
 
 export interface IAggregate {
-  readonly domainEvents: IDomainEvent[];
+  getDomainEvents(): IDomainEvent[];
   clearEvents(): void;
 }
 
@@ -18,7 +18,7 @@ export abstract class Aggregate<T> extends Entity<T> implements IAggregate, IEve
     super(props, id);
   }
 
-  public get domainEvents(): IDomainEvent[] {
+  public getDomainEvents(): IDomainEvent[] {
     return [...this._domainEvents];
   }
 

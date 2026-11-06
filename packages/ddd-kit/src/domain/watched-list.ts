@@ -58,10 +58,10 @@ export abstract class WatchedList<T> {
   }
 
   public find(predicate: (item: T) => boolean): Option<T> {
-    const index = this.currentItems.findIndex(predicate);
-    if (index === -1) return None.of<T>();
+    const item = this.currentItems.find(predicate);
+    if (item === undefined) return None.of<T>();
 
-    return Some.of(this.currentItems[index] as T);
+    return Some.of(item);
   }
 
   public exists(item: T): boolean {
