@@ -1,17 +1,22 @@
-import { describe, expect, mock, test } from "bun:test";
-import { Result, UnitOfWorkContext } from "@packages/ddd-kit";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { Option, Result } from "@packages/ddd-kit";
+import { mockPort } from "@packages/test/bun";
+import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
+import { HTTPException } from "hono/http-exception";
+import type { IEmailService } from "../../ports/email.port";
+import type { INotificationDigestStore } from "../../ports/notification-digest.port";
 import { NoOpInstrumentation } from "../../services/noop-instrumentation";
 import { sweepSpans } from "../sweep-span";
 
-const sendTemplateBatch = mock(async () => Result.ok());
-let flushTx: unknown;
+const email = mockPort<IEmailService>();
+const store = mockPort<INotificationDigestStore>();
+const { unitOfWork, outcome } = mockUnitOfWork();
 
 mock.module("../../../container", () => ({
   di: {
-    ITransactionService: {
-      run: <T>(work: () => Promise<T>) => UnitOfWorkContext.run(flushTx, work),
-    },
-    IEmailService: { sendTemplateBatch },
+    ITransactionService: unitOfWork,
+    IEmailService: email,
+    INotificationDigestStore: store,
   },
 }));
 
@@ -27,7 +32,7 @@ const row = (userId: string, category: string, id: string, locale: string | null
   category,
   eventType: "billing.payment.failed",
   email: `${userId}@example.com`,
-  locale,
+  locale: Option.fromNullable(locale),
   payload: {},
 });
 
@@ -51,7 +56,7 @@ describe("buildDigests", () => {
 
   test("keeps the recipient locale on the digest", () => {
     const digests = buildDigests([row("u1", "billing", "n1", "fr")]);
-    expect(digests[0]?.locale).toBe("fr");
+    expect(digests[0]?.locale.toNull()).toBe("fr");
   });
 });
 
@@ -79,25 +84,6 @@ describe("beatOfFlush", () => {
   });
 });
 
-function chainResolving(value: unknown): unknown {
-  const chain: unknown = new Proxy(() => {}, {
-    get: (_, prop) =>
-      prop === "then" ? (resolve: (v: unknown) => void) => resolve(value) : () => chain,
-  });
-  return chain;
-}
-
-function fakeFlushTx(lockGranted: boolean) {
-  const dueRow = { ...row("u1", "billing", "n1"), emailStillWanted: true };
-  const select = mock(() => chainResolving([dueRow]));
-  const tx = {
-    execute: mock(async () => ({ rows: [{ locked: lockGranted }] })),
-    select,
-    update: () => chainResolving(undefined),
-  };
-  return { tx, select };
-}
-
 const run = () =>
   flushDueNotifications({
     batchSize: 500,
@@ -106,28 +92,59 @@ const run = () =>
     spans: sweepSpans(new NoOpInstrumentation()),
   });
 
+function givenLock(granted: boolean) {
+  store.beginFlush.mockResolvedValue(Result.ok(granted));
+  store.claimDue.mockResolvedValueOnce(
+    Result.ok([{ ...row("u1", "billing", "n1"), emailStillWanted: true }]),
+  );
+  store.claimDue.mockResolvedValue(Result.ok([]));
+  store.markSent.mockResolvedValue(Result.ok());
+  store.dropUnwanted.mockResolvedValue(Result.ok());
+}
+
+beforeEach(() => {
+  store.beginFlush.mockReset();
+  store.claimDue.mockReset();
+  store.markSent.mockReset();
+  store.dropUnwanted.mockReset();
+  email.sendTemplateBatch.mockReset();
+  email.sendTemplateBatch.mockResolvedValue(Result.ok());
+});
+
 describe("flushDueNotifications single-flight", () => {
   test("given the advisory lock is held by another run, when a flush starts, then it skips and sends nothing", async () => {
-    const { tx, select } = fakeFlushTx(false);
-    flushTx = tx;
-    sendTemplateBatch.mockClear();
+    givenLock(false);
 
     const response = await run();
 
     expect(response).toEqual({ dryRun: false, skipped: true, flushed: 0, notifications: 0 });
-    expect(select).not.toHaveBeenCalled();
-    expect(sendTemplateBatch).not.toHaveBeenCalled();
+    expect(store.claimDue).not.toHaveBeenCalled();
+    expect(email.sendTemplateBatch).not.toHaveBeenCalled();
   });
 
   test("given the lock is granted inside the flush transaction, when a flush starts, then that transaction claims and mails the due rows", async () => {
-    const { tx, select } = fakeFlushTx(true);
-    flushTx = tx;
-    sendTemplateBatch.mockClear();
+    givenLock(true);
 
     const response = await run();
 
     expect(response).toEqual({ dryRun: false, skipped: false, flushed: 1, notifications: 1 });
-    expect(select).toHaveBeenCalled();
-    expect(sendTemplateBatch).toHaveBeenCalledTimes(1);
+    expect(store.markSent).toHaveBeenCalledWith(["n1"], expect.any(Date));
+    expect(email.sendTemplateBatch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("flushDueNotifications when the digest cannot be enqueued", () => {
+  test("given the e-mail queue refuses the batch, when a flush runs, then the unit rolls back by returning the failure and the run fails", async () => {
+    givenLock(true);
+    email.sendTemplateBatch.mockResolvedValue(
+      Result.fail({ code: "EMAIL_PROVIDER_FAILURE", message: "queue down" }),
+    );
+
+    const failure = await run().catch((err: unknown) => err);
+    const [settled] = await Promise.allSettled([unitOfWork.run.mock.results.at(-1)?.value]);
+
+    expect(failure).toBeInstanceOf(HTTPException);
+    expect(outcome()).toBe("rolled_back");
+    expect(settled?.status).toBe("fulfilled");
   });
 });

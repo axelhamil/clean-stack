@@ -61,7 +61,10 @@ export type DeliveryPage = {
 
 export interface IWebhookDeliveryRepository {
   list(args: ListDeliveriesArgs): Promise<Result<DeliveryPage, WebhookRepoError>>;
-  findById(id: string, organizationId: string): Promise<Option<WebhookDeliveryRecord>>;
+  findById(
+    id: string,
+    organizationId: string,
+  ): Promise<Result<Option<WebhookDeliveryRecord>, WebhookRepoError>>;
   claim(request: DeliveryClaimRequest): Promise<Result<WebhookDeliveryRecord[], WebhookRepoError>>;
   markSuccess(
     lease: DeliveryLease,
@@ -82,8 +85,14 @@ export interface IWebhookDeliveryRepository {
   ): Promise<Result<void, WebhookRepoError>>;
   findByIdWithAttempts(
     id: string,
+    endpointId: string,
     organizationId: string,
-  ): Promise<Option<WebhookDeliveryRecord & { attemptHistory: WebhookDeliveryAttemptRecord[] }>>;
+  ): Promise<
+    Result<
+      Option<WebhookDeliveryRecord & { attemptHistory: WebhookDeliveryAttemptRecord[] }>,
+      WebhookRepoError
+    >
+  >;
   enqueueTargeted(args: {
     endpointId: string;
     outboxEventId: string;

@@ -190,8 +190,8 @@ describe("DrizzleWebhookDeliveryRepository", () => {
 
       const result = await repo.findById("del-1", "org-1");
 
-      expect(result.isSome()).toBe(true);
-      expect(result.unwrap().id).toBe("del-1");
+      expect(result.getValue().isSome()).toBe(true);
+      expect(result.getValue().unwrap().id).toBe("del-1");
     });
 
     it("happy path: returns Option.none when no row found", async () => {
@@ -199,7 +199,19 @@ describe("DrizzleWebhookDeliveryRepository", () => {
 
       const result = await repo.findById("del-99", "org-1");
 
-      expect(result.isNone()).toBe(true);
+      expect(result.getValue().isNone()).toBe(true);
+    });
+
+    it("failure path: DB throws → capture called + Result.fail instead of a throw", async () => {
+      const boom = new Error("lookup boom");
+      const captureSpy = spyOn(instrumentation, "capture");
+      injectDbError(instrumentation, boom);
+
+      const result = await repo.findById("del-1", "org-1");
+
+      expect(result.isFailure).toBe(true);
+      expect(result.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
+      expect(captureSpy).toHaveBeenCalledWith(boom);
     });
 
     it("happy path: outer + inner spans emitted", async () => {
@@ -312,22 +324,22 @@ describe("DrizzleWebhookDeliveryRepository", () => {
       expect(outer).toBeDefined();
     });
 
-    it("happy path: inner db.query span emitted (findQuery at minimum)", async () => {
-      dbBehavior = async () => [];
+    it("multi-query method: opens the outer span only, no db.query span per statement", async () => {
+      dbBehavior = async () => [{ d: fakeDelivery }];
       const spy = spyOn(instrumentation, "startSpan");
 
-      await repo.enqueueReplay("del-99", "ep-1", "org-1");
+      await repo.enqueueReplay("del-1", "ep-1", "org-1");
 
-      const calls = spy.mock.calls;
-      const innerSpans = calls.filter((c) => c[0]?.op === "db.query");
-      expect(innerSpans.length).toBeGreaterThanOrEqual(1);
-      expect(innerSpans[0]?.[0]?.attributes?.["db.system.name"]).toBe("postgresql");
+      const innerSpans = spy.mock.calls.filter((c) => c[0]?.op === "db.query");
+      expect(innerSpans).toHaveLength(0);
     });
 
     it("failure path: DB throws → capture called + Result.fail", async () => {
       const boom = new Error("replay boom");
       const captureSpy = spyOn(instrumentation, "capture");
-      injectDbError(instrumentation, boom);
+      dbBehavior = async () => {
+        throw boom;
+      };
 
       const result = await repo.enqueueReplay("del-1", "ep-1", "org-1");
 
@@ -416,9 +428,9 @@ describe("DrizzleWebhookDeliveryRepository", () => {
     it("happy path: returns Option.none when delivery not found", async () => {
       dbBehavior = async () => [];
 
-      const result = await repo.findByIdWithAttempts("del-99", "org-1");
+      const result = await repo.findByIdWithAttempts("del-99", "ep-1", "org-1");
 
-      expect(result.isNone()).toBe(true);
+      expect(result.getValue().isNone()).toBe(true);
     });
 
     it("happy path: returns Option.some with attempts array when delivery exists", async () => {
@@ -429,28 +441,41 @@ describe("DrizzleWebhookDeliveryRepository", () => {
         return [fakeAttemptRow];
       };
 
-      const result = await repo.findByIdWithAttempts("del-1", "org-1");
+      const result = await repo.findByIdWithAttempts("del-1", "ep-1", "org-1");
 
-      expect(result.isSome()).toBe(true);
-      const record = result.unwrap();
+      expect(result.getValue().isSome()).toBe(true);
+      const record = result.getValue().unwrap();
       expect(record.id).toBe("del-1");
       expect(record.attemptHistory).toHaveLength(1);
       expect(record.attemptHistory[0]?.attemptNumber).toBe(1);
     });
 
-    it("happy path: outer span name + inner db.query spans", async () => {
-      dbBehavior = async () => [];
+    it("multi-query method: opens the outer span only, no db.query span per statement", async () => {
+      dbBehavior = async () => [{ d: fakeDelivery }];
       const spy = spyOn(instrumentation, "startSpan");
 
-      await repo.findByIdWithAttempts("del-1", "org-1");
+      await repo.findByIdWithAttempts("del-1", "ep-1", "org-1");
 
       const calls = spy.mock.calls;
       const outer = calls.find(
         (c) => c[0]?.name === "DrizzleWebhookDeliveryRepository > findByIdWithAttempts",
       );
-      const inner = calls.find((c) => c[0]?.op === "db.query");
+      const inner = calls.filter((c) => c[0]?.op === "db.query");
       expect(outer).toBeDefined();
-      expect(inner?.[0]?.attributes?.["db.system.name"]).toBe("postgresql");
+      expect(inner).toHaveLength(0);
+    });
+
+    it("failure path: DB throws → capture called + Result.fail instead of a throw", async () => {
+      const boom = new Error("lookup boom");
+      const captureSpy = spyOn(instrumentation, "capture");
+      dbBehavior = async () => {
+        throw boom;
+      };
+
+      const result = await repo.findByIdWithAttempts("del-1", "ep-1", "org-1");
+
+      expect(result.isFailure).toBe(true);
+      expect(captureSpy).toHaveBeenCalledWith(boom);
     });
   });
 

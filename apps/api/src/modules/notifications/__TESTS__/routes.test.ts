@@ -76,7 +76,7 @@ const mockEnqueue = mock(async (_events: unknown, _meta: unknown) => {
   enqueueTransactions.push(UnitOfWorkContext.transaction());
 });
 
-const { unitOfWork } = mockUnitOfWork();
+const { unitOfWork, outcome } = mockUnitOfWork();
 
 mock.module("../../../container", () => ({
   di: {
@@ -136,6 +136,12 @@ const { notificationsRoutes } = await import("../routes");
 const { Hono } = await import("hono");
 const { createErrorHandler } = await import("../../../shared/middleware/error.middleware");
 const { NoOpInstrumentation } = await import("../../../shared/services/noop-instrumentation");
+
+async function lastRunSettlement() {
+  const [settled] = await Promise.allSettled([unitOfWork.run.mock.results.at(-1)?.value]);
+
+  return settled?.status;
+}
 
 function makeApp() {
   const app = new Hono<{ Variables: { requestId: string } }>();
@@ -460,5 +466,87 @@ describe("PUT /notifications/org-preferences", () => {
       }),
     });
     expect(res.status).toBe(403);
+  });
+});
+
+describe("write routes - a failure rolls the unit back by returning it", () => {
+  const STORE_DOWN: NotificationError = {
+    code: "NOTIFICATION_WRITE_PROVIDER_FAILURE",
+    message: "db down",
+  };
+
+  function jsonRequest(path: string, method: string, body: unknown) {
+    return makeApp().request(path, {
+      method,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it("mark-read answers NOTIFICATION_NOT_FOUND for a foreign id", async () => {
+    currentSession = {};
+    mockMarkRead.mockImplementationOnce(async () => Result.ok([]));
+
+    const res = await jsonRequest("/notifications/read", "POST", { ids: ["notif-foreign"] });
+    const body = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(body).toMatchObject({ error: { code: "NOTIFICATION_NOT_FOUND" } });
+    expect(outcome()).toBe("rolled_back");
+    expect(await lastRunSettlement()).toBe("fulfilled");
+  });
+
+  it("mark-read surfaces a store failure", async () => {
+    currentSession = {};
+    mockMarkRead.mockImplementationOnce(async () => Result.fail(STORE_DOWN));
+
+    const res = await jsonRequest("/notifications/read", "POST", { ids: ["notif-1"] });
+
+    expect(res.status).toBe(502);
+    expect(outcome()).toBe("rolled_back");
+    expect(await lastRunSettlement()).toBe("fulfilled");
+  });
+
+  it("read-all surfaces a store failure", async () => {
+    currentSession = {};
+    mockMarkAllRead.mockImplementationOnce(async () => Result.fail(STORE_DOWN));
+
+    const res = await makeApp().request("/notifications/read-all", { method: "POST" });
+
+    expect(res.status).toBe(502);
+    expect(outcome()).toBe("rolled_back");
+    expect(await lastRunSettlement()).toBe("fulfilled");
+  });
+
+  it("preferences surfaces a store failure", async () => {
+    currentSession = {};
+    mockUpsertPreference.mockImplementationOnce(async () => Result.fail(STORE_DOWN));
+
+    const res = await jsonRequest("/notifications/preferences", "PUT", {
+      category: "billing",
+      channel: "email",
+      enabled: false,
+    });
+
+    expect(res.status).toBe(502);
+    expect(outcome()).toBe("rolled_back");
+    expect(await lastRunSettlement()).toBe("fulfilled");
+  });
+
+  it("org-preferences surfaces a store failure", async () => {
+    currentSession = { activeOrganizationId: "org-1" };
+    allowOrgPermission = true;
+    mockUpsertPreference.mockImplementationOnce(async () => Result.fail(STORE_DOWN));
+
+    const res = await jsonRequest("/notifications/org-preferences", "PUT", {
+      category: "security",
+      channel: "in_app",
+      enabled: true,
+      locked: true,
+    });
+
+    expect(res.status).toBe(502);
+    expect(outcome()).toBe("rolled_back");
+    expect(await lastRunSettlement()).toBe("fulfilled");
   });
 });

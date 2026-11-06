@@ -1,5 +1,4 @@
 import { type IUnitOfWork, Option, type Result } from "@packages/ddd-kit";
-import { db, eq, webhooksSchema } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { decryptSecret, deriveOrgSubKey } from "../../../../shared/aead";
 import { env } from "../../../../shared/env";
@@ -250,13 +249,13 @@ export class WebhookDeliveryWorker {
     return this.instrumentation.startSpan(
       { name: "WebhookDeliveryWorker > processDelivery", op: "function" },
       async () => {
-        const endpointResult = await this.findEndpointWithOrg(delivery.endpointId);
-        if (!endpointResult.ok) {
-          if (endpointResult.reason === "db_error") return failed("endpoint lookup db error");
-
+        const endpointResult = await this.endpoints.findEnabledById(delivery.endpointId);
+        if (endpointResult.isFailure) return failed("endpoint lookup db error");
+        const enabledEndpoint = endpointResult.getValue();
+        if (enabledEndpoint.isNone()) {
           return failed("endpoint not found or disabled", { terminal: true });
         }
-        const endpointAndOrg = endpointResult.row;
+        const endpointAndOrg = enabledEndpoint.unwrap();
         const organizationId = Option.some(endpointAndOrg.organizationId);
 
         const guard = await assertPublicUrl(endpointAndOrg.url);
@@ -536,68 +535,6 @@ export class WebhookDeliveryWorker {
         consecutiveFailures: bumped.consecutiveFailures,
       },
       { organizationId },
-    );
-  }
-
-  private async findEndpointWithOrg(endpointId: string): Promise<
-    | {
-        ok: true;
-        row: {
-          id: string;
-          url: string;
-          organizationId: string;
-          secretCipher: string;
-          previousSecretCipher: Option<string>;
-          previousSecretExpiresAt: Option<Date>;
-          enabled: boolean;
-        };
-      }
-    | { ok: false; reason: "not_found" | "db_error" }
-  > {
-    return this.instrumentation.startSpan(
-      { name: "WebhookDeliveryWorker > findEndpointWithOrg" },
-      async () => {
-        try {
-          const we = webhooksSchema.webhookEndpoint;
-          const query = db
-            .select({
-              id: we.id,
-              url: we.url,
-              organizationId: we.organizationId,
-              secretCipher: we.secretCipher,
-              previousSecretCipher: we.previousSecretCipher,
-              previousSecretExpiresAt: we.previousSecretExpiresAt,
-              enabled: we.enabled,
-            })
-            .from(we)
-            .where(eq(we.id, endpointId))
-            .limit(1);
-          const [row] = await this.instrumentation.startSpan(
-            {
-              name: query.toSQL().sql,
-              op: "db.query",
-              attributes: { "db.system.name": "postgresql" },
-            },
-            () => query.execute(),
-          );
-          if (!row?.enabled) return { ok: false, reason: "not_found" } as const;
-          return {
-            ok: true,
-            row: {
-              id: row.id,
-              url: row.url,
-              organizationId: row.organizationId,
-              secretCipher: row.secretCipher,
-              previousSecretCipher: Option.fromNullable(row.previousSecretCipher),
-              previousSecretExpiresAt: Option.fromNullable(row.previousSecretExpiresAt),
-              enabled: row.enabled,
-            },
-          } as const;
-        } catch (err) {
-          this.instrumentation.capture(err);
-          return { ok: false, reason: "db_error" } as const;
-        }
-      },
     );
   }
 }

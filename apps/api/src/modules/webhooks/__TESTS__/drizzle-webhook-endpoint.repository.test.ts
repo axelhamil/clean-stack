@@ -296,8 +296,8 @@ describe("DrizzleWebhookEndpointRepository", () => {
 
       const result = await repo.findById("ep-1", "org-1");
 
-      expect(result.isSome()).toBe(true);
-      expect(result.unwrap().id).toBe("ep-1");
+      expect(result.getValue().isSome()).toBe(true);
+      expect(result.getValue().unwrap().id).toBe("ep-1");
     });
 
     it("happy path: returns Option.none when no row found", async () => {
@@ -305,7 +305,19 @@ describe("DrizzleWebhookEndpointRepository", () => {
 
       const result = await repo.findById("ep-99", "org-1");
 
-      expect(result.isNone()).toBe(true);
+      expect(result.getValue().isNone()).toBe(true);
+    });
+
+    it("failure path: DB throws → capture called + Result.fail instead of a throw", async () => {
+      const boom = new Error("lookup boom");
+      const captureSpy = spyOn(instrumentation, "capture");
+      injectDbError(instrumentation, boom);
+
+      const result = await repo.findById("ep-1", "org-1");
+
+      expect(result.isFailure).toBe(true);
+      expect(result.getError().code).toBe("WEBHOOK_PERSISTENCE_PROVIDER_FAILURE");
+      expect(captureSpy).toHaveBeenCalledWith(boom);
     });
 
     it("happy path: outer + inner spans emitted", async () => {

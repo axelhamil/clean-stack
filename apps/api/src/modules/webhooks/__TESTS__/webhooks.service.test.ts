@@ -3,6 +3,7 @@ import { Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
+import { logger } from "../../../shared/logger";
 import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type {
@@ -28,6 +29,10 @@ const ORG_ID = "org-1";
 const USER_ID = "user-1";
 const ENDPOINT_ID = "ep-1";
 const DELIVERY_ID = "del-1";
+const REPO_DOWN: WebhookRepoError = {
+  code: "WEBHOOK_PERSISTENCE_PROVIDER_FAILURE",
+  message: "webhook endpoint lookup failed",
+};
 
 const stubEndpoint: WebhookEndpointRecord = {
   id: ENDPOINT_ID,
@@ -94,7 +99,9 @@ function makeEndpoints(
       Result.ok<Option<WebhookEndpointRecord>, WebhookRepoError>(Option.some(stubEndpoint)),
     ),
     delete: mock(async () => Result.ok<boolean, WebhookRepoError>(true)),
-    findById: mock(async () => Option.some(stubEndpoint)),
+    findById: mock(async () =>
+      Result.ok<Option<WebhookEndpointRecord>, WebhookRepoError>(Option.some(stubEndpoint)),
+    ),
     listByOrg: mock(async () =>
       Result.ok<WebhookEndpointRecord[], WebhookRepoError>([stubEndpoint]),
     ),
@@ -111,14 +118,16 @@ function makeDeliveries(
   const page: DeliveryPage = { items: [stubDelivery], nextCursor: Option.none() };
   return {
     list: mock(async () => Result.ok<DeliveryPage, WebhookRepoError>(page)),
-    findById: mock(async () => Option.some(stubDelivery)),
+    findById: mock(async () =>
+      Result.ok<Option<WebhookDeliveryRecord>, WebhookRepoError>(Option.some(stubDelivery)),
+    ),
     enqueueReplay: mock(async () =>
       Result.ok<Option<WebhookDeliveryRecord>, WebhookRepoError>(Option.some(stubDelivery)),
     ),
     enqueueTargeted: mock(async () =>
       Result.ok<WebhookDeliveryRecord, WebhookRepoError>(stubDelivery),
     ),
-    findByIdWithAttempts: mock(async () => Option.some(stubDeliveryWithAttempts)),
+    findByIdWithAttempts: mock(async () => Result.ok(Option.some(stubDeliveryWithAttempts))),
     ...overrides,
   } as unknown as IWebhookDeliveryRepository;
 }
@@ -144,6 +153,31 @@ function makeService(
 
 describe("WebhooksService", () => {
   describe("createEndpoint", () => {
+    it("keeps the endpoint and logs the code when its test delivery fails", async () => {
+      const warn = spyOn(logger, "warn");
+      const endpoints = makeEndpoints({
+        findById: mock(async () =>
+          Result.fail<Option<WebhookEndpointRecord>, WebhookRepoError>(REPO_DOWN),
+        ),
+      });
+      const service = makeService({ endpoints });
+
+      const result = await service.createEndpoint({
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+        url: "https://example.com/hook",
+        eventTypes: ["user.created"],
+        enabled: true,
+      });
+
+      expect(result.isSuccess).toBe(true);
+      expect(warn).toHaveBeenCalledWith(
+        { endpointId: ENDPOINT_ID, code: REPO_DOWN.code },
+        "webhook endpoint created but its test delivery failed",
+      );
+      warn.mockRestore();
+    });
+
     it("creates endpoint and returns record + plaintextSecret (happy path)", async () => {
       const service = makeService();
       const result = await service.createEndpoint({
@@ -449,7 +483,7 @@ describe("WebhooksService", () => {
   describe("findEndpoint", () => {
     it("returns Some(endpoint) when found", async () => {
       const service = makeService();
-      const opt = await service.findEndpoint(ENDPOINT_ID, ORG_ID);
+      const opt = (await service.findEndpoint(ENDPOINT_ID, ORG_ID)).getValue();
 
       expect(opt.isSome()).toBe(true);
       expect(opt.unwrap()).toEqual(stubEndpoint);
@@ -457,12 +491,27 @@ describe("WebhooksService", () => {
 
     it("returns None when not found", async () => {
       const endpoints = makeEndpoints({
-        findById: mock(async () => Option.none<WebhookEndpointRecord>()),
+        findById: mock(async () =>
+          Result.ok<Option<WebhookEndpointRecord>, WebhookRepoError>(Option.none()),
+        ),
       });
       const service = makeService({ endpoints });
-      const opt = await service.findEndpoint("nonexistent", ORG_ID);
+      const opt = (await service.findEndpoint("nonexistent", ORG_ID)).getValue();
 
       expect(opt.isNone()).toBe(true);
+    });
+
+    it("returns the repository failure instead of throwing", async () => {
+      const endpoints = makeEndpoints({
+        findById: mock(async () =>
+          Result.fail<Option<WebhookEndpointRecord>, WebhookRepoError>(REPO_DOWN),
+        ),
+      });
+      const service = makeService({ endpoints });
+      const result = await service.findEndpoint(ENDPOINT_ID, ORG_ID);
+
+      expect(result.isFailure).toBe(true);
+      expect(result.getError()).toEqual(REPO_DOWN);
     });
 
     it("calls instrumentation span with op=function", async () => {
@@ -550,6 +599,24 @@ describe("WebhooksService", () => {
   });
 
   describe("rotateSecret", () => {
+    it("returns the lookup failure instead of throwing when the repository is down", async () => {
+      const endpoints = makeEndpoints({
+        findById: mock(async () =>
+          Result.fail<Option<WebhookEndpointRecord>, WebhookRepoError>(REPO_DOWN),
+        ),
+      });
+      const service = makeService({ endpoints });
+
+      const result = await service.rotateSecret({
+        id: ENDPOINT_ID,
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+      });
+
+      expect(result.isFailure).toBe(true);
+      expect(result.getError()).toEqual(REPO_DOWN);
+    });
+
     it("generates a new secret, moves the current to previous, emits, returns plaintext", async () => {
       const enqueueMock = mock(async () => {});
       const spiedOutbox = {
@@ -559,7 +626,9 @@ describe("WebhooksService", () => {
         markFailed: mock(async () => {}),
       } as unknown as IOutboxRepository;
       const endpoints = makeEndpoints({
-        findById: mock(async () => Option.some(stubEndpoint)),
+        findById: mock(async () =>
+          Result.ok<Option<WebhookEndpointRecord>, WebhookRepoError>(Option.some(stubEndpoint)),
+        ),
         applySecretRotation: mock(async () =>
           Result.ok<Option<WebhookEndpointRecord>, WebhookRepoError>(Option.some(stubEndpoint)),
         ),
@@ -590,7 +659,9 @@ describe("WebhooksService", () => {
     });
     it("returns None when endpoint not found", async () => {
       const endpoints = makeEndpoints({
-        findById: mock(async () => Option.none<WebhookEndpointRecord>()),
+        findById: mock(async () =>
+          Result.ok<Option<WebhookEndpointRecord>, WebhookRepoError>(Option.none()),
+        ),
       });
       const service = makeService({ endpoints });
       const r = await service.rotateSecret({
@@ -614,6 +685,24 @@ describe("WebhooksService", () => {
   });
 
   describe("sendTest", () => {
+    it("returns the lookup failure instead of throwing when the repository is down", async () => {
+      const endpoints = makeEndpoints({
+        findById: mock(async () =>
+          Result.fail<Option<WebhookEndpointRecord>, WebhookRepoError>(REPO_DOWN),
+        ),
+      });
+      const service = makeService({ endpoints });
+
+      const result = await service.sendTest({
+        id: ENDPOINT_ID,
+        organizationId: ORG_ID,
+        actorUserId: USER_ID,
+      });
+
+      expect(result.isFailure).toBe(true);
+      expect(result.getError()).toEqual(REPO_DOWN);
+    });
+
     it("emits webhook.test event and enqueues targeted delivery, returns Some(delivery)", async () => {
       const enqueueTargeted = mock(async () =>
         Result.ok<WebhookDeliveryRecord, WebhookRepoError>(stubDelivery),
@@ -658,7 +747,9 @@ describe("WebhooksService", () => {
 
     it("returns Option.none() when endpoint not found, no enqueue", async () => {
       const endpoints = makeEndpoints({
-        findById: mock(async () => Option.none<WebhookEndpointRecord>()),
+        findById: mock(async () =>
+          Result.ok<Option<WebhookEndpointRecord>, WebhookRepoError>(Option.none()),
+        ),
       });
       const enqueueTargeted = mock(async () =>
         Result.ok<WebhookDeliveryRecord, WebhookRepoError>(stubDelivery),
@@ -835,7 +926,7 @@ describe("WebhooksService", () => {
   describe("findDelivery", () => {
     it("returns Some(delivery with attemptHistory) when found", async () => {
       const service = makeService();
-      const opt = await service.findDelivery(DELIVERY_ID, ORG_ID);
+      const opt = (await service.findDelivery(DELIVERY_ID, ENDPOINT_ID, ORG_ID)).getValue();
 
       expect(opt.isSome()).toBe(true);
       const val = opt.unwrap();
@@ -847,11 +938,14 @@ describe("WebhooksService", () => {
     it("returns None when delivery not found", async () => {
       const deliveries = makeDeliveries({
         findByIdWithAttempts: mock(async () =>
-          Option.none<WebhookDeliveryRecord & { attemptHistory: WebhookDeliveryAttemptRecord[] }>(),
+          Result.ok<
+            Option<WebhookDeliveryRecord & { attemptHistory: WebhookDeliveryAttemptRecord[] }>,
+            WebhookRepoError
+          >(Option.none()),
         ),
       });
       const service = makeService({ deliveries });
-      const opt = await service.findDelivery("nonexistent", ORG_ID);
+      const opt = (await service.findDelivery("nonexistent", ENDPOINT_ID, ORG_ID)).getValue();
 
       expect(opt.isNone()).toBe(true);
     });
@@ -868,7 +962,7 @@ describe("WebhooksService", () => {
         instrumentation,
       );
 
-      await service.findDelivery(DELIVERY_ID, ORG_ID);
+      await service.findDelivery(DELIVERY_ID, ENDPOINT_ID, ORG_ID);
 
       expect(spy).toHaveBeenCalledWith(
         expect.objectContaining({ name: "WebhooksService > findDelivery", op: "function" }),

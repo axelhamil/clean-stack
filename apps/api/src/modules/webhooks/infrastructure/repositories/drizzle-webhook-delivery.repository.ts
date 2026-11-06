@@ -157,7 +157,10 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
     );
   }
 
-  async findById(id: string, organizationId: string): Promise<Option<WebhookDeliveryRecord>> {
+  async findById(
+    id: string,
+    organizationId: string,
+  ): Promise<Result<Option<WebhookDeliveryRecord>, WebhookRepoError>> {
     const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookDeliveryRepository > findById" },
@@ -173,10 +176,10 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
             { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
             () => query.execute(),
           );
-          return Option.fromNullable(row).map((r) => toRecord(r.d));
+          return Result.ok(Option.fromNullable(row).map((r) => toRecord(r.d)));
         } catch (e) {
           this.instrumentation.capture(e);
-          throw e;
+          return fail(e, "webhook delivery lookup failed");
         }
       },
     );
@@ -290,10 +293,7 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
               ),
             )
             .limit(1);
-          const [existingRow] = await this.instrumentation.startSpan(
-            { name: findQuery.toSQL().sql, op: "db.query", attributes: dbAttrs },
-            () => findQuery.execute(),
-          );
+          const [existingRow] = await findQuery.execute();
           if (!existingRow) return Result.ok(Option.none());
           const existing = toRecord(existingRow.d);
           const query = exec
@@ -310,10 +310,7 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
               idempotencyKey: `replay:${uuidv7()}`,
             })
             .returning();
-          const [row] = await this.instrumentation.startSpan(
-            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
-            () => query.execute(),
-          );
+          const [row] = await query.execute();
           return Result.ok(Option.fromNullable(row).map(toRecord));
         } catch (e) {
           this.instrumentation.capture(e);
@@ -358,8 +355,14 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
 
   async findByIdWithAttempts(
     id: string,
+    endpointId: string,
     organizationId: string,
-  ): Promise<Option<WebhookDeliveryRecord & { attemptHistory: WebhookDeliveryAttemptRecord[] }>> {
+  ): Promise<
+    Result<
+      Option<WebhookDeliveryRecord & { attemptHistory: WebhookDeliveryAttemptRecord[] }>,
+      WebhookRepoError
+    >
+  > {
     const exec = resolveExecutor();
     return this.instrumentation.startSpan(
       { name: "DrizzleWebhookDeliveryRepository > findByIdWithAttempts" },
@@ -369,29 +372,31 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
             .select({ d: wd })
             .from(wd)
             .innerJoin(we, eq(wd.endpointId, we.id))
-            .where(and(eq(wd.id, id), eq(we.organizationId, organizationId)))
+            .where(
+              and(
+                eq(wd.id, id),
+                eq(wd.endpointId, endpointId),
+                eq(we.organizationId, organizationId),
+              ),
+            )
             .limit(1);
-          const [row] = await this.instrumentation.startSpan(
-            { name: deliveryQuery.toSQL().sql, op: "db.query", attributes: dbAttrs },
-            () => deliveryQuery.execute(),
-          );
-          if (!row) return Option.none();
+          const [row] = await deliveryQuery.execute();
+          if (!row) return Result.ok(Option.none());
           const attemptsQuery = exec
             .select()
             .from(wda)
             .where(eq(wda.deliveryId, id))
             .orderBy(asc(wda.attemptNumber));
-          const attemptRows = await this.instrumentation.startSpan(
-            { name: attemptsQuery.toSQL().sql, op: "db.query", attributes: dbAttrs },
-            () => attemptsQuery.execute(),
+          const attemptRows = await attemptsQuery.execute();
+          return Result.ok(
+            Option.some({
+              ...toRecord(row.d),
+              attemptHistory: attemptRows.map(toAttemptRecord),
+            }),
           );
-          return Option.some({
-            ...toRecord(row.d),
-            attemptHistory: attemptRows.map(toAttemptRecord),
-          });
         } catch (e) {
           this.instrumentation.capture(e);
-          throw e;
+          return fail(e, "webhook delivery lookup failed");
         }
       },
     );

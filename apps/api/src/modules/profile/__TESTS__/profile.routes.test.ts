@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
 import type { Locale } from "@packages/i18n";
+import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
+import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
+import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import type { ProfileError } from "../../../shared/ports/profile.port";
 
 const { unitOfWork, outcome } = mockUnitOfWork();
@@ -10,18 +13,26 @@ const mockFindLocale = mock(
   async (_userId: string): Promise<Result<Option<Locale>, ProfileError>> =>
     Result.ok(Option.none()),
 );
+const writeTransactions: unknown[] = [];
 const mockSetLocale = mock(
-  async (_userId: string, _locale: Locale): Promise<Result<void, ProfileError>> => Result.ok(),
+  async (_userId: string, _locale: Locale): Promise<Result<void, ProfileError>> => {
+    writeTransactions.push(UnitOfWorkContext.transaction());
+    return Result.ok();
+  },
 );
 const enqueueTransactions: unknown[] = [];
-const mockEnqueue = mock(async (_events: unknown, _meta: unknown) => {
-  enqueueTransactions.push(UnitOfWorkContext.transaction());
-});
+const outbox = mockPort<IOutboxRepository>();
+
+function recordEnqueueTransaction() {
+  outbox.enqueue.mockImplementation(async () => {
+    enqueueTransactions.push(UnitOfWorkContext.transaction());
+  });
+}
 
 mock.module("../../../container", () => ({
   di: {
     IProfileStore: { findLocale: mockFindLocale, setLocale: mockSetLocale },
-    IOutboxRepository: { enqueue: mockEnqueue },
+    IOutboxRepository: outbox,
     ITransactionService: unitOfWork,
     PolicyAcceptanceService: { hasAcceptedCurrent: mock(async () => Result.ok(true)) },
   },
@@ -61,8 +72,13 @@ function putLocale(locale: string) {
 }
 
 function emittedPayload() {
-  const [events] = (mockEnqueue.mock.calls[0] ?? []) as [{ payload: unknown }[]?];
-  return events?.[0]?.payload;
+  return enqueuedEvents(outbox)[0]?.payload;
+}
+
+async function lastRunSettlement() {
+  const [settled] = await Promise.allSettled([unitOfWork.run.mock.results.at(-1)?.value]);
+
+  return settled?.status;
 }
 
 describe("PUT /me/locale", () => {
@@ -70,7 +86,10 @@ describe("PUT /me/locale", () => {
     currentSession = {};
     mockFindLocale.mockClear();
     mockSetLocale.mockClear();
-    mockEnqueue.mockClear();
+    outbox.enqueue.mockReset();
+    recordEnqueueTransaction();
+    unitOfWork.run.mockClear();
+    writeTransactions.length = 0;
     enqueueTransactions.length = 0;
   });
 
@@ -101,7 +120,10 @@ describe("PUT /me/locale", () => {
 
     expect(outcome()).toBe("committed");
     expect(mockSetLocale).toHaveBeenCalledWith("user-1", "fr");
-    expect(enqueueTransactions[0]).toBeDefined();
+    const [writeTx] = writeTransactions;
+    const [enqueueTx] = enqueueTransactions;
+    expect(writeTx).toBeDefined();
+    expect(enqueueTx).toBe(writeTx);
   });
 
   it("emits nothing when the write fails", async () => {
@@ -112,7 +134,19 @@ describe("PUT /me/locale", () => {
     const res = await putLocale("fr");
 
     expect(res.status).toBe(502);
-    expect(mockEnqueue).not.toHaveBeenCalled();
+    expect(outbox.enqueue).not.toHaveBeenCalled();
+  });
+
+  it("rolls the unit back by returning the failure, not by throwing", async () => {
+    mockFindLocale.mockImplementationOnce(async () =>
+      Result.fail({ code: "PROFILE_PROVIDER_FAILURE", message: "db down" }),
+    );
+
+    const res = await putLocale("fr");
+
+    expect(res.status).toBe(502);
+    expect(outcome()).toBe("rolled_back");
+    expect(await lastRunSettlement()).toBe("fulfilled");
   });
 
   it("refuses an impersonated session", async () => {

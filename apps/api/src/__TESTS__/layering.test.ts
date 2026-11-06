@@ -9,10 +9,8 @@ const scan = createSourceScan(apiSrcRoot);
 const ENV_OWNER = "shared/env.ts";
 
 const ALLOWED_ENV_READERS: Record<string, string> = {
-  "cron/internal-job.ts":
-    "runner of the standalone scripts started by the scheduler outside the api process, it cannot import shared/env",
-  "cron/sweep.ts":
-    "standalone script started by the scheduler outside the api process, it cannot import shared/env",
+  "cron/env.ts":
+    "env of the standalone scripts started by the scheduler outside the api process, it cannot import shared/env",
 };
 
 const ALLOWED_TX_PARAMETERS: Record<string, string> = {};

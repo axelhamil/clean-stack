@@ -7,6 +7,7 @@ import type {
   HealthStatus,
   IHealthCheckRegistry,
 } from "../../../shared/ports/health.port";
+import type { IInstrumentation } from "../../../shared/ports/instrumentation.port";
 import { raceWithTimeout } from "../../../shared/race-with-timeout";
 
 const CHECK_TIMEOUT_MS = 5_000;
@@ -18,6 +19,8 @@ type CacheEntry = { check: AggregatedHealthCheck; expiresAt: number };
 export class InMemoryHealthCheckRegistry implements IHealthCheckRegistry {
   private readonly registrations = new Map<string, HealthCheckRegistration>();
   private readonly cache = new Map<string, CacheEntry>();
+
+  constructor(private readonly instrumentation: IInstrumentation) {}
 
   register(name: string, fn: HealthCheckFn, opts: { critical: boolean }): void {
     if (this.registrations.has(name)) {
@@ -43,7 +46,7 @@ export class InMemoryHealthCheckRegistry implements IHealthCheckRegistry {
     if (cached && cached.expiresAt > now) return cached.check;
 
     const start = performance.now();
-    const result = await runWithTimeout(reg.fn);
+    const result = await this.runWithTimeout(reg.fn);
     const durationMs = Math.round(performance.now() - start);
     const aggregated: AggregatedHealthCheck = {
       name: reg.name,
@@ -57,20 +60,22 @@ export class InMemoryHealthCheckRegistry implements IHealthCheckRegistry {
     this.cache.set(reg.name, { check: aggregated, expiresAt: now + ttl });
     return aggregated;
   }
-}
 
-function runWithTimeout(fn: HealthCheckFn): Promise<HealthCheckResult> {
-  const settled = fn().catch(
-    (err): HealthCheckResult => ({
+  private runWithTimeout(fn: HealthCheckFn): Promise<HealthCheckResult> {
+    const settled = fn().catch((err): HealthCheckResult => {
+      this.instrumentation.capture(err);
+
+      return {
+        status: "fail",
+        output: err instanceof Error ? err.message : "unknown error",
+      };
+    });
+
+    return raceWithTimeout(settled, CHECK_TIMEOUT_MS, () => ({
       status: "fail",
-      output: err instanceof Error ? err.message : "unknown error",
-    }),
-  );
-
-  return raceWithTimeout(settled, CHECK_TIMEOUT_MS, () => ({
-    status: "fail",
-    output: `timeout >${CHECK_TIMEOUT_MS}ms`,
-  }));
+      output: `timeout >${CHECK_TIMEOUT_MS}ms`,
+    }));
+  }
 }
 
 function aggregate(checks: AggregatedHealthCheck[]): HealthStatus {

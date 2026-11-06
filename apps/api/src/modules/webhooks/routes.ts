@@ -131,7 +131,8 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
       const orgId = c.get("orgId");
       const endpointId = c.req.param("id");
       const endpoint = await di.WebhooksService.findEndpoint(endpointId, orgId);
-      if (endpoint.isNone())
+      if (endpoint.isFailure) throw new AppErrorException(endpoint.getError());
+      if (endpoint.getValue().isNone())
         throw new HTTPException(404, { message: "Webhook endpoint not found" });
       const filters = c.req.valid("query");
       const result = await di.WebhooksService.listDeliveries({
@@ -159,13 +160,14 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
       const id = c.req.param("id");
       const deliveryId = c.req.param("deliveryId");
       const endpoint = await di.WebhooksService.findEndpoint(id, orgId);
-      if (endpoint.isNone())
+      if (endpoint.isFailure) throw new AppErrorException(endpoint.getError());
+      if (endpoint.getValue().isNone())
         throw new HTTPException(404, { message: "Webhook endpoint not found" });
-      const opt = await di.WebhooksService.findDelivery(deliveryId, orgId);
+      const found = await di.WebhooksService.findDelivery(deliveryId, id, orgId);
+      if (found.isFailure) throw new AppErrorException(found.getError());
+      const opt = found.getValue();
       if (opt.isNone()) throw new HTTPException(404, { message: "Webhook delivery not found" });
       const delivery = opt.unwrap();
-      if (delivery.endpointId !== id)
-        throw new HTTPException(404, { message: "Webhook delivery not found" });
       const { nextAttemptAt, lastError, lastResponseStatus, attemptHistory, ...rest } = delivery;
       return c.json({
         ...rest,
@@ -251,7 +253,8 @@ export const webhooksRoutes = new Hono<{ Variables: Vars }>()
       const endpointId = c.req.param("id");
       const deliveryId = c.req.param("deliveryId");
       const endpoint = await di.WebhooksService.findEndpoint(endpointId, orgId);
-      if (endpoint.isNone())
+      if (endpoint.isFailure) throw new AppErrorException(endpoint.getError());
+      if (endpoint.getValue().isNone())
         throw new HTTPException(404, { message: "Webhook endpoint not found" });
       const result = await di.WebhooksService.replayDelivery(
         deliveryId,

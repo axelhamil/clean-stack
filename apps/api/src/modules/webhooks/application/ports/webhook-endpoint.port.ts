@@ -41,7 +41,11 @@ export interface IWebhookEndpointRepository {
     args: UpdateEndpointArgs,
   ): Promise<Result<Option<WebhookEndpointRecord>, WebhookRepoError>>;
   delete(id: string, organizationId: string): Promise<Result<boolean, WebhookRepoError>>;
-  findById(id: string, organizationId: string): Promise<Option<WebhookEndpointRecord>>;
+  findById(
+    id: string,
+    organizationId: string,
+  ): Promise<Result<Option<WebhookEndpointRecord>, WebhookRepoError>>;
+  findEnabledById(id: string): Promise<Result<Option<WebhookEndpointRecord>, WebhookRepoError>>;
   listByOrg(organizationId: string): Promise<Result<WebhookEndpointRecord[], WebhookRepoError>>;
   applySecretRotation(args: {
     id: string;

@@ -12,6 +12,9 @@ declare module "inwire" {
 
 export const healthModule = defineModule()((b) =>
   b
-    .add("IHealthCheckRegistry", (): IHealthCheckRegistry => new InMemoryHealthCheckRegistry())
-    .add("DbHealthProbe", (c) => new DbHealthProbe(c.IHealthCheckRegistry)),
+    .add(
+      "IHealthCheckRegistry",
+      (c): IHealthCheckRegistry => new InMemoryHealthCheckRegistry(c.IInstrumentation),
+    )
+    .add("DbHealthProbe", (c) => new DbHealthProbe(c.IHealthCheckRegistry, c.IInstrumentation)),
 );
