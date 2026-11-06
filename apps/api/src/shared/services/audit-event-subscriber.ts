@@ -6,7 +6,6 @@ import {
   isNotNull,
   lockForTransaction,
   resolveExecutor,
-  sql,
 } from "@packages/drizzle";
 import { retentionFor } from "@packages/events";
 import { readActorId } from "@packages/outbox/event-actor";
@@ -17,7 +16,6 @@ import { computeAuditHash, GENESIS_HASH } from "./audit-hash";
 const al = auditLogSchema.auditLog;
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 const CHAIN_LOCK_KEY = "audit_log_chain";
-const LEGACY_CHAIN_LOCK = sql`select pg_advisory_xact_lock(hashtext(${CHAIN_LOCK_KEY}))`;
 
 function extractActor(event: DeliveredEvent): { id: string | null; type: AuditActorType } {
   const actorId = readActorId(event.payload);
@@ -59,7 +57,6 @@ export class AuditEventSubscriber implements BuiltInEventHandler {
           let prevHash: string | null = null;
           let hash: string | null = null;
           if (this.tamperEvidence) {
-            await exec.execute(LEGACY_CHAIN_LOCK);
             await lockForTransaction(CHAIN_LOCK_KEY);
             const last = await exec
               .select({ hash: al.hash })
