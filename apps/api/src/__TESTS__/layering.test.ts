@@ -17,6 +17,15 @@ const ALLOWED_TX_PARAMETERS: Record<string, string> = {};
 
 const ALLOWED_TRANSACTION_OPENERS: Record<string, string> = {};
 
+const COMPOSED_MODULES = ["audit-log", "consents", "policies", "profile", "quotas"];
+
+const HOST_REACH = [
+  /from\s+["'][./]*container["']/,
+  /from\s+["'][./]*shared\/env["']/,
+  /from\s+["'][./]*shared\/middleware\//,
+  /declare\s+module\s+["']inwire["']/,
+];
+
 const modules = readdirSync(join(apiSrcRoot, "modules"), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => `modules/${entry.name}`);
@@ -100,5 +109,13 @@ describe("layering rules of the api", () => {
     expect(allReads[ENV_OWNER]).toBeGreaterThan(0);
     expect(strayReaders).toEqual([]);
     expect(staleAllowances).toEqual([]);
+  });
+
+  it("a composed module reaches the host only through its prerequisites and route deps", () => {
+    const reaches = COMPOSED_MODULES.flatMap((module) =>
+      scan.sourceFiles(`modules/${module}`),
+    ).filter((file) => HOST_REACH.some((pattern) => pattern.test(scan.codeOf(file))));
+
+    expect(reaches).toEqual([]);
   });
 });

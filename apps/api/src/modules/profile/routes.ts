@@ -1,49 +1,60 @@
-import { AppErrorException, Result } from "@packages/ddd-kit";
+import { AppErrorException, type IUnitOfWork, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import type { RouteEnv, RouteGuards } from "@packages/http/route-guards";
 import { zV } from "@packages/http/validator";
 import { emitEvent } from "@packages/outbox/event-emitter";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { Hono } from "hono";
-import { di } from "../../container";
-import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
-import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
-import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
-import type { ProfileError } from "../../shared/ports/profile.port";
+import type { IProfileStore, ProfileError } from "../../shared/ports/profile.port";
 import { localeSchema } from "./profile.schema";
 
-export const profileRoutes = new Hono<{ Variables: AuthVariables }>().put(
-  "/locale",
-  requireAuth,
-  requireCurrentPolicies,
-  denyImpersonated,
-  zV("json", localeSchema),
-  async (c) => {
-    const { locale } = c.req.valid("json");
-    const userId = c.get("user").id;
+export interface ProfileRoutesDeps {
+  routeGuards: RouteGuards;
+  ITransactionService: IUnitOfWork;
+  IOutboxRepository: IOutboxRepository;
+  IProfileStore: Pick<IProfileStore, "findLocale" | "setLocale">;
+}
 
-    const done = await di.ITransactionService.run(async (): Promise<Result<void, ProfileError>> => {
-      const previous = await di.IProfileStore.findLocale(userId);
-      if (previous.isFailure) return Result.fail(previous.getError());
+export function createProfileRoutes(deps: ProfileRoutesDeps) {
+  const { routeGuards: g } = deps;
 
-      const written = await di.IProfileStore.setLocale(userId, locale);
-      if (written.isFailure) return written;
+  return new Hono<RouteEnv>().put(
+    "/locale",
+    g.requireAuth,
+    g.requireCurrentPolicies,
+    g.denyImpersonated,
+    zV("json", localeSchema),
+    async (c) => {
+      const { locale } = c.req.valid("json");
+      const userId = g.currentUserId(c);
 
-      await emitEvent(
-        di.IOutboxRepository,
-        EventTypes.USER_LOCALE_CHANGED,
-        "user",
-        userId,
-        {
-          userId,
-          locale,
-          previousLocale: previous.getValue().toNull(),
+      const done = await deps.ITransactionService.run(
+        async (): Promise<Result<void, ProfileError>> => {
+          const previous = await deps.IProfileStore.findLocale(userId);
+          if (previous.isFailure) return Result.fail(previous.getError());
+
+          const written = await deps.IProfileStore.setLocale(userId, locale);
+          if (written.isFailure) return written;
+
+          await emitEvent(
+            deps.IOutboxRepository,
+            EventTypes.USER_LOCALE_CHANGED,
+            "user",
+            userId,
+            {
+              userId,
+              locale,
+              previousLocale: previous.getValue().toNull(),
+            },
+            {},
+          );
+
+          return Result.ok();
         },
-        {},
       );
+      if (done.isFailure) throw new AppErrorException(done.getError());
 
-      return Result.ok();
-    });
-    if (done.isFailure) throw new AppErrorException(done.getError());
-
-    return c.json({ ok: true as const });
-  },
-);
+      return c.json({ ok: true as const });
+    },
+  );
+}

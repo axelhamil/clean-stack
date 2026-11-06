@@ -1,0 +1,47 @@
+import { Option } from "@packages/ddd-kit";
+import type { RouteGuards } from "@packages/http/route-guards";
+import type { Context } from "hono";
+import { HTTPException } from "hono/http-exception";
+import type { SessionUser } from "../auth";
+import type { Feature, QuotaKey } from "../shared/entitlements";
+import { requireAuth } from "../shared/middleware/auth.middleware";
+import { requireFeature, requirePlan, requireQuota } from "../shared/middleware/billing.middleware";
+import { denyImpersonated } from "../shared/middleware/deny-impersonated.middleware";
+import { requireOrg, requireOrgPermission } from "../shared/middleware/org.middleware";
+import { requireCurrentPolicies } from "../shared/middleware/policy.middleware";
+import { resolveClientIp } from "../shared/middleware/rate-limit.ip";
+import {
+  requireStaff,
+  requireStaffPermission,
+  requireStepUp,
+} from "../shared/middleware/staff.middleware";
+
+export type AppRouteGuards = RouteGuards<Feature, QuotaKey>;
+
+function sessionUser(c: Context): Option<SessionUser> {
+  const user: SessionUser | null | undefined = c.get("user");
+
+  return Option.fromNullable(user);
+}
+
+export const routeGuards: AppRouteGuards = {
+  requireAuth,
+  requireOrg,
+  requireOrgPermission,
+  requireCurrentPolicies,
+  denyImpersonated,
+  requireStaff,
+  requireStaffPermission,
+  requireStepUp,
+  requireFeature,
+  requirePlan,
+  requireQuota,
+  currentUserId: (c) => {
+    const user = sessionUser(c);
+    if (user.isNone()) throw new HTTPException(401, { message: "Unauthorized" });
+
+    return user.unwrap().id;
+  },
+  signedInUserId: (c) => sessionUser(c).map((user) => user.id),
+  clientIp: resolveClientIp,
+};

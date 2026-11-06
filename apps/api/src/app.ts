@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
 import { auth } from "./auth";
+import { type AppRouteGuards, routeGuards } from "./composition/route-guards";
 import { di } from "./container";
 import { adminImpersonationRoutes } from "./modules/admin/admin-impersonation.routes";
 import { adminOrgRoutes } from "./modules/admin/admin-orgs.routes";
@@ -14,15 +15,15 @@ import { adminStaffRoutes } from "./modules/admin/staff.routes";
 import { adminWorkspaceRoutes } from "./modules/admin/workspace.routes";
 import { apiTokenRoutes } from "./modules/api-token/routes";
 import { createApiTokenScanningRoutes } from "./modules/api-token/scanning.routes";
-import { auditLogRoutes } from "./modules/audit-log/routes";
+import { createAuditLogRoutes } from "./modules/audit-log/routes";
 import { billingRoutes } from "./modules/billing/routes";
-import { consentRoutes } from "./modules/consents/routes";
+import { createConsentRoutes } from "./modules/consents/routes";
 import { healthInternalRoutes } from "./modules/health/internal.routes";
 import { healthRoutes } from "./modules/health/routes";
 import { notificationsRoutes } from "./modules/notifications/routes";
 import { organizationSettingsRoutes } from "./modules/organization/routes";
-import { policyRoutes } from "./modules/policies/routes";
-import { profileRoutes } from "./modules/profile/routes";
+import { createPolicyRoutes } from "./modules/policies/routes";
+import { createProfileRoutes } from "./modules/profile/routes";
 import { rgpdInternalRoutes } from "./modules/rgpd/internal.routes";
 import { rgpdMeRoutes } from "./modules/rgpd/routes";
 import { uploadsRoutes } from "./modules/uploads/routes";
@@ -75,6 +76,8 @@ type AppEnv = {
 };
 
 const app = new Hono<AppEnv>();
+
+const routeDeps = di.scope({ routeGuards: (): AppRouteGuards => routeGuards }, { name: "routes" });
 
 const allowedOrigins = FRONT_ORIGINS;
 const apiTokenPepper = env.API_TOKEN_PEPPER ?? "dev-only-pepper-not-for-production-use";
@@ -240,8 +243,8 @@ app.route(
 
 const routes = app
   .route("/me", rgpdMeRoutes)
-  .route("/me", profileRoutes)
-  .route("/me/policies", policyRoutes)
+  .route("/me", createProfileRoutes(routeDeps))
+  .route("/me/policies", createPolicyRoutes(routeDeps))
   .route("/uploads", uploadsRoutes)
   .route("/admin", adminStaffRoutes)
   .route("/admin", adminWorkspaceRoutes)
@@ -250,11 +253,11 @@ const routes = app
   .route("/admin/orgs", adminOrgRoutes)
   .route("/admin/ops", adminOpsRoutes)
   .route("/admin/impersonation", adminImpersonationRoutes)
-  .route("/admin/audit-log", auditLogRoutes)
+  .route("/admin/audit-log", createAuditLogRoutes(routeDeps))
   .route("/settings/tokens", apiTokenRoutes)
   .route("/settings/webhooks", webhooksRoutes)
   .route("/settings/organization", organizationSettingsRoutes)
-  .route("/consents", consentRoutes)
+  .route("/consents", createConsentRoutes(routeDeps))
   .route("/billing", billingRoutes)
   .route("/notifications", notificationsRoutes);
 

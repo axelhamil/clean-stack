@@ -1,11 +1,18 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
+import type { RouteGuard } from "@packages/http/route-guards";
+import { openRouteGuards } from "@packages/http/testing/route-guards";
 import type { Locale } from "@packages/i18n";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
+import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
+import { createErrorHandler } from "../../../shared/middleware/error.middleware";
 import type { ProfileError } from "../../../shared/ports/profile.port";
+import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
+import { createProfileRoutes } from "../routes";
 
 const { unitOfWork, outcome } = mockUnitOfWork();
 
@@ -29,38 +36,30 @@ function recordEnqueueTransaction() {
   });
 }
 
-mock.module("../../../container", () => ({
-  di: {
-    IProfileStore: { findLocale: mockFindLocale, setLocale: mockSetLocale },
-    IOutboxRepository: outbox,
-    ITransactionService: unitOfWork,
-    PolicyAcceptanceService: { hasAcceptedCurrent: mock(async () => Result.ok(true)) },
-  },
-}));
+let impersonating = false;
 
-let currentSession: Record<string, unknown> = {};
-
-const realAuthMiddleware = await import("../../../shared/middleware/auth.middleware");
-mock.module("../../../shared/middleware/auth.middleware", () => ({
-  ...realAuthMiddleware,
-  requireAuth: async (c: { set: (k: string, v: unknown) => void }, next: () => Promise<void>) => {
-    c.set("user", { id: "user-1" });
-    c.set("session", currentSession);
-    await next();
-  },
-}));
-
-const { profileRoutes } = await import("../routes");
-const { Hono } = await import("hono");
-const { createErrorHandler } = await import("../../../shared/middleware/error.middleware");
-const { NoOpInstrumentation } = await import("../../../shared/services/noop-instrumentation");
+const refuseImpersonation: RouteGuard = async (_c, next) => {
+  if (impersonating) throw new HTTPException(403, { message: "impersonating" });
+  await next();
+};
 
 const app = new Hono<{ Variables: { requestId: string } }>()
   .use("*", async (c, next) => {
     c.set("requestId", "req-test");
     await next();
   })
-  .route("/me", profileRoutes);
+  .route(
+    "/me",
+    createProfileRoutes({
+      routeGuards: {
+        ...openRouteGuards({ userId: "user-1" }),
+        denyImpersonated: refuseImpersonation,
+      },
+      ITransactionService: unitOfWork,
+      IOutboxRepository: outbox,
+      IProfileStore: { findLocale: mockFindLocale, setLocale: mockSetLocale },
+    }),
+  );
 app.onError(createErrorHandler(new NoOpInstrumentation()));
 
 function putLocale(locale: string) {
@@ -83,7 +82,7 @@ async function lastRunSettlement() {
 
 describe("PUT /me/locale", () => {
   beforeEach(() => {
-    currentSession = {};
+    impersonating = false;
     mockFindLocale.mockClear();
     mockSetLocale.mockClear();
     outbox.enqueue.mockReset();
@@ -150,7 +149,7 @@ describe("PUT /me/locale", () => {
   });
 
   it("refuses an impersonated session", async () => {
-    currentSession = { impersonatedBy: "admin-1" };
+    impersonating = true;
 
     const res = await putLocale("fr");
 

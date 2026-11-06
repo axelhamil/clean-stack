@@ -1,6 +1,9 @@
 import { describe, expect, it, mock } from "bun:test";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
+import { mockPort } from "@packages/test/bun";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import type { AuditLogRoutesDeps } from "../../audit-log/routes";
 
 const realAuthMiddleware = await import("../../../shared/middleware/auth.middleware");
 mock.module("../../../shared/middleware/auth.middleware", () => ({
@@ -31,7 +34,8 @@ const { adminOrgRoutes } = await import("../admin-orgs.routes");
 const { adminUserRoutes } = await import("../routes");
 const { adminStaffRoutes } = await import("../staff.routes");
 const { adminWorkspaceRoutes } = await import("../workspace.routes");
-const { auditLogRoutes } = await import("../../audit-log/routes");
+const { createAuditLogRoutes } = await import("../../audit-log/routes");
+const { routeGuards } = await import("../../../composition/route-guards");
 const { listBackRoutes } = await import("../../../shared/surface/back-routes");
 
 const app = new Hono()
@@ -42,7 +46,14 @@ const app = new Hono()
   .route("/admin/orgs", adminOrgRoutes)
   .route("/admin/ops", adminOpsRoutes)
   .route("/admin/impersonation", adminImpersonationRoutes)
-  .route("/admin/audit-log", auditLogRoutes);
+  .route(
+    "/admin/audit-log",
+    createAuditLogRoutes({
+      routeGuards,
+      IOutboxRepository: mockPort<IOutboxRepository>(),
+      AuditQueryService: mockPort<AuditLogRoutesDeps["AuditQueryService"]>(),
+    }),
+  );
 app.onError((err, c) =>
   c.text(err instanceof HTTPException ? err.message : "unguarded", GATE_STATUS),
 );

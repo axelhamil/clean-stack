@@ -4,12 +4,12 @@ import type {
   AuditFilters,
   AuditPage,
   ChainVerification,
-  IAuditPort,
 } from "../../../../shared/ports/audit.port";
+import type { IAuditTrail } from "../ports/audit-trail.port";
 
 export class AuditQueryService {
   constructor(
-    private readonly audit: IAuditPort,
+    private readonly audit: IAuditTrail,
     private readonly instrumentation: IInstrumentation,
   ) {}
 

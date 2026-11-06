@@ -1,18 +1,19 @@
+import type { IInstrumentation, IUnitOfWork } from "@packages/ddd-kit";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { defineModule } from "inwire";
 import type { IConsentStore } from "./application/ports/consent.port";
 import { ConsentService } from "./application/services/consent.service";
 import { DrizzleConsentStore } from "./infrastructure/repositories/drizzle-consent.store";
 
-declare module "inwire" {
-  interface AppDeps {
-    IConsentStore: IConsentStore;
-    ConsentService: ConsentService;
-  }
+export interface ConsentPrerequisites {
+  IInstrumentation: IInstrumentation;
+  IOutboxRepository: IOutboxRepository;
+  ITransactionService: IUnitOfWork;
 }
 
-export const consentModule = defineModule()((b) =>
+export const consentModule = defineModule<ConsentPrerequisites>()((b) =>
   b
-    .add("IConsentStore", (c) => new DrizzleConsentStore(c.IInstrumentation))
+    .add("IConsentStore", (c): IConsentStore => new DrizzleConsentStore(c.IInstrumentation))
     .add(
       "ConsentService",
       (c) =>

@@ -1,5 +1,5 @@
 import type { OrgPermissions, StaffPermission, Tier } from "@packages/access-control";
-import type { ILogger } from "@packages/ddd-kit";
+import type { ILogger, Option } from "@packages/ddd-kit";
 import type { Context, MiddlewareHandler } from "hono";
 
 export interface RouteEnv {
@@ -20,4 +20,7 @@ export interface RouteGuards<TFeature extends string = string, TQuota extends st
   requireFeature(feature: TFeature): RouteGuard;
   requirePlan(minTier: Tier): RouteGuard;
   requireQuota(key: TQuota, readUsage: (c: Context) => Promise<number>): RouteGuard;
+  currentUserId(c: Context): string;
+  signedInUserId(c: Context): Option<string>;
+  clientIp(c: Context): string;
 }
