@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import * as realDrizzle from "@packages/drizzle";
+import type { DeliveredEvent } from "@packages/outbox/outbox.port";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import type { DeliveredEvent } from "../ports/outbox.port";
 
 // ---------------------------------------------------------------------------
 // Query-chain factories, called fresh on each tx.select / tx.insert

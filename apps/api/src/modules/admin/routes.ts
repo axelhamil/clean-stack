@@ -1,4 +1,5 @@
 import { AppErrorException } from "@packages/ddd-kit";
+import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { auth } from "../../auth";
@@ -6,7 +7,6 @@ import { di } from "../../container";
 import { deliverPasswordReset } from "../../shared/auth/password-reset-delivery";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { assertStepUp, requireStaffPermission } from "../../shared/middleware/staff.middleware";
-import { zV } from "../../shared/validator";
 import { addStaffNoteBodySchema } from "./application/dto/add-staff-note.dto";
 import { banUserBodySchema } from "./application/dto/ban-user.dto";
 import { listUsersQuerySchema } from "./application/dto/list-users.dto";

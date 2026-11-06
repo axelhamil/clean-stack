@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, setSystemTime } from "bun:test";
-import { Option, Result } from "@packages/ddd-kit";
+import { type ILogger, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
+import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
-import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import type { ITotpVerifier, TotpOutcome } from "../../../shared/ports/totp-verifier.port";
 import type { IStepUpStore } from "../application/ports/step-up-store.port";
 import { StepUpService } from "../application/services/step-up.service";
@@ -30,9 +30,14 @@ function setup(given: { totp?: TotpOutcome; sessionLive?: boolean; verifiedAt?: 
   outbox.enqueue.mockImplementation(async () => {});
 
   const { unitOfWork, outcome } = mockUnitOfWork();
-  const service = new StepUpService(store, totp, outbox, unitOfWork, {
-    ADMIN_STEP_UP_TTL_SECONDS: TTL_SECONDS,
-  });
+  const service = new StepUpService(
+    store,
+    totp,
+    outbox,
+    unitOfWork,
+    { ADMIN_STEP_UP_TTL_SECONDS: TTL_SECONDS },
+    mockPort<ILogger>(),
+  );
 
   return { service, store, outbox, outcome };
 }

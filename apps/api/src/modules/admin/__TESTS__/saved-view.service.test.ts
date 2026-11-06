@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
+import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
-import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import type { ISavedViewStore } from "../application/ports/saved-view-store.port";
 import { SavedViewService } from "../application/services/saved-view.service";
 

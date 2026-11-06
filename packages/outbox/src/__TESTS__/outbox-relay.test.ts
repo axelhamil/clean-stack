@@ -1,6 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 import {
   type IInstrumentation,
+  type ILogger,
   InMemoryEventDispatcher,
   Option,
   Result,
@@ -8,15 +9,14 @@ import {
 } from "@packages/ddd-kit";
 import { EventTypes, OUTBOX_LAST_ERROR_MAX_LENGTH, OutboxEventDeadPayload } from "@packages/events";
 import { mockPort, type PortMock } from "@packages/test/bun";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { mockUnitOfWork, type UnitOfWorkMock } from "@packages/test/bun/unit-of-work";
-import { mockInstrumentation } from "../../../__TESTS__/mock-instrumentation";
-import { logger } from "../../logger";
 import type {
   DeliveredEvent,
   IOutboxRepository,
   OutboxFailure,
   OutboxRecord,
-} from "../../ports/outbox.port";
+} from "../outbox.port";
 import { claimLimitOf, OutboxRelay, type OutboxRelayOptions } from "../outbox-relay";
 
 const TYPE = EventTypes.USER_CREATED;
@@ -57,6 +57,7 @@ let repository: PortMock<IOutboxRepository>;
 let dispatcher: InMemoryEventDispatcher<DeliveredEvent>;
 let uow: UnitOfWorkMock;
 let instrumentation: PortMock<IInstrumentation>;
+let logger: PortMock<ILogger>;
 
 function relay(options: Partial<OutboxRelayOptions> = {}) {
   return new OutboxRelay(
@@ -96,10 +97,7 @@ beforeEach(() => {
   dispatcher = new InMemoryEventDispatcher<DeliveredEvent>();
   uow = mockUnitOfWork();
   instrumentation = mockInstrumentation();
-});
-
-afterEach(() => {
-  spyOn(logger, "warn").mockRestore();
+  logger = mockPort<ILogger>();
 });
 
 describe("OutboxRelay.drainOnce", () => {
@@ -289,7 +287,7 @@ describe("OutboxRelay.drainOnce", () => {
   });
 
   it("a failed settle warns with the event and its failing handlers, and captures each failure", async () => {
-    const warn = spyOn(logger, "warn");
+    const warn = logger.warn;
     dispatcher.subscribe(TYPE, "audit-log", () => {});
     dispatcher.subscribe(TYPE, "webhook-fanout", () => {
       throw new Error("boom");

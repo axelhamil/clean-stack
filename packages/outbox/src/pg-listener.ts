@@ -1,6 +1,5 @@
-import type { IInstrumentation } from "@packages/ddd-kit";
+import type { IInstrumentation, ILogger } from "@packages/ddd-kit";
 import { Client, type ClientConfig } from "pg";
-import type { Logger } from "../logger";
 
 const RECONNECT_BACKOFF_MS = 250;
 const RECONNECT_MAX_BACKOFF_MS = 15_000;
@@ -75,7 +74,7 @@ export class PgListener {
 
   constructor(
     private readonly config: PgListenerConfig,
-    private readonly logger: Logger,
+    private readonly logger: ILogger,
     private readonly instrumentation: IInstrumentation,
     options: PgListenerOptions = {},
   ) {
@@ -132,7 +131,7 @@ export class PgListener {
     client.on("end", () => {
       if (this.stopping) return;
 
-      this.logger.warn(`${label} listener ended, will reconnect`);
+      this.logger.warn({}, `${label} listener ended, will reconnect`);
       this.instrumentation.addBreadcrumb({
         category: label,
         message: "listener connection ended, reconnecting",
@@ -163,7 +162,7 @@ export class PgListener {
           this.listenClient = client;
           this.reconnectBackoff = this.baseBackoffMs;
           this.startHeartbeat(client, dispose);
-          this.logger.debug(`${label} listener connected`);
+          this.logger.debug({}, `${label} listener connected`);
           if (this.everConnected) this.config.onReconnect?.();
           this.everConnected = true;
         } catch (err) {

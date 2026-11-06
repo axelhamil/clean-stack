@@ -1,5 +1,5 @@
 import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
-import { encodeTimeIdCursor } from "../../../../shared/pagination/time-id-cursor";
+import { encodeTimeIdCursor } from "@packages/http/time-id-cursor";
 import type {
   EntitlementsReadError,
   IEntitlementsReader,

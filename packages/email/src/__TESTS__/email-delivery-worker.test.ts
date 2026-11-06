@@ -1,28 +1,32 @@
 import { beforeEach, describe, expect, it } from "bun:test";
-import { type IInstrumentation, Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
+import {
+  type IInstrumentation,
+  type ILogger,
+  Option,
+  Result,
+  UnitOfWorkContext,
+} from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import type { Locale } from "@packages/i18n";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
+import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
 import { mockPort, type PortMock } from "@packages/test/bun";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { mockUnitOfWork, type UnitOfWorkMock } from "@packages/test/bun/unit-of-work";
 import type { ErrorResponse } from "resend";
-import { mockInstrumentation } from "../../__TESTS__/mock-instrumentation";
-import type { Logger } from "../logger";
 import type {
   EmailFailure,
   EmailLease,
   EmailMessageRecord,
   IEmailQueue,
-} from "../ports/email-queue.port";
-import type { IOutboxRepository } from "../ports/outbox.port";
-import { NoOpInstrumentation } from "../services/noop-instrumentation";
-import { enqueuedEvents } from "./enqueued-events";
+} from "../email-queue.port";
 
 // `@packages/emails` is intentionally NOT mocked here: nothing in this file asserts
 // on rendered content (only on which row got claimed/sent), so exercising the real
 // renderer is both cheaper than a stub and closer to what ships.
 
 const { EmailDeliveryWorker, chunkBatchKey, chunkIdempotencyKey, groupRows, resendBatchSender } =
-  await import("../services/email-delivery-worker.service");
+  await import("../email-delivery-worker");
 
 const OPTIONS = { leaseSeconds: 120, deadRetrySeconds: 21_600, deadReplayWindowHours: 24 };
 
@@ -55,7 +59,7 @@ const row = (over: Partial<EmailMessageRecord>): EmailMessageRecord => ({
   ...over,
 });
 
-const logger = mockPort<Logger>();
+const logger = mockPort<ILogger>();
 let queue: PortMock<IEmailQueue>;
 let outbox: PortMock<IOutboxRepository>;
 let uow: UnitOfWorkMock;
@@ -76,7 +80,7 @@ function claims(rows: EmailMessageRecord[]): void {
 function worker(
   options = OPTIONS,
   clock = () => now,
-  instrumentation: IInstrumentation = new NoOpInstrumentation(),
+  instrumentation: IInstrumentation = mockInstrumentation(),
 ) {
   return new EmailDeliveryWorker(
     queue,
@@ -382,7 +386,7 @@ describe("EmailDeliveryWorker.start", () => {
 
 describe("resendBatchSender", () => {
   it("aborts a send that outlives its timeout and reports it as a retryable failure", async () => {
-    const instrumentation = new NoOpInstrumentation();
+    const instrumentation = mockInstrumentation();
     const client = {
       batch: {
         send: (_entries: never, options: { signal: AbortSignal }) =>
@@ -426,7 +430,7 @@ describe("resendBatchSender", () => {
     const kinds = await Promise.all(
       cases.map(async ([error]) => {
         const client = { batch: { send: async () => ({ data: null, error }) } };
-        const result = await resendBatchSender(client, new NoOpInstrumentation(), logger).batchSend(
+        const result = await resendBatchSender(client, mockInstrumentation(), logger).batchSend(
           [{ to: "a@x.test" }],
           Option.some("key"),
         );

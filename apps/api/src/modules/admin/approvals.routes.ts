@@ -1,4 +1,5 @@
 import { AppErrorException } from "@packages/ddd-kit";
+import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
@@ -7,7 +8,6 @@ import {
   requireStaffPermission,
   requireStepUp,
 } from "../../shared/middleware/staff.middleware";
-import { zV } from "../../shared/validator";
 import { decideApprovalBodySchema } from "./application/dto/decide-approval.dto";
 import { listApprovalsQuerySchema } from "./application/dto/list-approvals.dto";
 import type { ApprovalRecord } from "./application/ports/approval-store.port";

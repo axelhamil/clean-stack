@@ -62,7 +62,7 @@ The RGPD module was used as the first leaf to validate the contract end-to-end. 
 |---|---|
 | 1. Back code | `apps/api/src/modules/rgpd/` (10 files: application/dto, application/ports, application/services, infrastructure/repositories, routes, internal.routes, module, tests). `container.ts:6,72`. `index.ts:12-13,55,62`. |
 | 2. Events | 5 events in `packages/events`: `USER_DELETION_{REQUESTED,CANCELLED}`, `USER_DELETED`, `USER_EXPORT_{REQUESTED,COMPLETED}`. 5 payloads, 5 `RETENTION_MAP` entries. |
-| 3. Ports | `apps/api/src/shared/ports/email.port.ts`: 3 template keys (`data_export_ready`, `delete_requested`, `delete_cancelled`, `delete_completed`: 4 keys, one is unused even without rgpd, kept for parity). `shared/services/email.service.ts`: matching `TEMPLATE_IDS`. |
+| 3. Ports | `packages/email/src/email.port.ts`: 3 template keys (`data_export_ready`, `delete_requested`, `delete_cancelled`, `delete_completed`: 4 keys, one is unused even without rgpd, kept for parity). `packages/email/src/email-delivery-worker.ts`: matching `TEMPLATE_IDS`. |
 | 4. Env vars | `RGPD_GRACE_PERIOD_DAYS`, `RGPD_EXPORT_RATE_LIMIT_HOURS`, `RGPD_SWEEP_BATCH_SIZE` in `shared/env.ts` + `.env.example`. |
 | 5. Schema | `packages/drizzle/src/schema/auth.ts`: **3 columns** on `user` (`pendingDeletionUntil`, `deletedAt`, `lastExportRequestedAt`): note: 3, not 2, because `deletedAt` lives only in the schema not in auth.ts `additionalFields`. `apps/api/src/auth.ts:107-113`: 3 `additionalFields` entries. Migration emitted by `pnpm db:generate`: 3 `ALTER TABLE user DROP COLUMN`. |
 | 6. Front | `features/rgpd/` (9 files), `features/legal/data-rights.route.tsx`, `apps/app/routes.ts` (1 `route("/legal/data-rights", ...)` entry), `features/privacy/privacy.route.tsx` (`DataExportCard` import + usage, relocated to Privacy page in A.5; `features/danger/` no longer exists), `features/account/account.route.tsx` (`RgpdDeletionCard` import + usage + `<Link to="/legal/data-rights">`: contextual danger zone, relocated in A.5), `shared/api/queries/account-deletion.ts`, `shared/api/mutations/{cancel,request}-account-deletion.ts`, `shared/api/mutations/request-data-export.ts`. Docs: `CRON.md` (rgpd-sweep section), `INTEGRATIONS.md` (rgpd env section + template rows), `MODULES.md` (rgpd row), `EVENTS.md` (via-rgpd-service section + event count, currently 54 → 49 after removing the 5 RGPD events, verify the live count in `event-types.ts` at removal time). |
@@ -94,7 +94,7 @@ Total clock time end-to-end (including the cartography pass, axis-by-axis edits,
 
 ### What you do NOT touch (worth naming)
 
-- `apps/api/src/shared/event-emitter.ts`: `emitEvent()` is shared infrastructure used by uploads + BetterAuth bridge too. Stays.
+- `packages/outbox/src/event-emitter.ts`: `emitEvent()` is shared infrastructure used by uploads + BetterAuth bridge too. Stays.
 - `apps/api/src/shared/services/audit-event-subscriber.ts`: the audit primitive (outbox event → `audit_log` row) is not RGPD-specific. Stays.
 - `docs/HISTORY.md` mentions of RGPD, historical record, preserve.
 - `docs/OBSERVABILITY.md` "RGPD-clean by default", generic GDPR-compliance phrasing, not module-specific. Stays.

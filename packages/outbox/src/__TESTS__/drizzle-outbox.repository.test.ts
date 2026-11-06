@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, mock } from "bun:test";
 import type { IDomainEvent } from "@packages/ddd-kit";
 import * as realDrizzle from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
-import { mockInstrumentation } from "../../__TESTS__/mock-instrumentation";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 
 const insertedRows: Array<{ id: string; eventType: string }> = [];
 const insert = mock(() => ({
@@ -15,7 +15,7 @@ const executor = { insert, execute: mock(async () => ({ rows: [] })) };
 
 mock.module("@packages/drizzle", () => ({ ...realDrizzle, resolveExecutor: () => executor }));
 
-const { DrizzleOutboxRepository } = await import("../services/drizzle-outbox.service");
+const { DrizzleOutboxRepository } = await import("../drizzle-outbox.repository");
 const { emitEvent } = await import("../event-emitter");
 
 function makeEvent(overrides: Partial<IDomainEvent> = {}): IDomainEvent {
@@ -39,7 +39,7 @@ describe("DrizzleOutboxRepository.enqueue", () => {
 
   it("given an unknown event type or an invalid payload, when enqueued, then it rejects before touching the database", async () => {
     const instrumentation = mockInstrumentation();
-    const repo = new DrizzleOutboxRepository(instrumentation);
+    const repo = new DrizzleOutboxRepository(instrumentation, () => undefined);
 
     await expect(repo.enqueue([makeEvent({ eventType: "nope.unknown" })], scope)).rejects.toThrow(
       'unknown event type "nope.unknown"',
@@ -54,7 +54,7 @@ describe("DrizzleOutboxRepository.enqueue", () => {
   });
 
   it("given events carrying an eventId, when enqueued, then each row id is that eventId", async () => {
-    const repo = new DrizzleOutboxRepository(mockInstrumentation());
+    const repo = new DrizzleOutboxRepository(mockInstrumentation(), () => undefined);
 
     await repo.enqueue(
       [makeEvent({ eventId: "evt-1" }), makeEvent({ eventId: "evt-2", aggregateId: "u2" })],
@@ -65,7 +65,7 @@ describe("DrizzleOutboxRepository.enqueue", () => {
   });
 
   it("emitEvent returns the id stored as the outbox row id", async () => {
-    const repo = new DrizzleOutboxRepository(mockInstrumentation());
+    const repo = new DrizzleOutboxRepository(mockInstrumentation(), () => undefined);
 
     const eventId = await emitEvent(repo, EventTypes.USER_CREATED, "user", "u1", {
       userId: "u1",

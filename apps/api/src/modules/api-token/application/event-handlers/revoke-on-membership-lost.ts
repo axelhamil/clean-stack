@@ -6,10 +6,10 @@ import {
   Result,
 } from "@packages/ddd-kit";
 import { EventTypes, PayloadByEventType } from "@packages/events";
-import { emitEvent } from "../../../../shared/event-emitter";
+import { emitEvent } from "@packages/outbox/event-emitter";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { payloadParser } from "../../../../shared/payload-parser";
 import type { ApiTokenError, IApiTokenRepository } from "../../../../shared/ports/api-token.port";
-import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 
 interface Deps {
   IApiTokenRepository: IApiTokenRepository;

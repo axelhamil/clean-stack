@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import type { EmailError } from "@packages/email/email.port";
 import { EventTypes } from "@packages/events";
-import type { EmailError } from "../../../shared/ports/email.port";
 import { notifyImpersonatedUser } from "../application/event-handlers/notify-impersonated-user";
 
 const sendTemplate = mock(async (): Promise<Result<void, EmailError>> => Result.ok());

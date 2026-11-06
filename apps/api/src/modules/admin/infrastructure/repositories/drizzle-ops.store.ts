@@ -1,6 +1,7 @@
 import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import {
   count,
+  dbOperationFailure,
   desc,
   emailSchema,
   eq,
@@ -8,7 +9,6 @@ import {
   resolveExecutor,
   webhooksSchema,
 } from "@packages/drizzle";
-import { dbOperationFailure } from "../../../../shared/db-failure";
 import type {
   DeadOutboxPage,
   DeadQueueCounts,

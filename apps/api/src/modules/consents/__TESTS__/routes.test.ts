@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Result } from "@packages/ddd-kit";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { Hono } from "hono";
-import { mockInstrumentation } from "../../../__TESTS__/mock-instrumentation";
 import { createErrorHandler } from "../../../shared/middleware/error.middleware";
 
 const record = mock(async () => Result.ok({ categories: { analytics: true } }));

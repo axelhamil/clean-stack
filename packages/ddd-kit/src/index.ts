@@ -17,6 +17,7 @@ export * from "./events/event-handler";
 export * from "./events/in-memory-event-dispatcher";
 export * from "./events/on-event";
 export * from "./events/outbox-mapping";
+export * from "./primitives/canonical-json";
 export * from "./primitives/option";
 export * from "./primitives/result";
 export * from "./primitives/uuid";

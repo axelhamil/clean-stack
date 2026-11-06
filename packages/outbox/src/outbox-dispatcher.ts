@@ -1,7 +1,6 @@
-import type { IInstrumentation } from "@packages/ddd-kit";
-import type { Logger } from "../logger";
-import type { IOutboxRepository } from "../ports/outbox.port";
-import { OUTBOX_CHANNEL } from "./drizzle-outbox.service";
+import type { IInstrumentation, ILogger } from "@packages/ddd-kit";
+import { OUTBOX_CHANNEL } from "./drizzle-outbox.repository";
+import type { IOutboxRepository } from "./outbox.port";
 import type { OutboxRelay } from "./outbox-relay";
 import { PgListener, type PgListenerOptions } from "./pg-listener";
 
@@ -32,7 +31,7 @@ export class OutboxDispatcher {
   constructor(
     private readonly outbox: IOutboxRepository,
     private readonly createRelay: CreateOutboxRelay,
-    private readonly logger: Logger,
+    private readonly logger: ILogger,
     connectionString: string,
     private readonly instrumentation: IInstrumentation,
     private readonly options: OutboxDispatcherOptions,
@@ -60,7 +59,7 @@ export class OutboxDispatcher {
     this.relay = this.createRelay(diLike);
     await this.retireNotifyTrigger();
     await this.listener.start();
-    this.logger.info("outbox dispatcher started");
+    this.logger.info({}, "outbox dispatcher started");
     this.wake();
   }
 
@@ -77,7 +76,7 @@ export class OutboxDispatcher {
       clearTimeout(grace);
     }
     await this.listener.stop();
-    this.logger.info("outbox dispatcher stopped");
+    this.logger.info({}, "outbox dispatcher stopped");
   }
 
   private async retireNotifyTrigger(): Promise<void> {

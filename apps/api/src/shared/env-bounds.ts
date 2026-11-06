@@ -1,4 +1,9 @@
 import { isIP } from "node:net";
+import {
+  EMAIL_SEND_TIMEOUT_SECONDS,
+  EMAIL_SETTLE_MARGIN_SECONDS,
+} from "@packages/email/email-timing";
+import { OUTBOX_SETTLE_MARGIN_SECONDS } from "@packages/outbox/outbox-relay";
 import { getPublicSuffix } from "tldts";
 import type { z } from "zod";
 import {
@@ -9,9 +14,6 @@ import {
   worstCaseShutdownMs,
 } from "./shutdown";
 
-export const OUTBOX_SETTLE_MARGIN_SECONDS = 10;
-export const EMAIL_SEND_TIMEOUT_SECONDS = 30;
-export const EMAIL_SETTLE_MARGIN_SECONDS = 15;
 const EMAIL_IDEMPOTENCY_KEY_TTL_HOURS = 24;
 export const WEBHOOK_DNS_TIMEOUT_SECONDS = 5;
 export const WEBHOOK_FETCH_TIMEOUT_SECONDS = 30;

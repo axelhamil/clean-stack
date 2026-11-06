@@ -1,10 +1,10 @@
 import { describe, expect, it, mock } from "bun:test";
 import { type AppError, Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
+import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
-import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import type { EndedSessions } from "../../../shared/ports/staff-store.port";
 import type { IAdminUserStore, UnbanOutcome } from "../application/ports/admin-user-store.port";
 import { AdminModerationService } from "../application/services/admin-moderation.service";

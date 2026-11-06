@@ -1,7 +1,7 @@
 import { describe, expect, it, mock } from "bun:test";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import type { IOutboxRepository } from "../ports/outbox.port";
 
 const expiresAt = new Date("2027-01-01T00:00:00Z");
 

@@ -12,13 +12,13 @@ import {
   lte,
   resolveExecutor,
 } from "@packages/drizzle";
-import { createDbFailure } from "../db-failure";
 import {
   afterTimeIdCursor,
   encodeTimeIdCursor,
   exactInstant,
   timeIdCursorSchema,
-} from "../pagination/time-id-cursor";
+} from "@packages/http/time-id-cursor";
+import { createDbFailure } from "../db-failure";
 import type {
   AuditEntry,
   AuditError,

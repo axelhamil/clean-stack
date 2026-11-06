@@ -1,5 +1,5 @@
+import { timeIdCursorSchema } from "@packages/http/time-id-cursor";
 import { z } from "zod";
-import { timeIdCursorSchema } from "../../../../shared/pagination/time-id-cursor";
 
 export const listUsersQuerySchema = z.object({
   search: z.string().trim().min(1).optional(),

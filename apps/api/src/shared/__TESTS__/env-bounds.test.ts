@@ -1,10 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { z } from "zod";
 import {
   EMAIL_SEND_TIMEOUT_SECONDS,
   EMAIL_SETTLE_MARGIN_SECONDS,
+} from "@packages/email/email-timing";
+import { OUTBOX_SETTLE_MARGIN_SECONDS } from "@packages/outbox/outbox-relay";
+import { z } from "zod";
+import {
   frontOrigins,
-  OUTBOX_SETTLE_MARGIN_SECONDS,
   validateApprovalEnv,
   validateEnvBounds,
   validateHostsEnv,

@@ -2,8 +2,8 @@ import { type OrgRole, rolesWith, type StaffPermission } from "@packages/access-
 import { Option } from "@packages/ddd-kit";
 
 import type { Audience } from "@packages/events";
-import type { DeliveredEvent } from "../ports/outbox.port";
-import { readActorId, readUserId } from "./event-actor";
+import { readActorId, readUserId } from "@packages/outbox/event-actor";
+import type { DeliveredEvent } from "@packages/outbox/outbox.port";
 
 export type AudienceTarget =
   | { kind: "user"; userId: string }

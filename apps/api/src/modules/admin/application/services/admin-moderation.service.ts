@@ -1,7 +1,7 @@
 import { type AppError, type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
-import { emitEvent } from "../../../../shared/event-emitter";
-import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
+import { emitEvent } from "@packages/outbox/event-emitter";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import type { EndedSessions } from "../../../../shared/ports/staff-store.port";
 import { announceImpersonationsEnded } from "../../../../shared/services/impersonation-end";
 import { announceSessionsEnded } from "../../../../shared/services/session-end";

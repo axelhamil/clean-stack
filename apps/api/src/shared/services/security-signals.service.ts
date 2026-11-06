@@ -1,8 +1,8 @@
-import { type AppError, Option, Result } from "@packages/ddd-kit";
+import { type AppError, type ILogger, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
-import { emitEventBestEffort } from "../event-emitter";
+import { emitEventBestEffort } from "@packages/outbox/event-emitter";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import type { VisitorGeo } from "../ports/ip-geo.port";
-import type { IOutboxRepository } from "../ports/outbox.port";
 import type { ISessionGeoStore } from "../ports/session-geo.port";
 
 export interface SecuritySignalsConfig {
@@ -23,6 +23,7 @@ export class SecuritySignalsService {
   constructor(
     private readonly store: ISessionGeoStore,
     private readonly outbox: IOutboxRepository,
+    private readonly logger: ILogger,
     private readonly config: SecuritySignalsConfig,
     private readonly now: () => Date = () => new Date(),
   ) {}
@@ -45,6 +46,7 @@ export class SecuritySignalsService {
 
     await emitEventBestEffort(
       this.outbox,
+      this.logger,
       EventTypes.SECURITY_GEO_DENIED,
       "security",
       path,
@@ -82,6 +84,7 @@ export class SecuritySignalsService {
 
     await emitEventBestEffort(
       this.outbox,
+      this.logger,
       EventTypes.SECURITY_IMPOSSIBLE_TRAVEL_DETECTED,
       "security",
       signIn.sessionId,

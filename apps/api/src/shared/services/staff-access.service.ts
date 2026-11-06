@@ -1,8 +1,8 @@
 import type { StaffAccess } from "@packages/access-control";
 import { type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
-import { emitEvent } from "../event-emitter";
-import type { IOutboxRepository } from "../ports/outbox.port";
+import { emitEvent } from "@packages/outbox/event-emitter";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import type { IStaffStore, StaffStoreError } from "../ports/staff-store.port";
 import { staffLookupOnce } from "../request-context";
 import {

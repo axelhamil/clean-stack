@@ -1,8 +1,8 @@
 import { resolveMx } from "node:dns/promises";
 import { type IInstrumentation, Result } from "@packages/ddd-kit";
+import { raceWithTimeout } from "@packages/outbox/race-with-timeout";
 import { env } from "../env";
 import type { DisposableEmailError, IDisposableEmailService } from "../ports/disposable-email.port";
-import { raceWithTimeout } from "../race-with-timeout";
 
 // disposable-email-domains is a CJS array of domains with no type declarations.
 const disposableDomains: string[] = require("disposable-email-domains") as string[];

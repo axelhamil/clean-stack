@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { logger } from "../../logger";
-import { NoOpInstrumentation } from "../noop-instrumentation";
+import type { ILogger } from "@packages/ddd-kit";
+import { mockPort } from "@packages/test/bun";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { type PgListenClient, PgListener } from "../pg-listener";
-import { FakePgListenClient } from "./fake-pg-listen-client";
+import { FakePgListenClient } from "../testing/fake-pg-listen-client";
+
+const logger = mockPort<ILogger>();
 
 function makeListener(
   overrides: { failConnect?: boolean; suspendConnect?: boolean; failFirstConnect?: boolean } = {},
@@ -18,7 +21,7 @@ function makeListener(
       onNotification: (payload) => received.push(payload),
     },
     logger,
-    new NoOpInstrumentation(),
+    mockInstrumentation(),
     {
       createClient: () => {
         const client = new FakePgListenClient();

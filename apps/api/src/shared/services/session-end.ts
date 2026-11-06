@@ -1,6 +1,6 @@
 import { EventTypes } from "@packages/events";
-import { emitEvent } from "../event-emitter";
-import type { IOutboxRepository } from "../ports/outbox.port";
+import { emitEvent } from "@packages/outbox/event-emitter";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import type { EndedSession } from "../ports/staff-store.port";
 
 export async function announceSessionsEnded(

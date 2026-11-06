@@ -1,0 +1,43 @@
+{
+  "name": "@packages/outbox",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./outbox.port": "./src/outbox.port.ts",
+    "./event-emitter": "./src/event-emitter.ts",
+    "./event-handlers": "./src/event-handlers.ts",
+    "./event-actor": "./src/event-actor.ts",
+    "./drizzle-outbox.repository": "./src/drizzle-outbox.repository.ts",
+    "./outbox-relay": "./src/outbox-relay.ts",
+    "./outbox-dispatcher": "./src/outbox-dispatcher.ts",
+    "./pg-listener": "./src/pg-listener.ts",
+    "./jitter": "./src/jitter.ts",
+    "./lease-budget": "./src/lease-budget.ts",
+    "./race-with-timeout": "./src/race-with-timeout.ts",
+    "./testing/fake-pg-listen-client": "./src/testing/fake-pg-listen-client.ts",
+    "./testing/enqueued-events": "./src/testing/enqueued-events.ts"
+  },
+  "scripts": {
+    "format": "biome format . --write",
+    "lint": "biome lint .",
+    "check": "biome check .",
+    "fix": "biome check --write .",
+    "type-check": "tsc --noEmit",
+    "test": "bun test --isolate"
+  },
+  "dependencies": {
+    "@packages/ddd-kit": "workspace:*",
+    "@packages/drizzle": "workspace:*",
+    "@packages/events": "workspace:*",
+    "@packages/sentry-scrub": "workspace:*",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@packages/test": "workspace:*",
+    "@packages/typescript-config": "workspace:*",
+    "@types/bun": "^1.4.4",
+    "@types/pg": "^8.23.1",
+    "typescript": "^7.0.2"
+  }
+}

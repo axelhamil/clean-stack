@@ -1,0 +1,37 @@
+{
+  "name": "@packages/email",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./email.port": "./src/email.port.ts",
+    "./email-queue.port": "./src/email-queue.port.ts",
+    "./email.service": "./src/email.service.ts",
+    "./drizzle-email-queue": "./src/drizzle-email-queue.ts",
+    "./email-delivery-worker": "./src/email-delivery-worker.ts",
+    "./email-timing": "./src/email-timing.ts"
+  },
+  "scripts": {
+    "format": "biome format . --write",
+    "lint": "biome lint .",
+    "check": "biome check .",
+    "fix": "biome check --write .",
+    "type-check": "tsc --noEmit",
+    "test": "bun test --isolate"
+  },
+  "dependencies": {
+    "@packages/ddd-kit": "workspace:*",
+    "@packages/drizzle": "workspace:*",
+    "@packages/emails": "workspace:*",
+    "@packages/events": "workspace:*",
+    "@packages/i18n": "workspace:*",
+    "@packages/outbox": "workspace:*",
+    "resend": "^6.35.0"
+  },
+  "devDependencies": {
+    "@packages/test": "workspace:*",
+    "@packages/typescript-config": "workspace:*",
+    "@types/bun": "^1.4.4",
+    "typescript": "^7.0.2"
+  }
+}

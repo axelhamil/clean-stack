@@ -20,7 +20,7 @@ see [`CRON.md`](./CRON.md).
 
 `@packages/emails` ships one React Email component + `subject()` per template key. Templates render server-side at enqueue time, no Resend dashboard required on a fresh clone.
 
-`TEMPLATE_IDS` in `apps/api/src/shared/services/email-delivery-worker.service.ts` is now an **override map**: an empty string means render the in-repo template; a non-empty string means use that Resend dashboard template ID instead. A fresh clone therefore sends real emails with zero dashboard setup.
+`TEMPLATE_IDS` in `packages/email/src/email-delivery-worker.ts` is now an **override map**: an empty string means render the in-repo template; a non-empty string means use that Resend dashboard template ID instead. A fresh clone therefore sends real emails with zero dashboard setup.
 
 ### Template inventory
 
@@ -42,7 +42,7 @@ see [`CRON.md`](./CRON.md).
 
 - **Variable names are case-sensitive** and must match the table above
   exactly. The single source of truth is `EmailTemplates` in
-  `apps/api/src/shared/ports/email.port.ts`.
+  `packages/email/src/email.port.ts`.
 - **All URLs** point at `APP_URL` (the front), never the API. The server hooks
   build them; the front consumes the token.
 - **Brand the visible label**, never embed the raw URL, Outlook/Gmail
@@ -50,7 +50,7 @@ see [`CRON.md`](./CRON.md).
 - **`expiresAt` is an ISO string** (`new Date(...).toISOString()`); render it
   with the user's locale on the template side.
 - **Locale is per recipient, never per batch**: `EmailRecipient<K>.locale`
-  (`apps/api/src/shared/ports/email.port.ts`), resolved at enqueue and frozen
+  (`packages/email/src/email.port.ts`), resolved at enqueue and frozen
   onto the `email_message.locale` column, so a retry days later replays the
   same language. There is deliberately no batch-level `locale` option: the two
   genuinely multi-recipient callers (notification digests, RGPD notices) are
@@ -381,7 +381,7 @@ publicly accessible HTTPS endpoint and a GitHub review of the integration:
 ## TL;DR, pre-production checklist
 
 - [ ] 9 Resend templates created with exact variable names; IDs filled in
-      `TEMPLATE_IDS` in `apps/api/src/shared/services/email-delivery-worker.service.ts`
+      `TEMPLATE_IDS` in `packages/email/src/email-delivery-worker.ts`
 - [ ] DNS records for sending domain (SPF, DKIM, DMARC): green in Resend
 - [ ] S3 bucket provisioned, scoped credentials, CORS configured
 - [ ] Stripe Products created with `metadata.tier` set; `ENTITLEMENTS` in

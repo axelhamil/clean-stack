@@ -1,9 +1,9 @@
 import { describe, expect, it, mock } from "bun:test";
 import { UnitOfWorkContext } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import type { IAdminUserStore } from "../application/ports/admin-user-store.port";
 
 mock.module("hono/bun", () => ({
@@ -29,7 +29,7 @@ mock.module("../../../container", () => ({
 
 const emitted: { type: string; payload: Record<string, unknown> }[] = [];
 
-mock.module("../../../shared/event-emitter", () => ({
+mock.module("@packages/outbox/event-emitter", () => ({
   emitEvent: mock(
     async (
       _o: unknown,

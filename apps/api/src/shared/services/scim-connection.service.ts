@@ -9,10 +9,10 @@ import {
 } from "@packages/ddd-kit";
 import { lockForTransaction, savepoint } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
+import { emitEvent } from "@packages/outbox/event-emitter";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { auth } from "../../auth";
 import { findMemberOf, scimProvisionedMembers } from "../../auth-queries";
-import { emitEvent } from "../event-emitter";
-import type { IOutboxRepository } from "../ports/outbox.port";
 
 export type ScimConnectionError = AppError<
   "SCIM_CONNECTION_NOT_FOUND" | "SCIM_CONNECTION_PROVIDER_FAILURE"

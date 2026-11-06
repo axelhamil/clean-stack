@@ -1,4 +1,5 @@
 import { AppErrorException } from "@packages/ddd-kit";
+import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { di } from "../../container";
@@ -6,7 +7,6 @@ import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.mi
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.middleware";
 import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
-import { zV } from "../../shared/validator";
 import { createEndpointBodySchema } from "./application/dto/create-endpoint.dto";
 import { listDeliveriesQuerySchema } from "./application/dto/list-deliveries.dto";
 import { updateEndpointBodySchema } from "./application/dto/update-endpoint.dto";

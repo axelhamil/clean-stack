@@ -1,12 +1,12 @@
 import { AppErrorException } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { zV } from "@packages/http/validator";
+import { emitEvent } from "@packages/outbox/event-emitter";
 import { Hono } from "hono";
 import { di } from "../../container";
-import { emitEvent } from "../../shared/event-emitter";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { resolveClientIp } from "../../shared/middleware/rate-limit.ip";
 import { requireStaffPermission } from "../../shared/middleware/staff.middleware";
-import { zV } from "../../shared/validator";
 import { listAuditEventsQuerySchema } from "./application/dto/list-audit-events.dto";
 
 export const auditLogRoutes = new Hono<{ Variables: AuthVariables }>()

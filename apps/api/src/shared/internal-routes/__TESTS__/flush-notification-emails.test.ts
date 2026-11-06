@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import type { IEmailService } from "@packages/email/email.port";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { HTTPException } from "hono/http-exception";
-import type { IEmailService } from "../../ports/email.port";
 import type { INotificationDigestStore } from "../../ports/notification-digest.port";
 import { NoOpInstrumentation } from "../../services/noop-instrumentation";
 import { sweepSpans } from "../sweep-span";

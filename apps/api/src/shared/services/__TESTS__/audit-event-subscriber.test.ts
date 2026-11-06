@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import * as realDrizzle from "@packages/drizzle";
+import type { DeliveredEvent } from "@packages/outbox/outbox.port";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import { mockInstrumentation } from "../../../__TESTS__/mock-instrumentation";
-import type { DeliveredEvent } from "../../ports/outbox.port";
 
 type AuditRow = Record<string, unknown> & { id: string };
 

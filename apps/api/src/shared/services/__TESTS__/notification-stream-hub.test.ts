@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import type { PgListener } from "@packages/outbox/pg-listener";
+import { FakePgListenClient } from "@packages/outbox/testing/fake-pg-listen-client";
 import { logger } from "../../logger";
 import { NoOpInstrumentation } from "../noop-instrumentation";
 import { MAX_STREAMS_PER_USER, NotificationStreamHub } from "../notification-stream-hub";
-import type { PgListener } from "../pg-listener";
-import { FakePgListenClient } from "./fake-pg-listen-client";
 
 const makeHub = () =>
   new NotificationStreamHub(logger, "postgres://unused", new NoOpInstrumentation());

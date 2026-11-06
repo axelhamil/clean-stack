@@ -1,8 +1,8 @@
 import { describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import type { IEmailService } from "@packages/email/email.port";
 import { EventTypes } from "@packages/events";
 import type { Locale } from "@packages/i18n";
-import type { IEmailService } from "../ports/email.port";
 import type { IProfileStore } from "../ports/profile.port";
 import { backupCodeUsedNotifier } from "../services/backup-code-used-notifier";
 

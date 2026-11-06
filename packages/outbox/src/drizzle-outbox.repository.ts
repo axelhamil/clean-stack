@@ -37,8 +37,7 @@ import type {
   OutboxLease,
   OutboxPendingState,
   OutboxRecord,
-} from "../ports/outbox.port";
-import { getRequestId } from "../request-context";
+} from "./outbox.port";
 
 export const OUTBOX_CHANNEL = "outbox_event";
 
@@ -140,7 +139,10 @@ function claimQuery(
 }
 
 export class DrizzleOutboxRepository implements IOutboxRepository {
-  constructor(private readonly instrumentation: IInstrumentation) {}
+  constructor(
+    private readonly instrumentation: IInstrumentation,
+    private readonly currentRequestId: () => string | undefined,
+  ) {}
 
   async enqueue(events: IDomainEvent[], scope: OutboxEnqueueScope): Promise<void> {
     const exec = resolveExecutor();
@@ -153,7 +155,7 @@ export class DrizzleOutboxRepository implements IOutboxRepository {
         try {
           for (const event of events) assertPayloadValid(event);
 
-          const requestId = getRequestId();
+          const requestId = this.currentRequestId();
           const rows = events.map((event) =>
             domainEventToOutboxRow(event, {
               source: scope.source,

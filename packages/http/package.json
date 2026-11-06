@@ -1,0 +1,33 @@
+{
+  "name": "@packages/http",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./validator": "./src/validator.ts",
+    "./time-id-cursor": "./src/time-id-cursor.ts",
+    "./route-guards": "./src/route-guards.ts"
+  },
+  "scripts": {
+    "format": "biome format . --write",
+    "lint": "biome lint .",
+    "check": "biome check .",
+    "fix": "biome check --write .",
+    "type-check": "tsc --noEmit",
+    "test": "bun test --isolate"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.9.1",
+    "@packages/access-control": "workspace:*",
+    "@packages/ddd-kit": "workspace:*",
+    "@packages/drizzle": "workspace:*",
+    "hono": "^4.13.14",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@packages/test": "workspace:*",
+    "@packages/typescript-config": "workspace:*",
+    "@types/bun": "^1.4.4",
+    "typescript": "^7.0.2"
+  }
+}

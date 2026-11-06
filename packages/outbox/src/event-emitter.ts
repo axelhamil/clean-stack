@@ -1,8 +1,7 @@
 import { createHash } from "node:crypto";
-import { type IDomainEvent, uuidv7 } from "@packages/ddd-kit";
+import { type IDomainEvent, type ILogger, uuidv7 } from "@packages/ddd-kit";
 import type { EventType } from "@packages/events";
-import { logger } from "./logger";
-import type { IOutboxRepository } from "./ports/outbox.port";
+import type { IOutboxRepository } from "./outbox.port";
 
 const SOURCE = "app/api";
 
@@ -58,6 +57,7 @@ export async function emitEvent<TPayload>(
  */
 export async function emitEventBestEffort<TPayload>(
   outbox: IOutboxRepository,
+  logger: ILogger,
   eventType: EventType,
   aggregateType: string,
   aggregateId: string,

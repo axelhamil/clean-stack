@@ -1,10 +1,10 @@
 import { AppErrorException } from "@packages/ddd-kit";
+import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
-import { zV } from "../../shared/validator";
 import { confirmUploadBodySchema } from "./application/dto/confirm-upload.dto";
 import { deleteUploadBodySchema } from "./application/dto/delete-upload.dto";
 import { presignDownloadBodySchema } from "./application/dto/presign-download.dto";

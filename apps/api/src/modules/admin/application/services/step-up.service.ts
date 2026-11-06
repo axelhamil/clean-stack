@@ -1,7 +1,13 @@
-import { type AppError, type IUnitOfWork, type Option, Result } from "@packages/ddd-kit";
+import {
+  type AppError,
+  type ILogger,
+  type IUnitOfWork,
+  type Option,
+  Result,
+} from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
-import { emitEvent, emitEventBestEffort } from "../../../../shared/event-emitter";
-import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
+import { emitEvent, emitEventBestEffort } from "@packages/outbox/event-emitter";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import type {
   ITotpVerifier,
   TotpOutcome,
@@ -50,6 +56,7 @@ export class StepUpService {
     private readonly outbox: IOutboxRepository,
     private readonly uow: IUnitOfWork,
     private readonly env: StepUpEnv,
+    private readonly logger: ILogger,
   ) {}
 
   async validUntil(sessionId: string): Promise<Result<Option<Date>, StepUpStoreError>> {
@@ -107,6 +114,7 @@ export class StepUpService {
   private announceFailure(input: StepUpAttempt, reason: FailureReason): Promise<void> {
     return emitEventBestEffort(
       this.outbox,
+      this.logger,
       EventTypes.ADMIN_STEP_UP_FAILED,
       "user",
       input.userId,

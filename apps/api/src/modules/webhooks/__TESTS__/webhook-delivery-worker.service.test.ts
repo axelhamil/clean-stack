@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { type IInstrumentation, Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
 import * as realDrizzle from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
+import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
 import { mockPort, type PortMock } from "@packages/test/bun";
 import { mockUnitOfWork, type UnitOfWorkMock } from "@packages/test/bun/unit-of-work";
-import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
 import * as realAead from "../../../shared/aead";
 import type { Logger } from "../../../shared/logger";
-import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import * as realSsrfGuard from "../../../shared/ssrf-guard";
 import type {
   DeliveryFailure,

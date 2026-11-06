@@ -1,17 +1,17 @@
 import { type AppError, AppErrorException, Option, Result } from "@packages/ddd-kit";
 import { EventTypes, publicNotificationPayload } from "@packages/events";
+import { zV } from "@packages/http/validator";
+import { emitEvent } from "@packages/outbox/event-emitter";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { streamSSE } from "hono/streaming";
 import { di } from "../../container";
-import { emitEvent } from "../../shared/event-emitter";
 import { logger } from "../../shared/logger";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.middleware";
 import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
 import { MAX_STREAMS_PER_USER } from "../../shared/services/notification-stream-hub";
-import { zV } from "../../shared/validator";
 import type { NotificationError } from "./application/ports/notification.port";
 import {
   listQuerySchema,

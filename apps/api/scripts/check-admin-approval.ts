@@ -21,11 +21,11 @@ import {
   staffSchema,
 } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
+import { timeIdCursorSchema } from "@packages/http/time-id-cursor";
 import { Hono } from "hono";
 import { di } from "../src/container";
 import { adminInternalRoutes } from "../src/modules/admin/internal.routes";
 import { env } from "../src/shared/env";
-import { timeIdCursorSchema } from "../src/shared/pagination/time-id-cursor";
 import { staffRecipients } from "../src/shared/services/staff-recipients";
 import { staffAccessOf } from "../src/shared/staff-access";
 import {

@@ -1,10 +1,10 @@
 import { AppErrorException } from "@packages/ddd-kit";
+import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { denyImpersonated } from "../../shared/middleware/deny-impersonated.middleware";
 import { resolveClientIp } from "../../shared/middleware/rate-limit.ip";
-import { zV } from "../../shared/validator";
 import { acceptPoliciesDto } from "./application/dto/accept-policies.dto";
 
 export const policyRoutes = new Hono<{ Variables: AuthVariables }>()

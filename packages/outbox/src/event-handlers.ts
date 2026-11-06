@@ -6,7 +6,7 @@ import {
   isEventHandler,
 } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
-import type { DeliveredEvent } from "./ports/outbox.port";
+import type { DeliveredEvent } from "./outbox.port";
 
 export interface BuiltInEventHandler {
   readonly name: string;

@@ -4,7 +4,7 @@
  * `apps/api/CLAUDE.md` on asserting call shape only against a mock, and on never
  * asserting on the SQL text a builder produced).
  *
- * The unit test suite (`drizzle-email-queue.service.test.ts`) mocks `onConflictDoNothing` as a
+ * The unit test suite (`packages/email/src/__TESTS__/drizzle-email-queue.test.ts`) mocks `onConflictDoNothing` as a
  * no-op passthrough and asserts on a return value the test itself controls (`insertReturns`),
  * deleting `.onConflictDoNothing(...)` from the service leaves that suite green. Nothing there
  * proves:
@@ -24,8 +24,9 @@ requireLocalDatabase("check-enqueue");
 
 import { Option } from "@packages/ddd-kit";
 import { db, emailSchema, inArray } from "@packages/drizzle";
-import type { EmailMessageInsert } from "../src/shared/ports/email-queue.port";
-import { DrizzleEmailQueue } from "../src/shared/services/drizzle-email-queue.service";
+import { DrizzleEmailQueue } from "@packages/email/drizzle-email-queue";
+import type { EmailMessageInsert } from "@packages/email/email-queue.port";
+import { logger } from "../src/shared/logger";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 
 const em = emailSchema.emailMessage;
@@ -81,7 +82,7 @@ async function main(): Promise<void> {
   try {
     await seedPreExisting();
 
-    const queue = new DrizzleEmailQueue(new NoOpInstrumentation());
+    const queue = new DrizzleEmailQueue(new NoOpInstrumentation(), logger);
 
     // [1] Mixed batch: one row whose idempotency_key already exists, one with a fresh key.
     const mixedResult = await queue.enqueue([

@@ -6,12 +6,12 @@ import {
   Result,
   UnitOfWorkContext,
 } from "@packages/ddd-kit";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { Hono } from "hono";
 import { generateToken, hmacToken } from "../crypto/api-token";
 import type { ApiTokenRecord } from "../ports/api-token.port";
-import type { IOutboxRepository } from "../ports/outbox.port";
 import { NoOpInstrumentation } from "../services/noop-instrumentation";
 
 const PREFIX = "clean_";

@@ -1,7 +1,7 @@
 import { describe, expect, it, mock, spyOn } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { mockPort } from "@packages/test/bun";
-import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import type {
   IStorageService,
   ObjectMetadata,

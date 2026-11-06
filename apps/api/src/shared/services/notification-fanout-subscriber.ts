@@ -10,8 +10,8 @@ import {
   sql,
 } from "@packages/drizzle";
 import { type NotificationChannel, notificationConfigOf } from "@packages/events";
-import type { BuiltInEventHandler } from "../event-handlers";
-import type { DeliveredEvent } from "../ports/outbox.port";
+import type { BuiltInEventHandler } from "@packages/outbox/event-handlers";
+import type { DeliveredEvent } from "@packages/outbox/outbox.port";
 import type { StaffEnv } from "../staff-access";
 import { DEFAULT_DIGEST_HOUR_UTC, digestDueAt } from "./digest-schedule";
 import { resolveAudience } from "./resolve-audience";

@@ -1,10 +1,10 @@
 import { AppErrorException } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { emitEventBestEffort } from "@packages/outbox/event-emitter";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
-import { emitEventBestEffort } from "../event-emitter";
 import { logger } from "../logger";
-import type { IOutboxRepository } from "../ports/outbox.port";
 import { resolveClientIp } from "./rate-limit.ip";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -51,6 +51,7 @@ async function emitCsrfRejected(
   const ip = resolveClientIp(c).slice(0, 45);
   await emitEventBestEffort(
     outbox,
+    logger,
     EventTypes.SECURITY_CSRF_REJECTED,
     "csrf",
     ip,

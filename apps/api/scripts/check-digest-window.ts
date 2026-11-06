@@ -17,9 +17,9 @@
 
 import type { IInstrumentation } from "@packages/ddd-kit";
 import { db, sql, TransactionService } from "@packages/drizzle";
+import type { DeliveredEvent } from "@packages/outbox/outbox.port";
 import type { Hono } from "hono";
 import { flushNotificationEmailsRoutes } from "../src/shared/internal-routes/flush-notification-emails.route";
-import type { DeliveredEvent } from "../src/shared/ports/outbox.port";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 import { NotificationFanoutSubscriber } from "../src/shared/services/notification-fanout-subscriber";
 import {

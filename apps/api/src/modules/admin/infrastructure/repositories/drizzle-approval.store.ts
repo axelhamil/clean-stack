@@ -17,6 +17,7 @@ import {
   sql,
   staffSchema,
 } from "@packages/drizzle";
+import { afterTimeIdCursor } from "@packages/http/time-id-cursor";
 import { createDbFailure } from "../../../../shared/db-failure";
 import { countEligibleWithTimeout } from "../../../../shared/internal-routes/sweep-count";
 import {
@@ -25,7 +26,6 @@ import {
   withSweepGuards,
 } from "../../../../shared/internal-routes/sweep-purge";
 import { sweepSpans } from "../../../../shared/internal-routes/sweep-span";
-import { afterTimeIdCursor } from "../../../../shared/pagination/time-id-cursor";
 import type { ListApprovalsInput } from "../../application/dto/list-approvals.dto";
 import {
   APPROVAL_STATUSES,

@@ -1,8 +1,8 @@
 import { type IInstrumentation, type ILogger, type IUnitOfWork, Result } from "@packages/ddd-kit";
+import type { IEmailService } from "@packages/email/email.port";
 import { EventTypes } from "@packages/events";
-import { emitEvent } from "../../../../shared/event-emitter";
-import type { IEmailService } from "../../../../shared/ports/email.port";
-import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
+import { emitEvent } from "@packages/outbox/event-emitter";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import type { IStaffStore } from "../../../../shared/ports/staff-store.port";
 import type { IStorageService, StorageError } from "../../../../shared/ports/storage.port";
 import type { ITotpVerifier } from "../../../../shared/ports/totp-verifier.port";

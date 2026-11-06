@@ -1,4 +1,5 @@
 import { AppErrorException } from "@packages/ddd-kit";
+import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
 import { di } from "../../container";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
@@ -8,7 +9,6 @@ import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.mi
 import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
 import { ScimConnectionService } from "../../shared/services/scim-connection.service";
 import { setSsoEnforcementBodySchema } from "../../shared/services/set-sso-enforcement.dto";
-import { zV } from "../../shared/validator";
 
 const scimSvc = new ScimConnectionService(
   di.IOutboxRepository,

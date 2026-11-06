@@ -1,23 +1,32 @@
-import { type IInstrumentation, type IUnitOfWork, Option, type Result } from "@packages/ddd-kit";
+import {
+  canonicalize,
+  type IInstrumentation,
+  type ILogger,
+  type IUnitOfWork,
+  Option,
+  type Result,
+} from "@packages/ddd-kit";
 import { type EmailTemplateKey, renderTemplate } from "@packages/emails";
 import { EventTypes } from "@packages/events";
 import { DEFAULT_LOCALE } from "@packages/i18n";
-import { type ErrorResponse, Resend } from "resend";
-import { env } from "../env";
-import { EMAIL_SEND_TIMEOUT_SECONDS, EMAIL_SETTLE_MARGIN_SECONDS } from "../env-bounds";
-import { emitEvent } from "../event-emitter";
-import { failureSchedule } from "../jitter";
-import { type Clock, leaseCountdown, monotonicClock, unitsWithinLease } from "../lease-budget";
-import type { Logger } from "../logger";
+import { emitEvent } from "@packages/outbox/event-emitter";
+import { failureSchedule } from "@packages/outbox/jitter";
+import {
+  type Clock,
+  leaseCountdown,
+  monotonicClock,
+  unitsWithinLease,
+} from "@packages/outbox/lease-budget";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
+import type { ErrorResponse } from "resend";
 import type {
   EmailFailure,
   EmailLease,
   EmailMessageRecord,
   EmailQueueError,
   IEmailQueue,
-} from "../ports/email-queue.port";
-import type { IOutboxRepository } from "../ports/outbox.port";
-import { canonicalize } from "./audit-hash";
+} from "./email-queue.port";
+import { EMAIL_SEND_TIMEOUT_SECONDS, EMAIL_SETTLE_MARGIN_SECONDS } from "./email-timing";
 
 export const EMAIL_BATCH_CHUNK_SIZE = 100;
 const POLL_INTERVAL_MS = 2_000;
@@ -55,6 +64,7 @@ export interface EmailDeliveryOptions {
   leaseSeconds: number;
   deadRetrySeconds: number;
   deadReplayWindowHours: number;
+  from?: string;
 }
 
 interface BatchSender {
@@ -88,26 +98,18 @@ export class EmailDeliveryWorker {
   private timer: ReturnType<typeof setInterval> | null = null;
   private draining = false;
   private stopping = false;
-  private readonly sender: BatchSender;
   private readonly claimLimit: number;
 
   constructor(
     private readonly queue: IEmailQueue,
     private readonly outbox: IOutboxRepository,
     private readonly uow: IUnitOfWork,
-    private readonly logger: Logger,
+    private readonly logger: ILogger,
     private readonly instrumentation: IInstrumentation,
     private readonly options: EmailDeliveryOptions,
-    sender?: BatchSender,
+    private readonly sender: BatchSender,
     private readonly clock: Clock = monotonicClock,
   ) {
-    this.sender =
-      sender ??
-      resendBatchSender(
-        env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null,
-        instrumentation,
-        logger,
-      );
     this.claimLimit =
       Math.min(MAX_CHUNKS_PER_CLAIM, unitsWithinLease(options.leaseSeconds, CHUNK_BUDGET)) *
       EMAIL_BATCH_CHUNK_SIZE;
@@ -116,7 +118,7 @@ export class EmailDeliveryWorker {
   async start(): Promise<void> {
     this.stopping = false;
     this.timer = setInterval(() => this.drainInBackground(), POLL_INTERVAL_MS);
-    this.logger.info("email delivery worker started");
+    this.logger.info({}, "email delivery worker started");
     this.drainInBackground();
   }
 
@@ -129,7 +131,7 @@ export class EmailDeliveryWorker {
     while (this.draining) {
       await new Promise((r) => setTimeout(r, 50));
     }
-    this.logger.info("email delivery worker stopped");
+    this.logger.info({}, "email delivery worker stopped");
   }
 
   /**
@@ -360,7 +362,11 @@ export class EmailDeliveryWorker {
   }
 
   private async toEntry(rowRecord: EmailMessageRecord): Promise<BatchEntry> {
-    const base = { from: env.RESEND_FROM, to: rowRecord.toAddress, subject: rowRecord.subject };
+    const base = {
+      from: this.options.from,
+      to: rowRecord.toAddress,
+      subject: rowRecord.subject,
+    };
 
     if (rowRecord.kind === "raw") {
       const body = rowRecord.payload as { html?: string; text?: string };
@@ -435,7 +441,7 @@ function kindOf(error: ErrorResponse): BatchErrorKind {
 export function resendBatchSender(
   client: ResendBatchClient | null,
   instrumentation: IInstrumentation,
-  logger: Logger,
+  logger: ILogger,
   timeoutMs: number = EMAIL_SEND_TIMEOUT_SECONDS * 1000,
 ): BatchSender {
   const timedOut: BatchError = {

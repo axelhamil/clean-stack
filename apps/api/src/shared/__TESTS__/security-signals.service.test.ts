@@ -1,15 +1,15 @@
 import { describe, expect, it } from "bun:test";
-import { Option, Result } from "@packages/ddd-kit";
+import { type ILogger, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
+import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
 import { mockPort } from "@packages/test/bun";
 import { UNKNOWN_VISITOR, type VisitorGeo } from "../ports/ip-geo.port";
-import type { IOutboxRepository } from "../ports/outbox.port";
 import type { ISessionGeoStore, PreviousSession } from "../ports/session-geo.port";
 import {
   type SecuritySignalsConfig,
   SecuritySignalsService,
 } from "../services/security-signals.service";
-import { enqueuedEvents } from "./enqueued-events";
 
 const OFF: SecuritySignalsConfig = { denyCountries: [], denyAsns: [] };
 const NOW = new Date("2026-10-30T12:00:00Z");
@@ -23,7 +23,7 @@ function setup(config: SecuritySignalsConfig, previous: Option<PreviousSession> 
   const store = mockPort<ISessionGeoStore>();
   store.findPreviousSession.mockResolvedValue(Result.ok(previous));
   const outbox = mockPort<IOutboxRepository>();
-  const service = new SecuritySignalsService(store, outbox, config, () => NOW);
+  const service = new SecuritySignalsService(store, outbox, mockPort<ILogger>(), config, () => NOW);
 
   return { store, outbox, service };
 }

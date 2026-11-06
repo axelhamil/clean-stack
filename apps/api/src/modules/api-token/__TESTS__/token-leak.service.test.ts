@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
+import type { IEmailService } from "@packages/email/email.port";
 import { EventTypes } from "@packages/events";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
+import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import { enqueuedEvents } from "../../../shared/__TESTS__/enqueued-events";
 import { generateToken, hmacToken } from "../../../shared/crypto/api-token";
 import type { ApiTokenRecord, IApiTokenRepository } from "../../../shared/ports/api-token.port";
-import type { IEmailService } from "../../../shared/ports/email.port";
-import type { IOutboxRepository } from "../../../shared/ports/outbox.port";
 import type { IUserAccountStore } from "../../../shared/ports/user-account.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import { TokenLeakService } from "../application/services/token-leak.service";

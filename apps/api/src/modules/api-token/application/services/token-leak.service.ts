@@ -1,15 +1,15 @@
 import { type IInstrumentation, type IUnitOfWork, type Option, Result } from "@packages/ddd-kit";
+import type { IEmailService } from "@packages/email/email.port";
 import { EventTypes } from "@packages/events";
 import { toLocale } from "@packages/i18n";
+import { emitEvent } from "@packages/outbox/event-emitter";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { hmacToken, parseToken } from "../../../../shared/crypto/api-token";
-import { emitEvent } from "../../../../shared/event-emitter";
 import type {
   ApiTokenError,
   ApiTokenRecord,
   IApiTokenRepository,
 } from "../../../../shared/ports/api-token.port";
-import type { IEmailService } from "../../../../shared/ports/email.port";
-import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { IUserAccountStore } from "../../../../shared/ports/user-account.port";
 
 export type LeakReportEntry = { token: string; type: string };

@@ -1,7 +1,22 @@
 import type { EventHandler, IInstrumentation, IUnitOfWork } from "@packages/ddd-kit";
 import { getRateLimitDbClient, TransactionService } from "@packages/drizzle";
+import { DrizzleEmailQueue } from "@packages/email/drizzle-email-queue";
+import type { IEmailService } from "@packages/email/email.port";
+import { QueuedEmailService } from "@packages/email/email.service";
+import { EmailDeliveryWorker, resendBatchSender } from "@packages/email/email-delivery-worker";
+import type { IEmailQueue } from "@packages/email/email-queue.port";
 import { ALL_EVENT_TYPES } from "@packages/events";
+import { DrizzleOutboxRepository } from "@packages/outbox/drizzle-outbox.repository";
+import { buildEventDispatcher } from "@packages/outbox/event-handlers";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
+import {
+  OUTBOX_BATCH_SIZE,
+  OUTBOX_STOP_SETTLE_MARGIN_MS,
+  OutboxDispatcher,
+} from "@packages/outbox/outbox-dispatcher";
+import { OutboxRelay } from "@packages/outbox/outbox-relay";
 import { container } from "inwire";
+import { Resend } from "resend";
 import { adminModule } from "./modules/admin/module";
 import { apiTokenModule } from "./modules/api-token/module";
 import { auditLogModule } from "./modules/audit-log/module";
@@ -18,48 +33,35 @@ import { webhooksModule } from "./modules/webhooks/module";
 import { authSecretKey } from "./shared/auth/auth-secrets";
 import type { OutermostUnitOfWork } from "./shared/auth/unit-of-work-adapter";
 import { env } from "./shared/env";
-import { buildEventDispatcher } from "./shared/event-handlers";
 import { logger } from "./shared/logger";
 import type { IAuditPort } from "./shared/ports/audit.port";
 import type { ICaptchaService } from "./shared/ports/captcha.port";
 import type { IDisposableEmailService } from "./shared/ports/disposable-email.port";
-import type { IEmailService } from "./shared/ports/email.port";
-import type { IEmailQueue } from "./shared/ports/email-queue.port";
 import type { IIpGeoService } from "./shared/ports/ip-geo.port";
 import type { INotificationDigestStore } from "./shared/ports/notification-digest.port";
-import type { IOutboxRepository } from "./shared/ports/outbox.port";
 import type { IPasswordBreachService } from "./shared/ports/password-breach.port";
 import type { IRateLimiter, IRateLimitUsage } from "./shared/ports/rate-limiter.port";
 import type { ISessionGeoStore } from "./shared/ports/session-geo.port";
 import type { ISweepRunStore } from "./shared/ports/sweep-run.port";
 import type { ITotpVerifier } from "./shared/ports/totp-verifier.port";
 import type { IUserAccountStore } from "./shared/ports/user-account.port";
+import { getRequestId } from "./shared/request-context";
 import { AdminActionService } from "./shared/services/admin-action.service";
 import { AuditEventSubscriber } from "./shared/services/audit-event-subscriber";
 import { backupCodeUsedNotifier } from "./shared/services/backup-code-used-notifier";
 import { DisposableEmailService } from "./shared/services/disposable-email.service";
 import { DrizzleAuditRepository } from "./shared/services/drizzle-audit.service";
-import { DrizzleEmailQueue } from "./shared/services/drizzle-email-queue.service";
 import { DrizzleNotificationDigestStore } from "./shared/services/drizzle-notification-digest.store";
-import { DrizzleOutboxRepository } from "./shared/services/drizzle-outbox.service";
 import { DrizzleSessionGeoStore } from "./shared/services/drizzle-session-geo.store";
 import { DrizzleSweepRunStore } from "./shared/services/drizzle-sweep-run.store";
 import { DrizzleTotpVerifier } from "./shared/services/drizzle-totp-verifier";
 import { DrizzleUserAccountStore } from "./shared/services/drizzle-user-account.store";
-import { QueuedEmailService } from "./shared/services/email.service";
-import { EmailDeliveryWorker } from "./shared/services/email-delivery-worker.service";
 import { HeaderIpGeoService } from "./shared/services/header-ip-geo.service";
 import { HibpPasswordBreachService } from "./shared/services/hibp-password-breach.service";
 import { LoggingInstrumentation } from "./shared/services/logging-instrumentation";
 import { NoopCaptchaService } from "./shared/services/noop-captcha.service";
 import { NotificationFanoutSubscriber } from "./shared/services/notification-fanout-subscriber";
 import { NotificationStreamHub } from "./shared/services/notification-stream-hub";
-import {
-  OUTBOX_BATCH_SIZE,
-  OUTBOX_STOP_SETTLE_MARGIN_MS,
-  OutboxDispatcher,
-} from "./shared/services/outbox-dispatcher.service";
-import { OutboxRelay } from "./shared/services/outbox-relay";
 import {
   RateLimiterFlexibleAdapter,
   storeFactoryFor,
@@ -108,7 +110,7 @@ export const di = container()
   .add("ISweepRunStore", (c): ISweepRunStore => new DrizzleSweepRunStore(c.IInstrumentation))
   .add(
     "IOutboxRepository",
-    (c): IOutboxRepository => new DrizzleOutboxRepository(c.IInstrumentation),
+    (c): IOutboxRepository => new DrizzleOutboxRepository(c.IInstrumentation, getRequestId),
   )
   .add("IAuditPort", (c): IAuditPort => new DrizzleAuditRepository(c.IInstrumentation))
   .add(
@@ -118,7 +120,7 @@ export const di = container()
         await c.IOutboxRepository.enqueue(events, { source: "app/api" });
       }),
   )
-  .add("IEmailQueue", (c): IEmailQueue => new DrizzleEmailQueue(c.IInstrumentation))
+  .add("IEmailQueue", (c): IEmailQueue => new DrizzleEmailQueue(c.IInstrumentation, logger))
   .add(
     "INotificationDigestStore",
     (c): INotificationDigestStore => new DrizzleNotificationDigestStore(c.IInstrumentation),
@@ -140,7 +142,13 @@ export const di = container()
           leaseSeconds: env.EMAIL_LEASE_SECONDS,
           deadRetrySeconds: env.EMAIL_DEAD_RETRY_HOURS * 3600,
           deadReplayWindowHours: env.EMAIL_DEAD_REPLAY_WINDOW_HOURS,
+          from: env.RESEND_FROM,
         },
+        resendBatchSender(
+          env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null,
+          c.IInstrumentation,
+          logger,
+        ),
       ),
   )
   .add(
@@ -190,7 +198,7 @@ export const di = container()
   .add(
     "SecuritySignalsService",
     (c) =>
-      new SecuritySignalsService(c.ISessionGeoStore, c.IOutboxRepository, {
+      new SecuritySignalsService(c.ISessionGeoStore, c.IOutboxRepository, logger, {
         denyCountries: env.SECURITY_DENY_COUNTRIES,
         denyAsns: env.SECURITY_DENY_ASNS,
         impossibleTravelWindowMinutes: env.IMPOSSIBLE_TRAVEL_WINDOW_MINUTES,

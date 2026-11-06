@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import * as realDrizzle from "@packages/drizzle";
+import type { DeliveredEvent } from "@packages/outbox/outbox.port";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import type { DeliveredEvent } from "../../ports/outbox.port";
 import { NoOpInstrumentation } from "../noop-instrumentation";
 
 const executor = {

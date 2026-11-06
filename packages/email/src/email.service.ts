@@ -9,8 +9,8 @@ import type {
   IEmailService,
   SendTemplateOptions,
   TemplateVariables,
-} from "../ports/email.port";
-import type { EmailMessageInsert, IEmailQueue } from "../ports/email-queue.port";
+} from "./email.port";
+import type { EmailMessageInsert, IEmailQueue } from "./email-queue.port";
 
 /**
  * Positional per-row key derived from the batch key. Only a fallback: the suffix

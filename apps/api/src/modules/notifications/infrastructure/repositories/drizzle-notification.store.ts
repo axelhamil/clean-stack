@@ -2,6 +2,7 @@ import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import {
   and,
   count,
+  dbOperationFailure,
   desc,
   eq,
   inArray,
@@ -10,7 +11,6 @@ import {
   notificationSchema,
   resolveExecutor,
 } from "@packages/drizzle";
-import { dbOperationFailure } from "../../../../shared/db-failure";
 import type {
   INotificationStore,
   NotificationError,

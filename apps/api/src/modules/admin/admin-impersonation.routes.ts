@@ -1,4 +1,5 @@
 import { type AppError, AppErrorException, type ErrorCode, Result } from "@packages/ddd-kit";
+import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { auth } from "../../auth";
@@ -7,7 +8,6 @@ import { IMPERSONATION_TTL_SECONDS } from "../../shared/auth/impersonation-ttl";
 import { type AuthVariables, requireAuth } from "../../shared/middleware/auth.middleware";
 import { resolveClientIp } from "../../shared/middleware/rate-limit.ip";
 import { requireStaffPermission, requireStepUp } from "../../shared/middleware/staff.middleware";
-import { zV } from "../../shared/validator";
 import { impersonateBodySchema } from "./application/dto/impersonate.dto";
 import { relaySetCookie } from "./relay-set-cookie";
 

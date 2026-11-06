@@ -67,6 +67,15 @@
     "packages/test": {
       "project": ["src/**/*.ts"]
     },
+    "packages/outbox": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/email": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/http": {
+      "project": ["src/**/*.ts"]
+    },
     "modules/*": {
       "project": ["**/*.ts"]
     },

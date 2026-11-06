@@ -183,7 +183,7 @@ If your event is in `RETENTION_MAP` with `operational` or `compliance`:
 
 ## Delivery: lease, retry and dead replay
 
-Three queues share one delivery model: the outbox (`outbox_event`), the email queue (`email_message`) and webhook delivery (`webhook_delivery`). Each claims in SQL with the database clock, settles guarded by the claimed `attempts`, keeps a dead state that is replayed on a slow cadence, and gives the attempt back on shutdown. The shared SQL fragments (`dbNow`, `leasedBy`, `claimedSet`, `releasedSet`) live in `packages/drizzle/src/lease.ts` and the pure failure schedule (`failureSchedule`, `retryAfterSeconds`) in `shared/jitter.ts`; the live, dead and due selection stays written per queue, since the dead markers, the settled markers and the claim filters differ. The outbox is described first, then what the two other queues change.
+Three queues share one delivery model: the outbox (`outbox_event`), the email queue (`email_message`) and webhook delivery (`webhook_delivery`). Each claims in SQL with the database clock, settles guarded by the claimed `attempts`, keeps a dead state that is replayed on a slow cadence, and gives the attempt back on shutdown. The shared SQL fragments (`dbNow`, `leasedBy`, `claimedSet`, `releasedSet`) live in `packages/drizzle/src/lease.ts` and the pure failure schedule (`failureSchedule`, `retryAfterSeconds`) in `packages/outbox/src/jitter.ts`; the live, dead and due selection stays written per queue, since the dead markers, the settled markers and the claim filters differ. The outbox is described first, then what the two other queues change.
 
 The relay (`OutboxRelay`, driven by `OutboxDispatcher`) wakes on the LISTEN notification, on the next due retry (`pendingState().dueInMs`) and on a 30 s poll, then drains in rounds:
 
@@ -336,7 +336,7 @@ if (!provided.some((sig) => timingSafeEqual(sig, expected))) return reject(401);
 - **Postgres LISTEN/NOTIFY** via dedicated `pg.Client` (hors pool Drizzle) + **30s poll fallback** for connection drops; the listener reconnects with backoff (250 ms to 15 s) and pings every 15 s. `pg_notify` is sent by `enqueue` on the same executor as the insert, so it leaves only at commit; there is no trigger.
 - **Claim by lease** (`FOR UPDATE SKIP LOCKED` + `UPDATE ... RETURNING` in one statement): multi-instance safe, and no lock is held while handlers run, so a slow or dead worker blocks nothing beyond its lease.
 - **AEAD secret encryption** (`@noble/ciphers` XChaCha20-Poly1305 + HKDF-SHA256 per-org sub-key) for webhook secrets at rest.
-- **Decorrelated jitter** retry (`apps/api/src/shared/jitter.ts`): `BASE * MULTIPLIER^attempts` then `random(BASE, upper)` clamped to 12h cap. Webhook and email deliveries turn dead on their 4th failed send; the outbox uses the same curve and turns dead after `OUTBOX_MAX_ATTEMPTS`.
+- **Decorrelated jitter** retry (`packages/outbox/src/jitter.ts`): `BASE * MULTIPLIER^attempts` then `random(BASE, upper)` clamped to 12h cap. Webhook and email deliveries turn dead on their 4th failed send; the outbox uses the same curve and turns dead after `OUTBOX_MAX_ATTEMPTS`.
 - **Claim window pattern** in delivery worker: claim a batch with `next_attempt_at = now() + (BATCH_SIZE × FETCH_TIMEOUT + buffer)`, fetch HTTP **outside** the TX, update status in a fresh TX. Prevents lock starvation.
 - **CloudEvents 1.0 envelope** stored in `outbox_event.metadata` (specversion, source, subject, traceparent, requestId) for cross-system interop. **`requestId`** carries the request's `X-Request-Id`: captured via an `AsyncLocalStorage` request context (`shared/request-context.ts`) at enqueue time, then copied into `audit_log.request_id` by the audit subscriber, so every audit row joins back to its originating HTTP request, pino logs, and Sentry event. (`traceparent` stays reserved for W3C trace context, unused until OTel is wired.)
 
@@ -607,15 +607,15 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |
 | `packages/drizzle/src/schema/{outbox,audit-log,webhooks}.ts` | The 4 tables |
 | `packages/drizzle/src/services/transaction-manager.service.ts` | `TransactionService.run()`: ALS flush + nested runs joining the outermost transaction + rollback when the callback resolves to a failed `Result` |
-| `apps/api/src/shared/services/outbox-dispatcher.service.ts` | LISTEN/NOTIFY worker, wake schedule, start and stop |
-| `apps/api/src/shared/services/outbox-relay.ts` | Claim by lease, run the named handlers, settle, dead announcement |
-| `apps/api/src/shared/services/drizzle-outbox.service.ts` | Outbox repository: enqueue, claim, `pendingState`, `markDelivered`, `markFailed` |
-| `apps/api/src/shared/event-handlers.ts` | Subscribes the built-in handlers to every catalog type, then the discovered `onEvent` handlers |
+| `packages/outbox/src/outbox-dispatcher.ts` | LISTEN/NOTIFY worker, wake schedule, start and stop |
+| `packages/outbox/src/outbox-relay.ts` | Claim by lease, run the named handlers, settle, dead announcement |
+| `packages/outbox/src/drizzle-outbox.repository.ts` | Outbox repository: enqueue, claim, `pendingState`, `markDelivered`, `markFailed` |
+| `packages/outbox/src/event-handlers.ts` | Subscribes the built-in handlers to every catalog type, then the discovered `onEvent` handlers |
 | `apps/api/src/shared/services/audit-event-subscriber.ts` | Built-in `audit-log` handler |
 | `apps/api/src/shared/services/webhook-fanout-subscriber.ts` | Built-in `webhook-fanout` handler (org-scoped) |
 | `apps/api/src/modules/webhooks/infrastructure/services/webhook-delivery-worker.service.ts` | HMAC POST + claim window + retry |
 | `apps/api/src/shared/aead.ts` | AEAD encrypt/decrypt for webhook secrets |
-| `apps/api/src/shared/jitter.ts` | Decorrelated jitter math |
-| `apps/api/src/shared/event-emitter.ts` | `emitEvent()` shared helper (used by RGPD, uploads, BetterAuth bridge) |
+| `packages/outbox/src/jitter.ts` | Decorrelated jitter math |
+| `packages/outbox/src/event-emitter.ts` | `emitEvent()` shared helper (used by RGPD, uploads, BetterAuth bridge) |
 | `apps/api/src/auth.ts` | BetterAuth bridge (23 events: 15 user + 8 org) |
 | `apps/api/src/modules/{audit-log,webhooks}/` | Built-in modules (admin routes + worker) |

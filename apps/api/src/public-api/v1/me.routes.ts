@@ -1,13 +1,13 @@
 import { AppErrorException, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import { zV } from "@packages/http/validator";
+import { emitEvent } from "@packages/outbox/event-emitter";
 import { Hono } from "hono";
 import { z } from "zod";
 import { di } from "../../container";
-import { emitEvent } from "../../shared/event-emitter";
 import type { ApiTokenVariables } from "../../shared/middleware/api-token.middleware";
 import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
 import type { UserAccountError } from "../../shared/ports/user-account.port";
-import { zV } from "../../shared/validator";
 import { requireScope } from "../require-scope";
 import { meResponseSchema } from "./schemas";
 

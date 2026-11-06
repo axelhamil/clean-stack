@@ -24,9 +24,9 @@ mock.module("../logger", () => ({
 const { requireCsrf } = await import("../middleware/csrf.middleware");
 const { createErrorHandler } = await import("../middleware/error.middleware");
 
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { Hono } from "hono";
-import { mockInstrumentation } from "../../__TESTS__/mock-instrumentation";
-import type { IOutboxRepository } from "../ports/outbox.port";
 
 const ALLOWED_ORIGINS = ["http://localhost:5173", "https://app.example.com"];
 
