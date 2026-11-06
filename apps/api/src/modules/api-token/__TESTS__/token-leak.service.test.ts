@@ -122,6 +122,25 @@ describe("TokenLeakService.handleReport", () => {
     );
   });
 
+  it("answers one verdict per entry, in order, mixing true and false positives", async () => {
+    storedUnder(RECORD.tokenHmac, RECORD);
+    const { raw: unknownRaw } = generateToken(PREFIX);
+
+    const verdicts = await service().handleReport([
+      { token: unknownRaw, type: "clean_token" },
+      { token: KNOWN_RAW, type: "clean_token" },
+      { token: "bad-format-token", type: "clean_token" },
+    ]);
+
+    expect(verdicts.getValue()).toEqual([
+      { token_raw: unknownRaw, token_type: "clean_token", label: "false_positive" },
+      { token_raw: KNOWN_RAW, token_type: "clean_token", label: "true_positive" },
+      { token_raw: "bad-format-token", token_type: "clean_token", label: "false_positive" },
+    ]);
+    expect(repo.revoke).toHaveBeenCalledTimes(1);
+    expect(enqueuedEvents(outbox)).toHaveLength(1);
+  });
+
   it("finds a token hashed under the previous pepper", async () => {
     const previous = { ...RECORD, id: "tok-prev" };
     storedUnder(hmacToken(KNOWN_RAW, PREVIOUS_PEPPER), previous);

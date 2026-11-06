@@ -76,6 +76,8 @@ export default {
     ORGANIZATION_ALREADY_EXISTS: "Une organisation portant ce nom existe déjà.",
     ORGANIZATION_SLUG_ALREADY_TAKEN: "Cette adresse d'organisation est déjà prise.",
     ORGANIZATION_NOT_FOUND: "Organisation introuvable.",
+    API_TOKEN_ORGANIZATION_NOT_FOUND:
+      "Basculez sur cette organisation avant de créer un jeton pour elle.",
     USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION:
       "Cet utilisateur n'est pas membre de cette organisation.",
     YOU_ARE_NOT_ALLOWED_TO_UPDATE_THIS_ORGANIZATION:
@@ -179,6 +181,8 @@ export default {
     ADMIN_USER_NOT_FOUND: "Ce compte n'existe plus.",
     ADMIN_USER_SELF_BAN_FORBIDDEN: "Vous ne pouvez pas suspendre votre propre compte.",
     ADMIN_IMPERSONATION_FORBIDDEN: "Vous ne pouvez pas voir le produit avec ce compte.",
+    ADMIN_IMPERSONATION_SELF_FORBIDDEN:
+      "Vous êtes déjà connecté avec votre propre compte. Choisissez un autre compte pour voir le produit.",
     ADMIN_STOP_IMPERSONATION_FORBIDDEN: "L'emprunt d'identité n'a pas pu être arrêté.",
     ADMIN_STAFF_MFA_FORBIDDEN:
       "Activez l'authentification à deux facteurs pour utiliser l'espace de l'équipe.",
