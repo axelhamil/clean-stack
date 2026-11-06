@@ -53,11 +53,12 @@ export function toAuthClientError(error: AuthClientErrorInput, fallbackMessage: 
 const errorEnvelopeSchema = z.object({
   error: z
     .object({
-      code: z.string().optional(),
-      message: z.string().optional(),
-      metadata: metadataSchema.optional(),
+      code: z.string().optional().catch(undefined),
+      message: z.string().optional().catch(undefined),
+      metadata: metadataSchema.optional().catch(undefined),
     })
-    .optional(),
+    .optional()
+    .catch(undefined),
 });
 
 type ErrorEnvelope = z.infer<typeof errorEnvelopeSchema>;

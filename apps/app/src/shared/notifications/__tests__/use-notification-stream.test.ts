@@ -150,14 +150,14 @@ describe("consume: garde-temps de silence", () => {
   });
 });
 
-describe("notificationStreamOptions: reprise apres coupure", () => {
-  test("une reconnexion rafraichit le compteur, faute de sondage pendant la coupure", () => {
+describe("notificationStreamOptions: connexion au flux", () => {
+  test("chaque connexion rafraichit le compteur, faute de sondage hors du flux", () => {
     const invalidate = vi.fn();
     const options = notificationStreamOptions({
       invalidateQueries: invalidate,
     } as unknown as QueryClient);
 
-    options.onReconnect?.();
+    options.onConnect?.();
 
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["notifications", "unread-count"] });
   });

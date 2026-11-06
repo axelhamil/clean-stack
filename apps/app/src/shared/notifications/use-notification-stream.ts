@@ -29,7 +29,7 @@ export function notificationStreamOptions(queryClient: QueryClient): Notificatio
   return {
     connect: (signal) => api.notifications.stream.$get({}, { init: { signal } }),
     onNotification: refresh,
-    onReconnect: refresh,
+    onConnect: refresh,
     onDisconnect: (attempt, err) =>
       addBreadcrumb("notification stream disconnected", { attempt, err: String(err) }),
   };

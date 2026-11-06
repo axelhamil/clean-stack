@@ -12,6 +12,6 @@ export function useStaffLiveUpdates(): void {
   useNotificationStreamConnection({
     connect: (signal) => api.notifications.stream.$get({}, { init: { signal } }),
     onNotification: refreshLiveQueries,
-    onReconnect: refreshLiveQueries,
+    onConnect: refreshLiveQueries,
   });
 }

@@ -59,6 +59,13 @@ describe("throwApiError", () => {
     expect(err.metadata?.foo).toBe("bar");
   });
 
+  it("keeps the server message when another envelope field has the wrong type", async () => {
+    const res = makeResponse(500, { error: { code: 42, message: "server says no" } });
+    const err = await throwApiError(res, "loadPolicies").catch((e) => e);
+    expect(err.message).toBe("server says no");
+    expect(err.code).toBeUndefined();
+  });
+
   it("throws even when no JSON body", async () => {
     const res = new Response(null, {
       status: 429,
