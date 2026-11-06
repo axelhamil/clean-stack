@@ -67,6 +67,9 @@
     "packages/test": {
       "project": ["src/**/*.ts"]
     },
+    "modules/*": {
+      "project": ["**/*.ts"]
+    },
     "infra": {
       "entry": ["coolify/apply.ts", "coolify/*.test.ts", "pgbackrest/*.test.ts", "vps/*.test.ts"],
       "project": ["coolify/**/*.ts", "pgbackrest/**/*.ts", "vps/**/*.ts", "test-support.ts"]

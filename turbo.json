@@ -30,6 +30,7 @@
       "dependsOn": ["^build"],
       "inputs": [
         "src/**",
+        "schemas/**",
         "common/**",
         "package.json",
         "tsconfig*.json",
@@ -56,6 +57,8 @@
       "dependsOn": ["^build"],
       "inputs": [
         "src/**",
+        "schemas/**",
+        "scripts/**",
         "common/**",
         "**/*.test.ts",
         "**/*.test.tsx",
@@ -77,7 +80,15 @@
     },
     "type-check": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "common/**", "a11y/**", "package.json", "tsconfig*.json"],
+      "inputs": [
+        "src/**",
+        "schemas/**",
+        "scripts/**",
+        "common/**",
+        "a11y/**",
+        "package.json",
+        "tsconfig*.json"
+      ],
       "outputs": []
     },
     "check:a11y": {

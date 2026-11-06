@@ -35,6 +35,8 @@
     "check:admin-ops": "bun scripts/check-admin-ops.ts",
     "check:admin-accounts": "bun scripts/check-admin-accounts.ts",
     "check:admin-workspace": "bun scripts/check-admin-workspace.ts",
+    "check:api-shape": "bun scripts/api-shape.ts",
+    "api-shape:update": "bun scripts/api-shape.ts --update",
     "start": "bun dist/migrate.js && bun dist/index.js",
     "type-check": "tsc --noEmit",
     "test": "bun test --isolate --parallel --pass-with-no-tests",

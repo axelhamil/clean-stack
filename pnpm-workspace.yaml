@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+  - "modules/*"
   - "infra"
 allowBuilds:
   '@swc/core': true

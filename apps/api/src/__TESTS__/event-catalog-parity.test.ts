@@ -14,9 +14,11 @@ const DECLARED_ON_CLASS = /\beventType\s*=\s*"([a-z_]+(?:\.[a-z_]+)+)"/g;
 
 const sourceRoots = [
   "apps/api/src",
-  ...readdirSync(join(repoRoot, "packages"))
-    .map((name) => `packages/${name}/src`)
-    .filter((root) => existsSync(join(repoRoot, root))),
+  ...["packages", "modules"].flatMap((workspaceRoot) =>
+    readdirSync(join(repoRoot, workspaceRoot))
+      .map((name) => `${workspaceRoot}/${name}/src`)
+      .filter((root) => existsSync(join(repoRoot, root))),
+  ),
 ];
 
 const CATALOG_ROOT = "packages/events/src";
