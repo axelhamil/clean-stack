@@ -10,7 +10,7 @@ const PREV_PEPPER = "b".repeat(32);
 const BUCKET_MIN = 15;
 const PEPPER_VERSION = 1;
 
-const findUserByIdSpy = mock(async (_id: string) => ({
+const ownerRow = () => ({
   id: "u1",
   name: "Test",
   email: "t@example.com",
@@ -28,7 +28,9 @@ const findUserByIdSpy = mock(async (_id: string) => ({
   banned: false as boolean | null,
   banReason: null as string | null,
   banExpires: null as Date | null,
-}));
+});
+
+const findUserByIdSpy = mock(async (_id: string) => ownerRow());
 
 const realAuthQueries = await import("../../auth-queries");
 mock.module("../../auth-queries", () => ({
@@ -239,6 +241,20 @@ describe("requireApiToken", () => {
     const res = await app.request("/x", {
       headers: { authorization: `Bearer ${raw}` },
     });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 for a valid token whose owner account was erased", async () => {
+    const { raw } = generateToken(PREFIX);
+    const record = makeRecord({ tokenHmac: hmacToken(raw, PEPPER) });
+    const { repo } = makeRepo(async () => Result.ok(Option.some(record)));
+    findUserByIdSpy.mockImplementationOnce(async () => ({ ...ownerRow(), deletedAt: new Date() }));
+    const app = new Hono()
+      .use(requireApiToken(makeDeps(repo), { scopes: [] }))
+      .get("/x", (c) => c.text("ok"));
+
+    const res = await app.request("/x", { headers: { authorization: `Bearer ${raw}` } });
+
     expect(res.status).toBe(401);
   });
 

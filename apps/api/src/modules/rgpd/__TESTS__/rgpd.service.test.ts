@@ -86,6 +86,8 @@ function makeRepo(overrides: Partial<IRgpdRepository> = {}): IRgpdRepository {
         anonymizedEmail: "deleted-uuid@anonymized.local",
         alreadyWiped: false,
         endedImpersonations: [],
+        removedMemberships: [],
+        revokedTokens: [],
       }),
     ),
     verifyPassword: mock(async () => Result.ok<boolean, RgpdError>(true)),
@@ -492,6 +494,8 @@ describe("RgpdService", () => {
                 expiresAt: new Date(createdAt.getTime() + 3_600_000),
               },
             ],
+            removedMemberships: [],
+            revokedTokens: [],
           }),
         ),
       });
@@ -727,6 +731,65 @@ describe("RgpdService", () => {
       expect(orgDeleted).toEqual(["org_personal", "org_solo"]);
     });
 
+    it("announces the membership of every surviving organization and each revoked api token", async () => {
+      const repo = makeRepo({
+        getUserDeletionState: mock(async () =>
+          Result.ok<Option<UserDeletionState>, RgpdError>(Option.some(elapsedState)),
+        ),
+        executeWipe: mock(async () =>
+          Result.ok<ExecuteWipeOutput, RgpdError>({
+            deletedOrgIds: ["org_personal"],
+            anonymizedEmail: "deleted-uuid@anonymized.local",
+            alreadyWiped: false,
+            endedImpersonations: [],
+            removedMemberships: [{ memberId: "mem_team", organizationId: "org_team" }],
+            revokedTokens: [
+              { tokenId: "tok_personal", organizationId: Option.none() },
+              { tokenId: "tok_team", organizationId: Option.some("org_team") },
+            ],
+          }),
+        ),
+      });
+      const spyOutbox = mockPort<IOutboxRepository>();
+      const service = buildService({ repo, email, outbox: spyOutbox });
+
+      const result = await service.executeAccountWipe({ userId: "u1" });
+
+      expect(result.isSuccess).toBe(true);
+      const events = enqueuedEvents(spyOutbox);
+      expect(events.filter((e) => e.eventType === EventTypes.ORG_MEMBER_REMOVED)).toEqual([
+        {
+          eventType: EventTypes.ORG_MEMBER_REMOVED,
+          aggregateId: "mem_team",
+          payload: { organizationId: "org_team", actorUserId: "u1", userId: "u1" },
+        },
+      ]);
+      expect(events.filter((e) => e.eventType === EventTypes.API_TOKEN_REVOKED)).toEqual([
+        {
+          eventType: EventTypes.API_TOKEN_REVOKED,
+          aggregateId: "tok_personal",
+          payload: {
+            userId: "u1",
+            actorUserId: "u1",
+            organizationId: null,
+            tokenId: "tok_personal",
+            reason: "user",
+          },
+        },
+        {
+          eventType: EventTypes.API_TOKEN_REVOKED,
+          aggregateId: "tok_team",
+          payload: {
+            userId: "u1",
+            actorUserId: "u1",
+            organizationId: "org_team",
+            tokenId: "tok_team",
+            reason: "user",
+          },
+        },
+      ]);
+    });
+
     it("short-circuits without emitting USER_DELETED when the repository reports the row already wiped (lost race, no SKIP LOCKED on rgpd-sweep)", async () => {
       const repo = makeRepo({
         getUserDeletionState: mock(async () =>
@@ -738,6 +801,8 @@ describe("RgpdService", () => {
             anonymizedEmail: "",
             alreadyWiped: true,
             endedImpersonations: [],
+            removedMemberships: [],
+            revokedTokens: [],
           }),
         ),
       });
