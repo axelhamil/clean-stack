@@ -95,7 +95,7 @@ Without `read:sensitive` Coolify lists every env key but hides its value: `apply
 
 ## 6. GitHub environments, secrets and variables
 
-Create the environments `staging` and `production`. Add no deployment branch rule to either: on a `workflow_run` event `github.ref` is the default branch (`dev`) for both environments, so a `main` rule on `production` would refuse every production deploy and a `dev` rule would let any `dev` run pass. `deploy.yml` routes by `workflow_run.head_branch` instead: only a CI run on `main` selects `production`. Protect `production` with required reviewers, so every production deploy waits for a maintainer approval.
+Create the environments `staging` and `production`. Add no deployment branch rule to either: on a `workflow_run` event `github.ref` is the default branch (`develop`) for both environments, so a `main` rule on `production` would refuse every production deploy and a `develop` rule would let any `develop` run pass. `deploy.yml` routes by `workflow_run.head_branch` instead: only a CI run on `main` selects `production`. Protect `production` with required reviewers, so every production deploy waits for a maintainer approval.
 
 | Kind | Name | Scope | Value |
 | --- | --- | --- | --- |
@@ -112,7 +112,7 @@ Create the environments `staging` and `production`. Add no deployment branch rul
 | Variable | `PGBACKREST_REPO1_S3_BUCKET`, `PGBACKREST_REPO1_PATH`, `PGBACKREST_DRILL_DATABASE`, `PGBACKREST_DRILL_USER` | environment `pgbackrest-drill` | default `clean-stack-pgbackrest`, `/production`, `postgres` and `postgres`: the database the drill queries and the role it queries as |
 | Variable | `PGBACKREST_DRILL_ENABLED` | repository | `true` once a manual run of `pgBackRest drill` passed; anything else skips the schedule |
 
-Restrict the deployment branches of `pgbackrest-drill` to `dev` and `main`. A scheduled run executes on the default branch, so `github.ref` is `dev`; the job then checks out `main`. A manual run is accepted from `main` only, by the `if` of the job. The R2 key is read-only, which bounds what a `dev` run can reach.
+Restrict the deployment branches of `pgbackrest-drill` to `develop` and `main`. A scheduled run executes on the default branch, so `github.ref` is `develop`; the job then checks out `main`. A manual run is accepted from `main` only, by the `if` of the job. The R2 key is read-only, which bounds what a `develop` run can reach.
 
 `COOLIFY_DEPLOY` is off on a fresh clone: CI never tries to deploy before the operator says so.
 
@@ -144,9 +144,9 @@ Rerun the dry run: it must report no change and no missing secret. A secret coun
 
 ## 8. Deploys
 
-`deploy.yml` runs on `workflow_run` of `CI`, completed, on `dev` and `main`. It does anything only when that run succeeded, was a push (not a pull request), came from this repository and `COOLIFY_DEPLOY` is `on`. `dev` deploys to `staging`, `main` to `production`.
+`deploy.yml` runs on `workflow_run` of `CI`, completed, on `develop` and `main`. It does anything only when that run succeeded, was a push (not a pull request), came from this repository and `COOLIFY_DEPLOY` is `on`. `develop` deploys to `staging`, `main` to `production`.
 
-GitHub fires `workflow_run` only from the workflow file on the default branch. With `dev` as the default branch, an edit of `deploy.yml` merged on `dev` takes effect at once, for staging and production alike. For the same reason `github.ref` is `dev` for both environments (section 6).
+GitHub fires `workflow_run` only from the workflow file on the default branch. With `develop` as the default branch, an edit of `deploy.yml` merged on `develop` takes effect at once, for staging and production alike. For the same reason `github.ref` is `develop` for both environments (section 6).
 
 1. **Build**: the three `apps/*/prod.Dockerfile` images, tagged `sha-<commit>` and pushed to GHCR; the job outputs their digests.
 2. **Deploy**: `deploy.ts` deploys `api`, then `app`, then `admin`, within one 45 min budget (the job allows 60). Before `api` it waits for an idle `sweep` and `rgpd-sweep` (never for the per-minute flush): only the latest execution counts, and one older than the task timeout plus 5 min counts as ended. One still running after 30 min skips `api`, and the run stops there. Per app it notes the current image and `GIT_SHA`, writes the new ones, starts the deployment and follows it. When that fails or outlives the budget it writes the noted image and `GIT_SHA` back (a hidden `GIT_SHA` stays at the new release, and the report says so) and stops. The report gives every app's state, `app` and `admin` read `not deployed` after an `api` skip or failure, and the job fails. A deployment that outlived the budget reads `still running in Coolify, config restored`: check it in the dashboard. A failed restore reads `restore failed`: fix the image and `GIT_SHA` by hand.

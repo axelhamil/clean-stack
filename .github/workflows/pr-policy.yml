@@ -45,7 +45,7 @@ jobs:
             esac
           fi
 
-          echo "::error::Pull requests target dev. main only receives hotfix/* branches of $REPOSITORY; a release from dev moves main by itself. Change the base branch of this PR to dev."
+          echo "::error::Pull requests target develop. main only receives hotfix/* branches of $REPOSITORY; a release from develop moves main by itself. Change the base branch of this PR to develop."
           exit 1
 
   linked-issue:
@@ -136,7 +136,7 @@ jobs:
               'This pull request is not triaged yet. Missing:',
               ...missing.map((item) => `- ${item}`),
               'The check reruns when the pull request or its issue changes.',
-              'See https://github.com/axelhamil/clean-stack/blob/dev/CONTRIBUTING.md',
+              'See https://github.com/axelhamil/clean-stack/blob/develop/CONTRIBUTING.md',
             ].join('\n');
 
             await core.summary.addRaw(message, true).write();

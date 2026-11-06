@@ -82,7 +82,7 @@ Most SaaS templates ship a half-baked auth you'll rip out and zero opinion on wh
 | **Type safety** | Hono RPC end-to-end (`hcWithType`). No client to write, no schema to sync, refactor in API → red squiggle in App on save. |
 | **Performance** | Bun-native `Bun.serve()` (~7 ms cold). Route-level code-splitting on the front (initial bundle ~355 KB, route chunks 1 to 43 KB) + `defaultPreload: "intent"`: perceived latency near zero. |
 | **AI-pair ready** | `CLAUDE.md` at the root + one per app and per package. Your agent already knows the rules: Result/Option, no `throw` in domain, capability gates, vertical-slice modules. |
-| **Zero-warning pipeline** | Husky + lint-staged + commitlint + a pre-push chain (Biome, boundaries, build, type-check, tests, jscpd, knip) that CI replays on every PR. Conventional Commits enforced; release-please keeps a release PR on `dev`, and merging it tags and moves `main`. No `--no-verify` shortcut. |
+| **Zero-warning pipeline** | Husky + lint-staged + commitlint + a pre-push chain (Biome, boundaries, build, type-check, tests, jscpd, knip) that CI replays on every PR. Conventional Commits enforced; release-please keeps a release PR on `develop`, and merging it tags and moves `main`. No `--no-verify` shortcut. |
 
 ---
 

@@ -34,16 +34,16 @@ function jobWith(jobs: Record<string, Job>, script: string): Job {
 }
 
 describe("the coolify deploy and rollback workflows", () => {
-  it("deploys only after a completed CI run on a push to dev or main", async () => {
+  it("deploys only after a completed CI run on a push to develop or main", async () => {
     const ci = await workflowOf(CI);
     const deploy = await workflowOf(DEPLOY);
 
-    expect(ci.on.push?.branches).toEqual(expect.arrayContaining(["dev", "main"]));
+    expect(ci.on.push?.branches).toEqual(expect.arrayContaining(["develop", "main"]));
     expect(deploy.on.push).toBeUndefined();
     expect(deploy.on.workflow_run).toEqual({
       workflows: [ci.name],
       types: ["completed"],
-      branches: ["dev", "main"],
+      branches: ["develop", "main"],
     });
   });
 
