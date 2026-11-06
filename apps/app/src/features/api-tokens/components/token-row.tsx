@@ -28,7 +28,9 @@ export function TokenRow({ token, activeOrg, onRevoke, isRevoking, guard }: Toke
 
   return (
     <TableRow>
-      <TableCell className="font-medium">{token.name}</TableCell>
+      <TableCell>
+        <TypographyInline weight="medium">{token.name}</TypographyInline>
+      </TableCell>
       <TableCell>
         <TypographyInline font="mono">{token.tokenStart}…</TypographyInline>
       </TableCell>

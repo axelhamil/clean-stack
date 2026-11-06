@@ -17,46 +17,55 @@ export type RotateSecretResponse = InferResponseType<typeof $rotate, 200>;
 
 export const createEndpointMutationOptions = mutationOptions({
   mutationKey: ["settings", "webhooks", "create"] as const,
-  mutationFn: async (input: CreateEndpointBody) => {
+  mutationFn: async (input: CreateEndpointBody): Promise<CreateEndpointResponse> => {
     const res = await $create({ json: input });
     if (!res.ok) await throwApiError(res, "createWebhookEndpoint");
-    return (await res.json()) as CreateEndpointResponse;
+    return res.json();
   },
 });
 
 export const updateEndpointMutationOptions = mutationOptions({
   mutationKey: ["settings", "webhooks", "update"] as const,
-  mutationFn: async ({ id, ...json }: UpdateEndpointBody & { id: string }) => {
+  mutationFn: async ({
+    id,
+    ...json
+  }: UpdateEndpointBody & { id: string }): Promise<InferResponseType<typeof $update, 200>> => {
     const res = await $update({ param: { id }, json });
     if (!res.ok) await throwApiError(res, "updateWebhookEndpoint");
-    return (await res.json()) as InferResponseType<typeof $update, 200>;
+    return res.json();
   },
 });
 
 export const deleteEndpointMutationOptions = mutationOptions({
   mutationKey: ["settings", "webhooks", "delete"] as const,
-  mutationFn: async (id: string) => {
+  mutationFn: async (id: string): Promise<InferResponseType<typeof $delete, 200>> => {
     const res = await $delete({ param: { id } });
     if (!res.ok) await throwApiError(res, "deleteWebhookEndpoint");
-    return (await res.json()) as InferResponseType<typeof $delete, 200>;
+    return res.json();
   },
 });
 
 export const replayDeliveryMutationOptions = mutationOptions({
   mutationKey: ["settings", "webhooks", "replay"] as const,
-  mutationFn: async ({ endpointId, deliveryId }: { endpointId: string; deliveryId: string }) => {
+  mutationFn: async ({
+    endpointId,
+    deliveryId,
+  }: {
+    endpointId: string;
+    deliveryId: string;
+  }): Promise<InferResponseType<typeof $replay, 201>> => {
     const res = await $replay({ param: { id: endpointId, deliveryId } });
     if (!res.ok) await throwApiError(res, "replayWebhookDelivery");
-    return (await res.json()) as InferResponseType<typeof $replay, 201>;
+    return res.json();
   },
 });
 
 export const rotateSecretMutationOptions = mutationOptions({
   mutationKey: ["settings", "webhooks", "rotate"] as const,
-  mutationFn: async (id: string) => {
+  mutationFn: async (id: string): Promise<RotateSecretResponse> => {
     const res = await $rotate({ param: { id } });
     if (!res.ok) await throwApiError(res, "rotateWebhookSecret");
-    return (await res.json()) as RotateSecretResponse;
+    return res.json();
   },
 });
 

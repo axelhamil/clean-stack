@@ -1,3 +1,4 @@
+import { Band } from "@packages/ui/components/ui/band";
 import { BrandLink } from "@packages/ui/components/ui/brand-link";
 import { Button } from "@packages/ui/components/ui/button";
 import { IconButton } from "@packages/ui/components/ui/icon-button";
@@ -5,6 +6,7 @@ import { KeyboardShortcut } from "@packages/ui/components/ui/keyboard-shortcut";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import { Separator } from "@packages/ui/components/ui/separator";
+import { TypographyInline } from "@packages/ui/components/ui/typography";
 import { cn } from "@packages/ui/libs/utils.js";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Search } from "lucide-react";
@@ -48,63 +50,67 @@ export function AppShell({ user, children }: AppShellProps) {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-30 border-b bg-background">
-        <div className={cn(pageContainerVariants(), "flex h-14 items-center gap-2 sm:gap-4")}>
-          <BrandLink asChild>
-            <Link to="/dashboard">
-              <LogoMark />
-              <span className="hidden sm:inline">{t("shell.brandLabel")}</span>
-            </Link>
-          </BrandLink>
+      <Band asChild edge="bottom" surface="opaque" className="sticky top-0 z-30">
+        <header>
+          <div className={cn(pageContainerVariants(), "flex h-14 items-center gap-2 sm:gap-4")}>
+            <BrandLink asChild>
+              <Link to="/dashboard">
+                <LogoMark />
+                <span className="hidden sm:inline">{t("shell.brandLabel")}</span>
+              </Link>
+            </BrandLink>
 
-          <Separator orientation="vertical" className="h-5" />
+            <Separator orientation="vertical" className="h-5" />
 
-          <OrgSwitcher />
+            <OrgSwitcher />
 
-          <nav className="hidden shrink-0 items-center gap-1 md:flex">
-            {primaryNav.map((item) => (
-              <NavLink key={item.to} variant="pill" active={item.active} asChild>
-                <Link to={item.to}>{t(item.labelKey)}</Link>
-              </NavLink>
-            ))}
-          </nav>
+            <nav className="hidden shrink-0 items-center gap-1 md:flex">
+              {primaryNav.map((item) => (
+                <NavLink key={item.to} variant="pill" active={item.active} asChild>
+                  <Link to={item.to}>{t(item.labelKey)}</Link>
+                </NavLink>
+              ))}
+            </nav>
 
-          <div className="ml-auto flex shrink-0 items-center gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={fireCommandPalette}
-              className="hidden h-9 gap-2 text-muted-foreground lg:inline-flex"
-            >
-              <Search className="size-4" />
-              <span>{t("shell.search")}</span>
-              <KeyboardShortcut className="ml-2">{SHORTCUT_LABEL}</KeyboardShortcut>
-            </Button>
+            <div className="ml-auto flex shrink-0 items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fireCommandPalette}
+                className="hidden h-9 gap-2 lg:inline-flex"
+              >
+                <TypographyInline tone="muted" className="flex items-center gap-2">
+                  <Search className="size-4" />
+                  {t("shell.search")}
+                </TypographyInline>
+                <KeyboardShortcut className="ml-2">{SHORTCUT_LABEL}</KeyboardShortcut>
+              </Button>
 
-            <IconButton
-              variant="ghost"
-              onClick={fireCommandPalette}
-              className="lg:hidden"
-              label={t("shell.openCommandPalette")}
-              shortcut={SHORTCUT_LABEL}
-            >
-              <Search />
-            </IconButton>
+              <IconButton
+                variant="ghost"
+                onClick={fireCommandPalette}
+                className="lg:hidden"
+                label={t("shell.openCommandPalette")}
+                shortcut={SHORTCUT_LABEL}
+              >
+                <Search />
+              </IconButton>
 
-            <NotificationBell />
+              <NotificationBell />
 
-            <ThemeToggle />
+              <ThemeToggle />
 
-            <UserMenu user={user} />
+              <UserMenu user={user} />
+            </div>
           </div>
-        </div>
 
-        {pathname.startsWith("/settings") && (
-          <div className="border-t">
-            <ContextualTabs className={pageContainerVariants()} />
-          </div>
-        )}
-      </header>
+          {pathname.startsWith("/settings") && (
+            <Band>
+              <ContextualTabs className={pageContainerVariants()} />
+            </Band>
+          )}
+        </header>
+      </Band>
 
       <ImpersonationBanner />
       <DeletionPendingBanner />

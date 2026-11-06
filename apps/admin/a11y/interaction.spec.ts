@@ -177,6 +177,28 @@ test.describe("signed in", () => {
     await expect(opener).toBeFocused();
   });
 
+  test("closing the palette clears what was typed, by Escape or by the shortcut", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.locator("main")).toHaveCount(1);
+    const palette = page.getByRole("dialog", { name: "Back office search" });
+    const search = palette.getByRole("combobox");
+
+    await page.keyboard.press("Control+k");
+    await search.fill("audit");
+    await page.keyboard.press("Escape");
+    await expect(palette).toBeHidden();
+    await page.keyboard.press("Control+k");
+    await expect(search).toHaveValue("");
+
+    await search.fill("audit");
+    await page.keyboard.press("Control+k");
+    await expect(palette).toBeHidden();
+    await page.keyboard.press("Control+k");
+    await expect(search).toHaveValue("");
+  });
+
   test("the palette lists the sections the permissions open and runs one with the keyboard", async ({
     page,
   }) => {

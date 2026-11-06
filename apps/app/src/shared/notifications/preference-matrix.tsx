@@ -63,6 +63,10 @@ export const FORCED_NOTE_KEYS = {
   none: null,
 } as const;
 
+function isNotificationFrequency(value: string): value is NotificationFrequency {
+  return NOTIFICATION_FREQUENCIES.some((candidate) => candidate === value);
+}
+
 export function PreferenceMatrix({
   rows,
   onChange,
@@ -150,9 +154,9 @@ export function PreferenceMatrix({
                     <Select
                       value={row.email.frequency}
                       disabled={frozen || !row.email.enabled}
-                      onValueChange={(frequency) =>
-                        emit("email", { frequency: frequency as NotificationFrequency })
-                      }
+                      onValueChange={(frequency) => {
+                        if (isNotificationFrequency(frequency)) emit("email", { frequency });
+                      }}
                     >
                       <SelectTrigger
                         aria-label={t("notifications.emailFrequencyAriaLabel", {

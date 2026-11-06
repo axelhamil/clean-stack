@@ -5,7 +5,13 @@ import {
   DescriptionList,
   DescriptionTerm,
 } from "@packages/ui/components/ui/description-list";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@packages/ui/components/ui/sheet";
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@packages/ui/components/ui/sheet";
 import { TypographySmall } from "@packages/ui/components/ui/typography";
 import { useFormatDateTime } from "@packages/web-kit/i18n/use-format-date";
 import { useTranslation } from "react-i18next";
@@ -50,7 +56,7 @@ export function AuditMetadataSheet({ row, onClose }: AuditMetadataSheetProps) {
             <SheetHeader>
               <SheetTitle className="pr-6 break-words">{row.action}</SheetTitle>
             </SheetHeader>
-            <div className="flex min-w-0 flex-col gap-4 px-4 pb-4">
+            <SheetBody>
               <DescriptionList>
                 <DescriptionItem>
                   <DescriptionTerm>{t("auditLog.metadata.actorLabel")}</DescriptionTerm>
@@ -77,7 +83,7 @@ export function AuditMetadataSheet({ row, onClose }: AuditMetadataSheetProps) {
               ) : (
                 <CodeBlock>{JSON.stringify(row.metadata, null, 2)}</CodeBlock>
               )}
-            </div>
+            </SheetBody>
           </>
         )}
       </SheetContent>

@@ -42,7 +42,7 @@ export function UserMenu({ user }: UserMenuProps) {
         >
           <Avatar className="size-8">
             {image ? <AvatarImage src={image} alt={display} /> : null}
-            <AvatarFallback className="text-xs font-medium">{initialsOf(display)}</AvatarFallback>
+            <AvatarFallback>{initialsOf(display)}</AvatarFallback>
           </Avatar>
         </IconButton>
       </DropdownMenuTrigger>

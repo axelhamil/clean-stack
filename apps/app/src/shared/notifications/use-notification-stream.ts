@@ -1,4 +1,7 @@
-import { useNotificationStreamConnection } from "@packages/web-kit/notifications/use-notification-stream";
+import {
+  type NotificationStreamOptions,
+  useNotificationStreamConnection,
+} from "@packages/web-kit/notifications/use-notification-stream";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/api-client";
 import { notificationsListQueryKey, unreadCountQueryOptions } from "../api/queries/notifications";
@@ -20,13 +23,18 @@ export function refreshOnNotification(queryClient: QueryClient): () => void {
   };
 }
 
-export function useNotificationStream(): { connected: boolean } {
-  const queryClient = useQueryClient();
+export function notificationStreamOptions(queryClient: QueryClient): NotificationStreamOptions {
+  const refresh = refreshOnNotification(queryClient);
 
-  return useNotificationStreamConnection({
+  return {
     connect: (signal) => api.notifications.stream.$get({}, { init: { signal } }),
-    onNotification: refreshOnNotification(queryClient),
+    onNotification: refresh,
+    onReconnect: refresh,
     onDisconnect: (attempt, err) =>
       addBreadcrumb("notification stream disconnected", { attempt, err: String(err) }),
-  });
+  };
+}
+
+export function useNotificationStream(): void {
+  useNotificationStreamConnection(notificationStreamOptions(useQueryClient()));
 }

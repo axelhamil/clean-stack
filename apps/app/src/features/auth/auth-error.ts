@@ -1,6 +1,6 @@
 import { messageFromCode, rateLimitedMessage } from "@packages/web-kit/api/errors/messages";
 import { isExternalRedirect } from "@packages/web-kit/auth/safe-redirect";
-import type { TFunction } from "i18next";
+import type { ParseKeys, TFunction } from "i18next";
 import { authClient } from "../../shared/auth/auth-client";
 
 interface BetterAuthError {
@@ -18,7 +18,7 @@ interface BetterAuthError {
  */
 export function resolveAuthError(
   error: BetterAuthError,
-  fallbackKey: string,
+  fallbackKey: ParseKeys<"auth">,
   t: TFunction<"auth">,
   tErrors: TFunction<"errors">,
 ): string {
@@ -28,7 +28,7 @@ export function resolveAuthError(
     const mapped = messageFromCode(code, tErrors);
     if (mapped) return mapped;
   }
-  return t(fallbackKey as never);
+  return t(fallbackKey);
 }
 
 export function ssoCallbackUrl(redirectTo?: string): string {

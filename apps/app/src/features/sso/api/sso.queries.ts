@@ -20,7 +20,7 @@ export const ssoProvidersQueryOptions = queryOptions({
   queryFn: async () => {
     const { data, error } = await authClient.sso.providers();
     if (error) throw toAuthClientError(error, errorFallback("loadSsoProviders"));
-    const providers = (data?.providers ?? []) as SsoProviderSummary[];
+    const providers: SsoProviderSummary[] = data?.providers ?? [];
     // The endpoint returns no `createdAt` (or any other insertion-order field) to
     // sort by, and `findMany` on the server carries no `orderBy`: without a stable
     // sort here, "the org's provider" below would resolve to a different row across
@@ -65,7 +65,7 @@ export const scimConnectionQueryOptions = queryOptions({
   queryFn: async ({ signal }) => {
     const res = await $scimConnection({}, { init: { signal } });
     if (!res.ok) await throwApiError(res, "loadScimConnection");
-    const body = (await res.json()) as InferResponseType<typeof $scimConnection, 200>;
+    const body: InferResponseType<typeof $scimConnection, 200> = await res.json();
     return body.connection;
   },
 });

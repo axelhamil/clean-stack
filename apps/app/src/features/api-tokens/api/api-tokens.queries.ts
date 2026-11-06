@@ -13,9 +13,9 @@ export type ApiToken = ApiTokensResponse["items"][number];
 export const apiTokensQueryOptions = (organizationId: string | null) =>
   queryOptions({
     queryKey: ["settings", "api-tokens", organizationId] as const,
-    queryFn: async ({ signal }) => {
+    queryFn: async ({ signal }): Promise<ApiTokensResponse> => {
       const res = await $list({}, { init: { signal } });
       if (!res.ok) await throwApiError(res, "loadApiTokens");
-      return (await res.json()) as ApiTokensResponse;
+      return res.json();
     },
   });

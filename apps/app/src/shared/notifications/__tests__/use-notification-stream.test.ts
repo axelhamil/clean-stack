@@ -4,7 +4,7 @@ import {
 } from "@packages/web-kit/notifications/use-notification-stream";
 import type { QueryClient } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { refreshOnNotification } from "../use-notification-stream";
+import { notificationStreamOptions, refreshOnNotification } from "../use-notification-stream";
 
 const fakeClient = () => {
   const invalidate = vi.fn();
@@ -147,5 +147,18 @@ describe("consume: garde-temps de silence", () => {
     expect(cancel).toHaveBeenCalledTimes(1);
 
     await done;
+  });
+});
+
+describe("notificationStreamOptions: reprise apres coupure", () => {
+  test("une reconnexion rafraichit le compteur, faute de sondage pendant la coupure", () => {
+    const invalidate = vi.fn();
+    const options = notificationStreamOptions({
+      invalidateQueries: invalidate,
+    } as unknown as QueryClient);
+
+    options.onReconnect?.();
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["notifications", "unread-count"] });
   });
 });

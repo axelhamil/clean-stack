@@ -1,3 +1,4 @@
+import { Band } from "@packages/ui/components/ui/band";
 import { NavLink } from "@packages/ui/components/ui/nav-link";
 import { pageContainerVariants } from "@packages/ui/components/ui/page-container";
 import { cn } from "@packages/ui/libs/utils.js";
@@ -8,17 +9,22 @@ import { LEGAL_ROUTES } from "../legal-routes";
 export function LegalFooter() {
   const { t } = useTranslation("common");
   return (
-    <footer className="border-t">
-      <nav
-        aria-label={t("legalFooter.ariaLabel")}
-        className={cn(pageContainerVariants(), "flex flex-wrap items-center gap-x-6 gap-y-1 py-3")}
-      >
-        {LEGAL_ROUTES.map((route) => (
-          <NavLink key={route.to} size="sm" variant="plain" asChild>
-            <Link to={route.to}>{t(route.labelKey)}</Link>
-          </NavLink>
-        ))}
-      </nav>
-    </footer>
+    <Band asChild>
+      <footer>
+        <nav
+          aria-label={t("legalFooter.ariaLabel")}
+          className={cn(
+            pageContainerVariants(),
+            "flex flex-wrap items-center gap-x-6 gap-y-1 py-3",
+          )}
+        >
+          {LEGAL_ROUTES.map((route) => (
+            <NavLink key={route.to} size="sm" variant="plain" asChild>
+              <Link to={route.to}>{t(route.labelKey)}</Link>
+            </NavLink>
+          ))}
+        </nav>
+      </footer>
+    </Band>
   );
 }

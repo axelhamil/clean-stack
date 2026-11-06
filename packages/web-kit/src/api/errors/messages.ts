@@ -17,6 +17,7 @@
 
 import { enCatalog } from "@packages/i18n";
 import type { TFunction } from "i18next";
+import { isErrorsKey } from "../../i18n/errors-key";
 import { apiErrorFields } from "./api-error";
 
 const SUFFIXES = [
@@ -46,7 +47,7 @@ const STATUS_CODE = /^HTTP_(\d{3})$/;
  * which makes the pre-boot answer a real sentence rather than a debug token.
  */
 function suffixMessage(suffix: (typeof SUFFIXES)[number], t: TFunction<"errors">): string {
-  return t(`bySuffix.${suffix}` as never, { defaultValue: enCatalog.errors.bySuffix[suffix] });
+  return t(`bySuffix.${suffix}`, { defaultValue: enCatalog.errors.bySuffix[suffix] });
 }
 
 export function rateLimitedMessage(t: TFunction<"errors">): string {
@@ -59,12 +60,14 @@ export function rateLimitedMessage(t: TFunction<"errors">): string {
  * catalog: two lookups over one registry is one lookup that will drift.
  */
 export function messageFromCode(code: string, t: TFunction<"errors">): string | undefined {
-  const exact = t(`byCode.${code}` as never, { defaultValue: "" });
+  const codeKey = `byCode.${code}`;
+  const exact = isErrorsKey(codeKey) ? t(codeKey, { defaultValue: "" }) : "";
   if (exact) return exact;
 
   const status = STATUS_CODE.exec(code)?.[1];
+  const statusKey = `byStatus.${status}`;
   const statusCopy =
-    status === undefined ? "" : t(`byStatus.${status}` as never, { defaultValue: "" });
+    status !== undefined && isErrorsKey(statusKey) ? t(statusKey, { defaultValue: "" }) : "";
   if (statusCopy) return statusCopy;
 
   const suffix = SUFFIXES.find((candidate) => code.endsWith(`_${candidate}`));

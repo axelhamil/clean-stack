@@ -2,7 +2,6 @@ import { LoadErrorAlert } from "@packages/ui/components/ui/load-error-alert";
 import { SettingsSection } from "@packages/ui/components/ui/settings-section";
 import { toastError } from "@packages/web-kit/api/errors/toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { updateOrgPreferenceMutationOptions } from "../../../shared/api/mutations/notifications";
 import { orgNotificationPreferencesQueryOptions } from "../../../shared/api/queries/notifications";
@@ -24,7 +23,7 @@ export function OrgNotificationDefaultsCard() {
   const { data, isPending, isLoadingError } = useQuery(
     orgNotificationPreferencesQueryOptions(organizationId),
   );
-  const rows = useMemo(() => buildPreferenceMatrix(data?.items ?? []), [data]);
+  const rows = buildPreferenceMatrix(data?.items ?? []);
 
   const update = useMutation({
     ...updateOrgPreferenceMutationOptions,

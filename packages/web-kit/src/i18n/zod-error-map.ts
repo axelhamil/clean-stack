@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import { z } from "zod";
+import { isErrorsKey } from "./errors-key";
 
 /**
  * Installs localized Zod messages globally.
@@ -41,8 +42,9 @@ export function applyZodErrorMap(t: TFunction<"errors">): void {
         if (issue.format === "url") return t("validation.invalidUrl");
         return t("validation.invalidFormat");
       }
-      if (issue.code === "custom" && typeof issue.params?.i18nKey === "string") {
-        return t(issue.params.i18nKey as never);
+      const i18nKey = issue.code === "custom" ? issue.params?.i18nKey : undefined;
+      if (typeof i18nKey === "string" && isErrorsKey(i18nKey)) {
+        return t(i18nKey);
       }
       return undefined;
     },

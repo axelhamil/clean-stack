@@ -13,7 +13,7 @@ export const subscriptionQueryOptions = (organizationId: string | null) =>
     queryFn: async (): Promise<EntitlementsView> => {
       const res = await api.billing.subscription.$get();
       if (!res.ok) await throwApiError(res, "loadSubscription");
-      return res.json() as Promise<EntitlementsView>;
+      return res.json();
     },
     staleTime: AUTH_QUERY_STALE_TIME_MS,
   });

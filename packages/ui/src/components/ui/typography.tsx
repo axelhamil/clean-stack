@@ -135,8 +135,13 @@ const typographyInlineVariants = cva("", {
       sm: "text-sm",
       xs: "text-xs",
     },
+    weight: {
+      inherit: "",
+      medium: "font-medium",
+      semibold: "font-semibold",
+    },
   },
-  defaultVariants: { tone: "default", font: "sans", size: "inherit" },
+  defaultVariants: { tone: "default", font: "sans", size: "inherit", weight: "inherit" },
 });
 
 interface TypographyInlineProps
@@ -149,11 +154,18 @@ interface TypographyInlineProps
  * inherits from the parent unless set; `mono` is for identifiers (event
  * types, token prefixes, URLs), without the inline code chip.
  */
-function TypographyInline({ className, tone, font, size, ...props }: TypographyInlineProps) {
+function TypographyInline({
+  className,
+  tone,
+  font,
+  size,
+  weight,
+  ...props
+}: TypographyInlineProps) {
   return (
     <span
       data-slot="typography-inline"
-      className={cn(typographyInlineVariants({ tone, font, size }), className)}
+      className={cn(typographyInlineVariants({ tone, font, size, weight }), className)}
       {...props}
     />
   );

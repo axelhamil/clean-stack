@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { throwApiError } from "./api-error";
+import { apiErrorFields, throwApiError } from "./api-error";
 
 function makeResponse(
   status: number,
@@ -93,5 +93,21 @@ describe("throwApiError", () => {
     const err = await throwApiError(res, "loadPolicies").catch((e) => e);
     expect(err.status).toBe(429);
     expect(err.metadata?.retryAfter).toBeUndefined();
+  });
+});
+
+describe("apiErrorFields", () => {
+  it("drops a field of the wrong type and keeps the others", () => {
+    expect(apiErrorFields({ code: 42, status: 403, message: "nope" })).toEqual({
+      code: undefined,
+      status: 403,
+      message: "nope",
+      metadata: undefined,
+    });
+  });
+
+  it("reads the fields off a thrown error", () => {
+    const err = Object.assign(new Error("boom"), { code: "X_INVALID", status: 400 });
+    expect(apiErrorFields(err)).toMatchObject({ code: "X_INVALID", status: 400, message: "boom" });
   });
 });

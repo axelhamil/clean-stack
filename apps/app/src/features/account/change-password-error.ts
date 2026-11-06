@@ -1,4 +1,4 @@
-import type { ApiError } from "@packages/web-kit/api/errors/api-error";
+import { apiErrorFields } from "@packages/web-kit/api/errors/api-error";
 import { formatApiError } from "@packages/web-kit/api/errors/messages";
 import type { TFunction } from "i18next";
 
@@ -20,7 +20,7 @@ export function resolveChangePasswordError(
   fallback: string,
   tErrors: TFunction<"errors">,
 ): ChangePasswordFieldError {
-  const code = (error as ApiError | undefined)?.code;
+  const { code } = apiErrorFields(error);
   const field = code === "INVALID_PASSWORD" ? "currentPassword" : "newPassword";
 
   return { field, message: formatApiError(error, fallback, tErrors) };

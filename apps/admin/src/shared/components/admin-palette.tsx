@@ -19,7 +19,7 @@ import {
   User,
   Users,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type SetStateAction, useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { paletteOrgsQueryOptions, paletteUsersQueryOptions } from "../api/queries/palette-search";
 import { savedViewsQueryOptions } from "../api/queries/saved-views";
@@ -47,14 +47,19 @@ export function AdminPalette() {
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
   const [draft, setDraft] = useDebouncedFilter(term, setTerm);
-  useTogglePaletteShortcut(setOpen);
 
-  useEffect(() => {
-    if (open) return;
+  const changeOpen = useCallback(
+    (next: SetStateAction<boolean>) => {
+      const isOpen = typeof next === "function" ? next(open) : next;
+      setOpen(isOpen);
+      if (isOpen) return;
 
-    setDraft("");
-    setTerm("");
-  }, [open, setDraft]);
+      setDraft("");
+      setTerm("");
+    },
+    [open, setDraft],
+  );
+  useTogglePaletteShortcut(changeOpen);
 
   const search = term.trim();
   const isSearching = search.length >= SEARCH_MIN_LENGTH;
@@ -150,7 +155,7 @@ export function AdminPalette() {
   return (
     <CommandPaletteDialog
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={changeOpen}
       groups={groups}
       title={t("backOffice.palette.title")}
       description={t("backOffice.palette.description")}

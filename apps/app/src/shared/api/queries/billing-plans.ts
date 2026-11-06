@@ -8,7 +8,8 @@ export const plansQueryOptions = queryOptions({
   queryFn: async (): Promise<PlanCatalogItem[]> => {
     const res = await api.billing.plans.$get();
     if (!res.ok) await throwApiError(res, "loadPlans");
-    return (await res.json()).plans as PlanCatalogItem[];
+    const body = await res.json();
+    return body.plans;
   },
   staleTime: 5 * 60 * 1000,
 });

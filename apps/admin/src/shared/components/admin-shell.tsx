@@ -80,7 +80,7 @@ function ShellAccount() {
 function ShellBrand() {
   const { t } = useTranslation("admin");
 
-  return <TypographyInline className="font-semibold">{t("backOffice.brand")}</TypographyInline>;
+  return <TypographyInline weight="semibold">{t("backOffice.brand")}</TypographyInline>;
 }
 
 export function AdminShell({ children }: AdminShellProps) {

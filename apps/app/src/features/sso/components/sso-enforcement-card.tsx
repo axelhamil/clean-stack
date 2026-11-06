@@ -17,9 +17,10 @@ import { primaryProviderFor, ssoProvidersQueryOptions } from "../api/sso.queries
 
 // `ssoEnforced` is a server-only additionalField on the organization schema
 // (apps/api/src/auth.ts): the organization client isn't generated with knowledge
-// of it, so it has to be read through a narrow, explicit cast.
-interface OrgWithSsoEnforcement {
-  ssoEnforced?: boolean;
+// of it, so it has to be read through a narrow, explicit guard.
+function isSsoEnforced(org: object | null | undefined): boolean {
+  if (!org || !("ssoEnforced" in org)) return false;
+  return org.ssoEnforced === true;
 }
 
 export function SsoEnforcementCard() {
@@ -31,7 +32,7 @@ export function SsoEnforcementCard() {
   const { data: providers } = useQuery(ssoProvidersQueryOptions);
   const provider = primaryProviderFor(providers, org?.id);
   const hasVerifiedProvider = provider?.domainVerified === true;
-  const enforced = (org as OrgWithSsoEnforcement | undefined)?.ssoEnforced ?? false;
+  const enforced = isSsoEnforced(org);
 
   const setEnforcement = useMutation({
     ...setSsoEnforcementMutationOptions,

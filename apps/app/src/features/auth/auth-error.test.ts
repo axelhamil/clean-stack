@@ -9,9 +9,9 @@ const tErrors = ((key: string, opts?: { defaultValue?: string }) => {
 
 describe("resolveAuthError", () => {
   it("returns the rate-limit copy when status is 429", () => {
-    expect(resolveAuthError({ status: 429, message: "Too many" }, "fallback", t, tErrors)).toBe(
-      "Too many requests. Please wait a moment.",
-    );
+    expect(
+      resolveAuthError({ status: 429, message: "Too many" }, "signIn.failed", t, tErrors),
+    ).toBe("Too many requests. Please wait a moment.");
   });
 
   it("returns the mapped code copy when the error carries a known code", () => {
@@ -22,7 +22,7 @@ describe("resolveAuthError", () => {
     expect(
       resolveAuthError(
         { status: 401, code: "ACCOUNT_PASSWORD_INVALID" },
-        "fallback",
+        "signIn.failed",
         t,
         withDefault,
       ),
@@ -37,7 +37,7 @@ describe("resolveAuthError", () => {
     expect(
       resolveAuthError(
         { status: 401, error: { code: "CAPTCHA_REQUIRED" } },
-        "fallback",
+        "signIn.failed",
         t,
         withCaptchaCopy,
       ),
@@ -45,9 +45,7 @@ describe("resolveAuthError", () => {
   });
 
   it("returns the caller fallback key translation when message and code are absent", () => {
-    expect(resolveAuthError({ status: 500 }, "fallback message", t, tErrors)).toBe(
-      "fallback message",
-    );
+    expect(resolveAuthError({ status: 500 }, "signIn.failed", t, tErrors)).toBe("signIn.failed");
   });
 });
 

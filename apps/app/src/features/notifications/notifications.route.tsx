@@ -4,7 +4,6 @@ import { TypographyH1 } from "@packages/ui/components/ui/typography";
 import { toastError } from "@packages/web-kit/api/errors/toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { updatePreferenceMutationOptions } from "../../shared/api/mutations/notifications";
 import { notificationPreferencesQueryOptions } from "../../shared/api/queries/notifications";
@@ -25,7 +24,7 @@ function NotificationsPage() {
   const queryClient = useQueryClient();
   const guard = useImpersonationGuard();
   const { data, isPending, isLoadingError } = useQuery(notificationPreferencesQueryOptions);
-  const rows = useMemo(() => buildPreferenceMatrix(data?.items ?? []), [data]);
+  const rows = buildPreferenceMatrix(data?.items ?? []);
 
   const update = useMutation({
     ...updatePreferenceMutationOptions,

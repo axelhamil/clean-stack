@@ -26,7 +26,7 @@ const DELIVERY_STATUSES: readonly WebhookDeliveryStatus[] = [
 ];
 
 export function isDeliveryStatus(value: string): value is WebhookDeliveryStatus {
-  return (DELIVERY_STATUSES as readonly string[]).includes(value);
+  return DELIVERY_STATUSES.some((candidate) => candidate === value);
 }
 
 // Same shape as `ENDPOINT_STATUS_KEYS` above, for the delivery status shown
