@@ -87,7 +87,7 @@ export function requireApiToken(
     }
 
     const userRow = await findUserById(record.userId);
-    if (!userRow) {
+    if (!userRow || userRow.deletedAt !== null) {
       throw new HTTPException(401, { message: "Unauthorized" });
     }
 

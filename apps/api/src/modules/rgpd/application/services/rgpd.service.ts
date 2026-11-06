@@ -319,6 +319,32 @@ export class RgpdService {
                 { organizationId: orgId },
               );
             }
+            for (const { memberId, organizationId } of wipe.getValue().removedMemberships) {
+              await emitEvent(
+                this.outbox,
+                EventTypes.ORG_MEMBER_REMOVED,
+                "member",
+                memberId,
+                { organizationId, actorUserId: input.userId, userId: input.userId },
+                { organizationId },
+              );
+            }
+            for (const { tokenId, organizationId } of wipe.getValue().revokedTokens) {
+              await emitEvent(
+                this.outbox,
+                EventTypes.API_TOKEN_REVOKED,
+                "api_token",
+                tokenId,
+                {
+                  userId: input.userId,
+                  actorUserId: input.userId,
+                  organizationId: organizationId.toNull(),
+                  tokenId,
+                  reason: "user" as const,
+                },
+                { organizationId: organizationId.toNull() },
+              );
+            }
             const notified = await this.email.sendTemplate(
               "delete_completed",
               originalEmail,

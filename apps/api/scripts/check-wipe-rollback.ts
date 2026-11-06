@@ -15,6 +15,11 @@
  * email, forcing a genuine Postgres-level failure at the exact insert the wipe transaction
  * performs, then drops the constraint again in cleanup.
  *
+ * A second probe then runs a wipe that succeeds and proves what the mocks cannot: the erased
+ * account's api tokens are revoked in the same transaction (those of a deleted organization too,
+ * before the cascade removes them), `ORG_MEMBER_REMOVED` reaches the
+ * outbox for each organization that survives, and the token no longer authenticates.
+ *
  * WARNING: `ALTER TABLE ... ADD CONSTRAINT` takes an ACCESS EXCLUSIVE lock on the shared
  * `email_message` table for the duration of the statement, stop the dev API worker (and any
  * other process reading/writing `email_message`) before running this script, or the lock wait
@@ -27,14 +32,30 @@ import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-wipe-rollback");
 
-import { authSchema, db, eq, sql, staffSchema, TransactionService } from "@packages/drizzle";
+import {
+  apiTokenSchema,
+  authSchema,
+  db,
+  eq,
+  inArray,
+  multiTenantSchema,
+  outboxSchema,
+  sql,
+  staffSchema,
+  TransactionService,
+} from "@packages/drizzle";
+import { EventTypes } from "@packages/events";
+import { Hono } from "hono";
 import { DrizzleStaffStore } from "../src/modules/admin/infrastructure/repositories/drizzle-staff.store";
+import { DrizzleApiTokenRepository } from "../src/modules/api-token/infrastructure/repositories/drizzle-api-token.repository";
 import { RgpdService } from "../src/modules/rgpd/application/services/rgpd.service";
 import { DrizzleRgpdRepository } from "../src/modules/rgpd/infrastructure/repositories/drizzle-rgpd.repository";
 import { NoOpStorageService } from "../src/modules/uploads/infrastructure/services/noop-storage.service";
 import { authSecretKey } from "../src/shared/auth/auth-secrets";
+import { generateToken, hmacToken } from "../src/shared/crypto/api-token";
 import { env } from "../src/shared/env";
 import { logger } from "../src/shared/logger";
+import { requireApiToken } from "../src/shared/middleware/api-token.middleware";
 import type { IInstrumentation } from "../src/shared/ports/instrumentation.port";
 import { DrizzleEmailQueue } from "../src/shared/services/drizzle-email-queue.service";
 import { DrizzleOutboxRepository } from "../src/shared/services/drizzle-outbox.service";
@@ -47,6 +68,18 @@ const PROBE_MARKER = "wipe-rollback-probe";
 const userId = `check-wipe-rollback-${crypto.randomUUID()}`;
 const probeEmail = `${PROBE_MARKER}-${userId}@example.com`;
 const CONSTRAINT_NAME = "check_wipe_rollback_probe";
+
+const erasedId = `check-wipe-erased-${crypto.randomUUID()}`;
+const erasedEmail = `${erasedId}@example.com`;
+const teammateId = `${erasedId}-teammate`;
+const teamOrgId = `${erasedId}-team`;
+const personalOrgId = `${erasedId}-personal`;
+const erasedMemberId = `${erasedId}-member`;
+const personalTokenId = `${erasedId}-token-personal`;
+const teamTokenId = `${erasedId}-token-team`;
+const personalOrgTokenId = `${erasedId}-token-personal-org`;
+const TOKEN_PREFIX = "clean_";
+const TOKEN_PEPPER = "p".repeat(32);
 
 const checks = checkRecorder();
 const { check } = checks;
@@ -94,15 +127,11 @@ async function cleanup(): Promise<void> {
   await db.execute(sql`DELETE FROM outbox_event WHERE aggregate_id = ${userId}`);
 }
 
-async function main(): Promise<void> {
-  await cleanup();
-  await seedUser();
-  await addFailingConstraint();
-
+function buildService(): RgpdService {
   const outbox = new DrizzleOutboxRepository(instrumentation);
   const email = new QueuedEmailService(new DrizzleEmailQueue(instrumentation), instrumentation);
   const uow = new TransactionService(instrumentation);
-  const service = new RgpdService(
+  return new RgpdService(
     new DrizzleRgpdRepository(logger, instrumentation),
     new NoOpStorageService(),
     email,
@@ -113,8 +142,156 @@ async function main(): Promise<void> {
     { PLATFORM_ADMIN_IDS: [] },
     new DrizzleTotpVerifier(instrumentation, authSecretKey(env)),
   );
+}
 
-  const result = await service.executeAccountWipe({ userId });
+async function seedErasedAccount(): Promise<string> {
+  await db.insert(authSchema.user).values([
+    {
+      id: erasedId,
+      name: "Wipe Erased Probe",
+      email: erasedEmail,
+      emailVerified: true,
+      pendingDeletionUntil: new Date(Date.now() - 1000),
+      locale: "en",
+    },
+    { id: teammateId, name: "Wipe Teammate Probe", email: `${teammateId}@example.com` },
+  ]);
+  await db.insert(multiTenantSchema.organization).values([
+    { id: teamOrgId, name: "Wipe probe team", slug: teamOrgId },
+    { id: personalOrgId, name: "Wipe probe personal", slug: `personal-${personalOrgId}` },
+  ]);
+  const member = (id: string, organizationId: string, memberUserId: string) => ({
+    id,
+    organizationId,
+    userId: memberUserId,
+    role: "owner",
+    createdAt: new Date(),
+  });
+  await db
+    .insert(multiTenantSchema.member)
+    .values([
+      member(erasedMemberId, teamOrgId, erasedId),
+      member(`${teammateId}-member`, teamOrgId, teammateId),
+      member(`${erasedId}-personal-member`, personalOrgId, erasedId),
+    ]);
+
+  const { raw, start } = generateToken(TOKEN_PREFIX);
+  const token = (id: string, organizationId: string | null, tokenHmac: string) => ({
+    id,
+    userId: erasedId,
+    organizationId,
+    name: id,
+    scopes: ["read:profile"],
+    tokenHmac,
+    tokenStart: start,
+  });
+  await db
+    .insert(apiTokenSchema.apiToken)
+    .values([
+      token(personalTokenId, null, hmacToken(raw, TOKEN_PEPPER)),
+      token(teamTokenId, teamOrgId, `${teamTokenId}-hmac`),
+      token(personalOrgTokenId, personalOrgId, `${personalOrgTokenId}-hmac`),
+    ]);
+  return raw;
+}
+
+async function cleanupErasedAccount(): Promise<void> {
+  await db.delete(authSchema.user).where(inArray(authSchema.user.id, [erasedId, teammateId]));
+  await db
+    .delete(multiTenantSchema.organization)
+    .where(inArray(multiTenantSchema.organization.id, [teamOrgId, personalOrgId]));
+  await db.execute(sql`DELETE FROM email_message WHERE to_address = ${erasedEmail}`);
+  await db
+    .delete(outboxSchema.outboxEvent)
+    .where(
+      inArray(outboxSchema.outboxEvent.aggregateId, [
+        erasedId,
+        personalOrgId,
+        erasedMemberId,
+        personalTokenId,
+        teamTokenId,
+        personalOrgTokenId,
+      ]),
+    );
+}
+
+async function requestWithToken(raw: string): Promise<number> {
+  const app = new Hono()
+    .use(
+      requireApiToken(
+        {
+          repo: new DrizzleApiTokenRepository(instrumentation),
+          outbox: new DrizzleOutboxRepository(instrumentation),
+          prefix: TOKEN_PREFIX,
+          pepper: TOKEN_PEPPER,
+          pepperVersion: 1,
+          bucketMin: 15,
+        },
+        { scopes: ["read:profile"] },
+      ),
+    )
+    .get("/probe", (c) => c.text("ok"));
+  const res = await app.request("/probe", { headers: { authorization: `Bearer ${raw}` } });
+  return res.status;
+}
+
+async function checkErasedAccountLosesAccess(): Promise<void> {
+  await cleanupErasedAccount();
+  const raw = await seedErasedAccount();
+  check("the token authenticates before the wipe", (await requestWithToken(raw)) === 200);
+
+  const result = await buildService().executeAccountWipe({ userId: erasedId });
+  check("the completed wipe reports success", result.isSuccess);
+
+  const tokens = await db
+    .select({ id: apiTokenSchema.apiToken.id, revokedAt: apiTokenSchema.apiToken.revokedAt })
+    .from(apiTokenSchema.apiToken)
+    .where(eq(apiTokenSchema.apiToken.userId, erasedId));
+  check(
+    "every api token left after the wipe is revoked",
+    tokens.length === 2 && tokens.every((t) => t.revokedAt !== null),
+    tokens,
+  );
+
+  const outboxRows = await db
+    .select({
+      eventType: outboxSchema.outboxEvent.eventType,
+      aggregateId: outboxSchema.outboxEvent.aggregateId,
+    })
+    .from(outboxSchema.outboxEvent)
+    .where(
+      inArray(outboxSchema.outboxEvent.aggregateId, [
+        erasedMemberId,
+        personalTokenId,
+        teamTokenId,
+        personalOrgTokenId,
+      ]),
+    );
+  const announced = outboxRows.map((r) => `${r.eventType}:${r.aggregateId}`).sort();
+  const expected = [
+    `${EventTypes.ORG_MEMBER_REMOVED}:${erasedMemberId}`,
+    `${EventTypes.API_TOKEN_REVOKED}:${personalTokenId}`,
+    `${EventTypes.API_TOKEN_REVOKED}:${teamTokenId}`,
+    `${EventTypes.API_TOKEN_REVOKED}:${personalOrgTokenId}`,
+    `${EventTypes.API_TOKEN_USED}:${personalTokenId}`,
+  ].sort();
+  check(
+    "the outbox announces the surviving membership and every revoked token, deleted orgs included",
+    JSON.stringify(announced) === JSON.stringify(expected),
+    announced,
+  );
+
+  check("the token is refused after the wipe", (await requestWithToken(raw)) === 401);
+
+  await cleanupErasedAccount();
+}
+
+async function main(): Promise<void> {
+  await cleanup();
+  await seedUser();
+  await addFailingConstraint();
+
+  const result = await buildService().executeAccountWipe({ userId });
 
   console.log("[1] executeAccountWipe result ->", result.isFailure ? result.getError() : "success");
   check("the wipe reports failure when the confirmation enqueue fails", result.isFailure);
@@ -155,16 +332,22 @@ async function main(): Promise<void> {
 
   await cleanup();
 
+  console.log("[4] a completed wipe cuts the erased account's api access");
+  await checkErasedAccountLosesAccess();
+
   if (checks.failures > 0) {
     console.error(`\n${checks.failures} check(s) failed`);
     process.exit(1);
   }
-  console.log("\nAll assertions passed, the wipe transaction genuinely rolled back.");
+  console.log(
+    "\nAll assertions passed: the failed wipe rolled back, the completed one cut access.",
+  );
   process.exit(0);
 }
 
 main().catch(async (err) => {
   console.error("check-wipe-rollback crashed:", err);
   await cleanup().catch(() => {});
+  await cleanupErasedAccount().catch(() => {});
   process.exit(1);
 });

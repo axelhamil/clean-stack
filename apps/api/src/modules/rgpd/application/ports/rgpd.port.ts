@@ -65,11 +65,23 @@ export interface UserExportPayload {
   }>;
 }
 
+export interface RemovedMembership {
+  memberId: string;
+  organizationId: string;
+}
+
+export interface RevokedApiToken {
+  tokenId: string;
+  organizationId: Option<string>;
+}
+
 export interface ExecuteWipeOutput {
   deletedOrgIds: string[];
   anonymizedEmail: string;
   alreadyWiped: boolean;
   endedImpersonations: EndedImpersonation[];
+  removedMemberships: RemovedMembership[];
+  revokedTokens: RevokedApiToken[];
 }
 
 export interface PendingDeletionRow {

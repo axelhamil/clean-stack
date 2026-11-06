@@ -430,11 +430,12 @@ Filter: `if (ctx.context.returned instanceof APIError) return` (skip on 4xx/5xx)
 - `USER_EMAIL_CHANGE_REQUESTED`: `user.changeEmail.sendChangeEmailConfirmation`. Payload: `{ userId, newEmail }`. Confirmation sent to the **current** address.
 
 ### Via `organizationHooks` (org plugin)
-- `ORG_CREATED` (afterCreateOrganization) · `ORG_UPDATED` · `ORG_DELETED` · `ORG_MEMBER_INVITED` (afterCreateInvitation) · `ORG_INVITATION_CANCELLED` · `ORG_MEMBER_REMOVED` (afterRemoveMember) · `ORG_MEMBER_ROLE_CHANGED` (afterUpdateMemberRole)
+- `ORG_CREATED` (afterCreateOrganization) · `ORG_UPDATED` · `ORG_DELETED` · `ORG_MEMBER_INVITED` (afterCreateInvitation) · `ORG_INVITATION_CANCELLED` · `ORG_MEMBER_REMOVED` (afterRemoveMember; also the account wipe, see RGPD below) · `ORG_MEMBER_ROLE_CHANGED` (afterUpdateMemberRole)
 - `ORG_MEMBER_JOINED` fires from **two** hooks: `afterAddMember` (direct add: org-create creator + signup auto-personal-org) **and** `afterAcceptInvitation` (member joins via invite). The two lifecycles are independent in BetterAuth: wiring only one would silently drop the other path.
 
 ### Via RGPD service
 - `USER_DELETION_{REQUESTED,CANCELLED}` · `USER_DELETED` · `USER_EXPORT_{REQUESTED,COMPLETED}` (payload contains `storageKey`, **not** the presigned URL: security)
+- The account wipe also emits, in its transaction and with the erased user as actor, one `ORG_MEMBER_REMOVED` per organization that survives it and one `API_TOKEN_REVOKED` (`reason: "user"`) per token it revokes, including tokens of the organizations it deletes: they are revoked before the delete cascades them. `revokeTokensOnMembershipLost` then finds nothing left to revoke.
 
 ### Via UploadService
 - `UPLOAD_REQUESTED` · `UPLOAD_CONFIRMED` · `UPLOAD_DELETED` (payload uses `hashKey(key)`: sha256 truncated, never the raw filename, for PII protection)
