@@ -1,3 +1,4 @@
+import type { IUnitOfWork } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import type { MiddlewareHandler } from "hono";
 import { createMiddleware } from "hono/factory";
@@ -8,7 +9,10 @@ import type { ApiScope } from "../../modules/api-token/application/dto/create-to
 import { hmacToken, parseToken } from "../crypto/api-token";
 import { emitEvent } from "../event-emitter";
 import type { IApiTokenRepository } from "../ports/api-token.port";
+import type { IInstrumentation } from "../ports/instrumentation.port";
+import type { ILogger } from "../ports/logger.port";
 import type { IOutboxRepository } from "../ports/outbox.port";
+import { getRequestId } from "../request-context";
 
 export interface ApiTokenVariables {
   user: SessionUser;
@@ -20,6 +24,9 @@ export interface ApiTokenVariables {
 export interface ApiTokenDeps {
   repo: IApiTokenRepository;
   outbox: IOutboxRepository;
+  uow: IUnitOfWork;
+  instrumentation: IInstrumentation;
+  logger: ILogger;
   prefix: string;
   pepper: string;
   pepperVersion: number;
@@ -97,30 +104,41 @@ export function requireApiToken(
       throw new HTTPException(401, { message: "Unauthorized" });
     }
 
-    const user = userRow as unknown as SessionUser;
-
     // apiTokenId must be set before the per-token rate-limit policy runs.
     c.set("apiTokenId", record.id);
-    c.set("user", user);
+    c.set("user", userRow);
     c.set("tokenScopes", recordScopes);
     c.set("orgId", record.organizationId.toNull());
 
     const bucketFloor = new Date(Date.now() - deps.bucketMin * 60_000);
-    const touchResult = await deps.repo.touchLastUsed(record.id, bucketFloor);
-    if (touchResult.isSuccess && touchResult.getValue()) {
-      await emitEvent(
-        deps.outbox,
-        EventTypes.API_TOKEN_USED,
-        "api_token",
-        record.id,
-        {
-          userId: record.userId,
-          actorUserId: record.userId,
-          organizationId: record.organizationId.toNull(),
-          tokenId: record.id,
-          scopes: record.scopes,
-        },
-        { organizationId: record.organizationId.toUndefined() },
+    try {
+      await deps.uow.run(async () => {
+        const touched = await deps.repo.touchLastUsed(record.id, bucketFloor);
+        if (touched.isFailure || !touched.getValue()) return touched;
+
+        await emitEvent(
+          deps.outbox,
+          EventTypes.API_TOKEN_USED,
+          "api_token",
+          record.id,
+          {
+            userId: record.userId,
+            actorUserId: record.userId,
+            organizationId: record.organizationId.toNull(),
+            tokenId: record.id,
+            scopes: record.scopes,
+          },
+          { organizationId: record.organizationId.toUndefined() },
+        );
+
+        return touched;
+      });
+    } catch (err) {
+      const requestId = getRequestId();
+      deps.instrumentation.capture(err, { requestId, metadata: { tokenId: record.id } });
+      deps.logger.warn(
+        { err, requestId, tokenId: record.id },
+        "api token usage record failed: request served without it",
       );
     }
 

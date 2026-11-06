@@ -28,6 +28,13 @@ export const rgpdModule = defineModule()((b) =>
           c.IStaffStore,
           env,
           c.ITotpVerifier,
+          {
+            appUrl: env.APP_URL,
+            gracePeriodDays: env.RGPD_GRACE_PERIOD_DAYS,
+            exportRateLimitHours: env.RGPD_EXPORT_RATE_LIMIT_HOURS,
+            sweepDeadlineMs: env.SWEEP_DEADLINE_MS,
+          },
+          logger,
         ),
     ),
 );

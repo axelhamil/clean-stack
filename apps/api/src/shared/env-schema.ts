@@ -62,9 +62,9 @@ export const envSchema = z
       .transform(commaList)
       .pipe(z.array(z.enum(["signature", "private-network"])).min(1))
       .optional(),
-    RGPD_GRACE_PERIOD_DAYS: z.coerce.number().int().min(0).optional(),
-    RGPD_EXPORT_RATE_LIMIT_HOURS: z.coerce.number().int().positive().optional(),
-    RGPD_SWEEP_BATCH_SIZE: z.coerce.number().int().positive().optional(),
+    RGPD_GRACE_PERIOD_DAYS: z.coerce.number().int().min(0).default(7),
+    RGPD_EXPORT_RATE_LIMIT_HOURS: z.coerce.number().int().positive().default(24),
+    RGPD_SWEEP_BATCH_SIZE: z.coerce.number().int().positive().default(50),
     S3_ENDPOINT: z.url().optional(),
     S3_REGION: z.string().optional(),
     S3_BUCKET: z.string().optional(),

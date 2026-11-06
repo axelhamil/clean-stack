@@ -1,11 +1,9 @@
 import { type IUnitOfWork, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
-import { env } from "../../../../shared/env";
 import { emitEvent } from "../../../../shared/event-emitter";
-import { DEFAULT_SWEEP_DEADLINE_MS } from "../../../../shared/internal-routes/sweep-runner";
-import { logger } from "../../../../shared/logger";
 import type { IEmailService } from "../../../../shared/ports/email.port";
 import type { IInstrumentation } from "../../../../shared/ports/instrumentation.port";
+import type { ILogger } from "../../../../shared/ports/logger.port";
 import type { IOutboxRepository } from "../../../../shared/ports/outbox.port";
 import type { IStaffStore } from "../../../../shared/ports/staff-store.port";
 import type { IStorageService, StorageError } from "../../../../shared/ports/storage.port";
@@ -25,6 +23,13 @@ import type {
 } from "../ports/rgpd.port";
 
 const EXPORT_DOWNLOAD_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+export interface RgpdSettings {
+  appUrl: string;
+  gracePeriodDays: number;
+  exportRateLimitHours: number;
+  sweepDeadlineMs: number;
+}
 
 export interface PreflightAccountDeletionInput {
   userId: string;
@@ -90,6 +95,8 @@ export class RgpdService {
     private readonly staff: IStaffStore,
     private readonly staffEnv: StaffListing,
     private readonly totp: ITotpVerifier,
+    private readonly settings: RgpdSettings,
+    private readonly logger: ILogger,
   ) {}
 
   async preflightAccountDeletion(
@@ -160,9 +167,7 @@ export class RgpdService {
             return Result.fail({ code: "ACCOUNT_PASSWORD_INVALID", message: "invalid password" });
         }
 
-        const until = new Date(
-          Date.now() + (env.RGPD_GRACE_PERIOD_DAYS ?? 7) * 24 * 60 * 60 * 1000,
-        );
+        const until = new Date(Date.now() + this.settings.gracePeriodDays * 24 * 60 * 60 * 1000);
         const txResult = await this.transactions.run(async () => {
           const refused = await this.refusedLastManager(input.userId);
           if (refused.isFailure) return refused;
@@ -181,7 +186,7 @@ export class RgpdService {
         });
         if (txResult.isFailure) return Result.fail(txResult.getError());
 
-        const cancelUrl = `${env.APP_URL}/settings/account`;
+        const cancelUrl = `${this.settings.appUrl}/settings/account`;
         const sent = await this.email.sendTemplate(
           "delete_requested",
           state.email,
@@ -192,7 +197,7 @@ export class RgpdService {
           },
         );
         if (sent.isFailure)
-          logger.warn(
+          this.logger.warn(
             { userId: input.userId, code: sent.getError().code },
             "deletion marked but notification email failed",
           );
@@ -250,7 +255,7 @@ export class RgpdService {
           },
         );
         if (sent.isFailure)
-          logger.warn(
+          this.logger.warn(
             { userId: input.userId, code: sent.getError().code },
             "deletion cleared but notification email failed",
           );
@@ -355,7 +360,7 @@ export class RgpdService {
               },
             );
             if (notified.isFailure) {
-              logger.error(
+              this.logger.error(
                 { userId: input.userId, code: notified.getError().code },
                 "account wipe rolled back: deletion confirmation could not be enqueued",
               );
@@ -368,7 +373,7 @@ export class RgpdService {
           });
         } catch (e) {
           this.instrumentation.capture(e);
-          logger.error({ err: e, userId: input.userId }, "account wipe transaction failed");
+          this.logger.error({ err: e, userId: input.userId }, "account wipe transaction failed");
           return Result.fail({
             code: "ACCOUNT_WIPE_PROVIDER_FAILURE",
             message: "wipe transaction failed",
@@ -379,7 +384,7 @@ export class RgpdService {
           const failure = inner.getError();
           if (failure.code === "ACCOUNT_WIPE_NOTIFY_PROVIDER_FAILURE") return Result.fail(failure);
 
-          logger.error(
+          this.logger.error(
             { userId: input.userId, code: failure.code },
             "account wipe transaction reported failure",
           );
@@ -448,7 +453,7 @@ export class RgpdService {
 
         const batchResult = await this.rgpd.findUsersReadyForWipe(input.batchSize ?? 50);
         if (batchResult.isFailure) {
-          logger.error(
+          this.logger.error(
             { code: batchResult.getError().code },
             "rgpd sweep aborted: could not load batch",
           );
@@ -467,7 +472,7 @@ export class RgpdService {
           });
 
         const now = input.now ?? Date.now;
-        const deadlineAt = now() + (input.deadlineMs ?? DEFAULT_SWEEP_DEADLINE_MS);
+        const deadlineAt = now() + (input.deadlineMs ?? this.settings.sweepDeadlineMs);
 
         const succeeded: string[] = [];
         const failed: Array<{ userId: string; errorCode: string }> = [];
@@ -479,7 +484,7 @@ export class RgpdService {
           // half-erased account, the one outcome an Art. 17 sweep must never produce.
           if (now() >= deadlineAt) {
             truncated = true;
-            logger.warn(
+            this.logger.warn(
               {
                 processed: succeeded.length + failed.length,
                 remaining: batch.length - succeeded.length - failed.length,
@@ -499,7 +504,7 @@ export class RgpdService {
           } catch (e) {
             const message = e instanceof Error ? e.message : "unknown";
             failed.push({ userId: row.userId, errorCode: "WIPE_UNCAUGHT" });
-            logger.error(
+            this.logger.error(
               { err: e, userId: row.userId, message },
               "wipe threw uncaught error: Result contract violated",
             );
@@ -507,12 +512,12 @@ export class RgpdService {
         }
 
         if (succeeded.length > 0)
-          logger.info(
+          this.logger.info(
             { processed: batch.length, succeeded: succeeded.length, failed: failed.length },
             "rgpd sweep completed",
           );
 
-        if (failed.length > 0) logger.warn({ failed }, "rgpd sweep had failures");
+        if (failed.length > 0) this.logger.warn({ failed }, "rgpd sweep had failures");
 
         return Result.ok({
           processed: succeeded.length + failed.length,
@@ -536,7 +541,7 @@ export class RgpdService {
 
         const state = stateResult.getValue();
 
-        const exportRateLimitHours = env.RGPD_EXPORT_RATE_LIMIT_HOURS ?? 24;
+        const exportRateLimitHours = this.settings.exportRateLimitHours;
         const minNextRequestAt = state.lastExportRequestedAt.isSome()
           ? state.lastExportRequestedAt.unwrap().getTime() + exportRateLimitHours * 60 * 60 * 1000
           : 0;
@@ -606,7 +611,7 @@ export class RgpdService {
           },
         );
         if (sent.isFailure)
-          logger.warn(
+          this.logger.warn(
             { userId: input.userId, code: sent.getError().code },
             "data export upload succeeded but email failed",
           );
@@ -631,7 +636,7 @@ export class RgpdService {
   private async purgeUserObjects(userId: string): Promise<number> {
     const list = await this.storage.listObjectKeys(`${userId}/`);
     if (list.isFailure) {
-      logger.warn(
+      this.logger.warn(
         { userId, code: list.getError().code },
         "storage prefix listing failed after wipe: orphaned blobs need manual cleanup",
       );
@@ -641,7 +646,7 @@ export class RgpdService {
     const keys = list.getValue();
     const deleted = await this.storage.deleteObjects(keys);
     if (deleted.isFailure) {
-      logger.warn(
+      this.logger.warn(
         { userId, code: deleted.getError().code },
         "storage prefix delete failed after wipe: orphaned blobs need manual cleanup",
       );
