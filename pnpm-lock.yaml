@@ -742,6 +742,9 @@ importers:
         specifier: ^17.1.9
         version: 17.1.9(i18next@26.5.11(typescript@7.0.2))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@7.0.2)
     devDependencies:
+      '@packages/test':
+        specifier: workspace:*
+        version: link:../test
       '@packages/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
