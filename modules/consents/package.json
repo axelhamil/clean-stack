@@ -1,0 +1,38 @@
+{
+  "name": "@modules/consents",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./consents.module": "./src/consents.module.ts",
+    "./application/ports/consent.port": "./src/application/ports/consent.port.ts",
+    "./application/services/consent.service": "./src/application/services/consent.service.ts",
+    "./application/config/consent-settings": "./src/application/config/consent-settings.ts",
+    "./infrastructure/http/consents.routes": "./src/infrastructure/http/consents.routes.ts"
+  },
+  "scripts": {
+    "format": "biome format . --write",
+    "lint": "biome lint .",
+    "check": "biome check .",
+    "fix": "biome check --write .",
+    "type-check": "tsc --noEmit",
+    "test": "bun test --isolate"
+  },
+  "dependencies": {
+    "@packages/cookie-consent": "workspace:*",
+    "@packages/ddd-kit": "workspace:*",
+    "@packages/drizzle": "workspace:*",
+    "@packages/events": "workspace:*",
+    "@packages/http": "workspace:*",
+    "@packages/outbox": "workspace:*",
+    "hono": "^4.13.14",
+    "inwire": "^4.0.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@packages/test": "workspace:*",
+    "@packages/typescript-config": "workspace:*",
+    "@types/bun": "^1.4.4",
+    "typescript": "^7.0.2"
+  }
+}

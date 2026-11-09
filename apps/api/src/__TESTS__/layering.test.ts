@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { createSourceScan } from "@packages/test/source-scan";
+import { createSourceScan, isRouteFile, reachesHost } from "@packages/test/source-scan";
 
 const apiSrcRoot = join(import.meta.dir, "..");
 const scan = createSourceScan(apiSrcRoot);
@@ -22,22 +22,10 @@ const COMPOSED_MODULES = [
   "api-token",
   "audit-log",
   "billing",
-  "consents",
   "notifications",
-  "policies",
-  "profile",
-  "quotas",
   "rgpd",
   "uploads",
   "webhooks",
-];
-
-const HOST_REACH = [
-  /from\s+["'][./]*container["']/,
-  /from\s+["'][./]*auth["']/,
-  /from\s+["'][./]*shared\/env["']/,
-  /from\s+["'][./]*shared\/middleware\//,
-  /declare\s+module\s+["']inwire["']/,
 ];
 
 const modules = readdirSync(join(apiSrcRoot, "modules"), { withFileTypes: true })
@@ -50,10 +38,8 @@ function layersNamed(name: string): string[] {
     .filter((layer) => existsSync(join(apiSrcRoot, layer)));
 }
 
-function isRouteFile(file: string): boolean {
-  const name = file.split("/").at(-1) ?? "";
-
-  return file.startsWith("public-api/") || name === "routes.ts" || name.endsWith(".routes.ts");
+function isApiRouteFile(file: string): boolean {
+  return file.startsWith("public-api/") || isRouteFile(file);
 }
 
 describe("layering rules of the api", () => {
@@ -68,14 +54,14 @@ describe("layering rules of the api", () => {
 
   it("routes never write to the database", () => {
     const routeFiles = [...scan.sourceFiles("modules"), ...scan.sourceFiles("public-api")].filter(
-      isRouteFile,
+      isApiRouteFile,
     );
     const writes = {
       ...scan.writeCallsPerFile("modules"),
       ...scan.writeCallsPerFile("public-api"),
     };
 
-    const writingRoutes = Object.keys(writes).filter(isRouteFile);
+    const writingRoutes = Object.keys(writes).filter(isApiRouteFile);
 
     expect(routeFiles.length).toBeGreaterThan(0);
     expect(writingRoutes).toEqual([]);
@@ -128,7 +114,7 @@ describe("layering rules of the api", () => {
   it("a composed module reaches the host only through its prerequisites and route deps", () => {
     const reaches = COMPOSED_MODULES.flatMap((module) =>
       scan.sourceFiles(`modules/${module}`),
-    ).filter((file) => HOST_REACH.some((pattern) => pattern.test(scan.codeOf(file))));
+    ).filter((file) => reachesHost(scan.codeOf(file)));
 
     expect(reaches).toEqual([]);
   });

@@ -1,0 +1,292 @@
+import { describe, expect, it, mock } from "bun:test";
+import { Option, Result } from "@packages/ddd-kit";
+import { EventTypes } from "@packages/events";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
+import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
+import { mockPort } from "@packages/test/bun";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
+import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
+import type {
+  ConsentError,
+  ConsentRecordRow,
+  IConsentStore,
+} from "../application/ports/consent.port";
+import { ConsentService } from "../application/services/consent.service";
+
+const activeRow: ConsentRecordRow = {
+  id: "row-1",
+  subjectId: "subj-1",
+  userId: Option.some("u1"),
+  categories: ["necessary", "analytics"],
+  policyVersion: "2026-07-09",
+  grantedAt: new Date(),
+  withdrawnAt: Option.none(),
+  expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 180),
+  ipAddress: Option.none(),
+  userAgent: Option.none(),
+};
+
+function makeStore(overrides: Partial<IConsentStore> = {}): IConsentStore {
+  return {
+    insert: mock(async () => Result.ok<ConsentError>()),
+    findActiveBySubject: mock(async () =>
+      Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.none()),
+    ),
+    findActiveByUser: mock(async () =>
+      Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.none()),
+    ),
+    linkSubjectToUser: mock(async () => Result.ok<string[], ConsentError>([])),
+    ...overrides,
+  };
+}
+
+describe("ConsentService", () => {
+  describe("record", () => {
+    it("inserts row with 'necessary' always included and emits USER_COOKIE_CONSENT_GRANTED", async () => {
+      const spyOutbox = mockPort<IOutboxRepository>();
+      const store = makeStore();
+      const service = new ConsentService(
+        store,
+        spyOutbox,
+        mockUnitOfWork().unitOfWork,
+        mockInstrumentation(),
+      );
+
+      const result = await service.record({
+        subjectId: "subj-1",
+        categories: ["analytics"],
+        ip: "1.2.3.4",
+      });
+
+      expect(result.isSuccess).toBe(true);
+      expect(store.insert).toHaveBeenCalledTimes(1);
+
+      const insertedRow = (store.insert as ReturnType<typeof mock>).mock
+        .calls[0]?.[0] as ConsentRecordRow;
+      expect(insertedRow.categories).toContain("necessary");
+      expect(insertedRow.categories).toContain("analytics");
+      expect(insertedRow.ipAddress.unwrapOr("none")).toBe("1.2.3.4");
+      expect(insertedRow.userAgent.isNone()).toBe(true);
+
+      const grantedEvents = enqueuedEvents(spyOutbox).filter(
+        (e) => e.eventType === EventTypes.USER_COOKIE_CONSENT_GRANTED,
+      );
+      expect(grantedEvents).toHaveLength(1);
+    });
+
+    it("propagates store failure without emitting events", async () => {
+      const store = makeStore({
+        insert: mock(async () =>
+          Result.fail<void, ConsentError>({
+            code: "CONSENT_PROVIDER_FAILURE",
+            message: "db error",
+          }),
+        ),
+      });
+      const outbox = mockPort<IOutboxRepository>();
+      const service = new ConsentService(
+        store,
+        outbox,
+        mockUnitOfWork().unitOfWork,
+        mockInstrumentation(),
+      );
+
+      const result = await service.record({ subjectId: "subj-1", categories: [] });
+
+      expect(result.isFailure).toBe(true);
+      expect(result.getError().code).toBe("CONSENT_PROVIDER_FAILURE");
+      expect(enqueuedEvents(outbox)).toHaveLength(0);
+    });
+
+    it("always inserts a new record when a user updates preferences (append-only)", async () => {
+      const store = makeStore({
+        findActiveByUser: mock(async () =>
+          Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.some(activeRow)),
+        ),
+      });
+      const service = new ConsentService(
+        store,
+        mockPort<IOutboxRepository>(),
+        mockUnitOfWork().unitOfWork,
+        mockInstrumentation(),
+      );
+
+      const result = await service.record({
+        subjectId: "subj-1",
+        userId: "u1",
+        categories: ["functional"],
+      });
+
+      expect(result.isSuccess).toBe(true);
+      expect(store.insert).toHaveBeenCalledTimes(1);
+      const insertedRow = (store.insert as ReturnType<typeof mock>).mock
+        .calls[0]?.[0] as ConsentRecordRow;
+      expect(insertedRow.categories).toContain("functional");
+      expect(insertedRow.categories).not.toContain("analytics");
+    });
+  });
+
+  describe("withdraw", () => {
+    it("inserts a withdrawal row with empty categories + withdrawnAt set and emits USER_COOKIE_CONSENT_WITHDRAWN", async () => {
+      const spyOutbox = mockPort<IOutboxRepository>();
+      const store = makeStore();
+      const service = new ConsentService(
+        store,
+        spyOutbox,
+        mockUnitOfWork().unitOfWork,
+        mockInstrumentation(),
+      );
+
+      const result = await service.withdraw({ subjectId: "subj-1" });
+
+      expect(result.isSuccess).toBe(true);
+      expect(store.insert).toHaveBeenCalledTimes(1);
+
+      const insertedRow = (store.insert as ReturnType<typeof mock>).mock
+        .calls[0]?.[0] as ConsentRecordRow;
+      expect(insertedRow.categories).toEqual([]);
+      expect(insertedRow.withdrawnAt.isSome()).toBe(true);
+
+      const withdrawnEvents = enqueuedEvents(spyOutbox).filter(
+        (e) => e.eventType === EventTypes.USER_COOKIE_CONSENT_WITHDRAWN,
+      );
+      expect(withdrawnEvents).toHaveLength(1);
+    });
+
+    it("propagates store failure without emitting events", async () => {
+      const store = makeStore({
+        insert: mock(async () =>
+          Result.fail<void, ConsentError>({
+            code: "CONSENT_PROVIDER_FAILURE",
+            message: "db error",
+          }),
+        ),
+      });
+      const outbox = mockPort<IOutboxRepository>();
+      const service = new ConsentService(
+        store,
+        outbox,
+        mockUnitOfWork().unitOfWork,
+        mockInstrumentation(),
+      );
+
+      const result = await service.withdraw({ subjectId: "subj-1" });
+
+      expect(result.isFailure).toBe(true);
+      expect(result.getError().code).toBe("CONSENT_PROVIDER_FAILURE");
+      expect(enqueuedEvents(outbox)).toHaveLength(0);
+    });
+  });
+
+  describe("getActive", () => {
+    it("delegates to findActiveByUser when userId is provided", async () => {
+      const store = makeStore({
+        findActiveByUser: mock(async () =>
+          Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.some(activeRow)),
+        ),
+      });
+      const service = new ConsentService(
+        store,
+        mockPort<IOutboxRepository>(),
+        mockUnitOfWork().unitOfWork,
+        mockInstrumentation(),
+      );
+
+      const result = await service.getActive("subj-1", "2026-07-09", "u1");
+
+      expect(result.isSuccess).toBe(true);
+      expect(store.findActiveByUser).toHaveBeenCalled();
+      expect(store.findActiveBySubject).not.toHaveBeenCalled();
+      expect(result.getValue().isSome()).toBe(true);
+      expect(result.getValue().unwrap()).toEqual(activeRow);
+    });
+
+    it("falls back to findActiveBySubject when userId is provided but has no user record", async () => {
+      const store = makeStore({
+        findActiveByUser: mock(async () =>
+          Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.none()),
+        ),
+        findActiveBySubject: mock(async () =>
+          Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.some(activeRow)),
+        ),
+      });
+      const service = new ConsentService(
+        store,
+        mockPort<IOutboxRepository>(),
+        mockUnitOfWork().unitOfWork,
+        mockInstrumentation(),
+      );
+
+      const result = await service.getActive("subj-1", "2026-07-09", "u1");
+
+      expect(result.isSuccess).toBe(true);
+      expect(store.findActiveByUser).toHaveBeenCalled();
+      expect(store.findActiveBySubject).toHaveBeenCalled();
+      expect(result.getValue().isSome()).toBe(true);
+      expect(result.getValue().unwrap()).toEqual(activeRow);
+    });
+
+    it("delegates to findActiveBySubject when userId is not provided", async () => {
+      const store = makeStore({
+        findActiveBySubject: mock(async () =>
+          Result.ok<Option<ConsentRecordRow>, ConsentError>(Option.none()),
+        ),
+      });
+      const service = new ConsentService(
+        store,
+        mockPort<IOutboxRepository>(),
+        mockUnitOfWork().unitOfWork,
+        mockInstrumentation(),
+      );
+
+      const result = await service.getActive("subj-1", "2026-07-09");
+
+      expect(result.isSuccess).toBe(true);
+      expect(store.findActiveBySubject).toHaveBeenCalled();
+      expect(store.findActiveByUser).not.toHaveBeenCalled();
+      expect(result.getValue().isNone()).toBe(true);
+    });
+  });
+
+  describe("reconcile", () => {
+    it("links the browser's orphan consent records to the user and emits USER_COOKIE_CONSENT_LINKED", async () => {
+      const spyOutbox = mockPort<IOutboxRepository>();
+      const store = makeStore({
+        linkSubjectToUser: mock(async () => Result.ok<string[], ConsentError>(["c1", "c2"])),
+      });
+      const service = new ConsentService(
+        store,
+        spyOutbox,
+        mockUnitOfWork().unitOfWork,
+        mockInstrumentation(),
+      );
+
+      const result = await service.reconcile("subj-1", "u1");
+
+      expect(result.isSuccess).toBe(true);
+      expect(store.linkSubjectToUser).toHaveBeenCalledWith("subj-1", "u1");
+      expect(enqueuedEvents(spyOutbox)).toEqual([
+        {
+          eventType: EventTypes.USER_COOKIE_CONSENT_LINKED,
+          aggregateId: "u1",
+          payload: { userId: "u1", subjectId: "subj-1", consentRecordIds: ["c1", "c2"] },
+        },
+      ]);
+    });
+
+    it("emits nothing when every record was already linked", async () => {
+      const spyOutbox = mockPort<IOutboxRepository>();
+      const service = new ConsentService(
+        makeStore(),
+        spyOutbox,
+        mockUnitOfWork().unitOfWork,
+        mockInstrumentation(),
+      );
+
+      const result = await service.reconcile("subj-1", "u1");
+
+      expect(result.isSuccess).toBe(true);
+      expect(enqueuedEvents(spyOutbox)).toEqual([]);
+    });
+  });
+});

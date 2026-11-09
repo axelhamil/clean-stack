@@ -8,7 +8,7 @@
 modules/<name>/
   package.json        exports per layer pointing at src/ and schemas/, no build
   tsconfig.json       noEmit
-  bunfig.toml         preload from @packages/test
+  bunfig.toml         preload from @packages/test, only when a test needs one
   schemas/            the tables this module owns
   scripts/            check-*.ts against a real database, about this module only
   src/
@@ -22,7 +22,7 @@ modules/<name>/
 
 ## Contract
 
-1. **The module exports factories, the host composes them.** `<name>.module.ts` (`defineModule`), `create<Name>Routes(deps)`, `create<Name>InternalRoutes(deps)`, plus what the host must bind (application services, event handlers). Only an app imports `*.module.ts`. **Why**: a second importer would inherit the module's prerequisites and could wire it twice.
+1. **The module exports factories, the host composes them.** `<name>.module.ts` (`defineModule`), `create<Name>Routes(deps)`, `create<Name>InternalRoutes(deps)`, plus what the host must bind (application services, event handlers) and every port or service type the host container's inferred type names (its declaration emit needs a public specifier for each, else `TS2883` in `container.ts`). Only an app imports `*.module.ts`. **Why**: a second importer would inherit the module's prerequisites and could wire it twice.
 2. **Everything from outside arrives in `<Name>Prerequisites`**: `ddd-kit` ports, the ports the module declares, its typed settings. Never `env`, never the built container, never the auth instance. **Why**: a package that reads ambient state cannot be type-checked or tested alone, and swapping a provider would touch its code.
 3. **A need towards another module is a port the consumer declares**, served by an application service of the provider and bound by the host. Never an import of the other module. **Why**: the dependency stays visible in one host file and either side can be removed without touching the other.
 4. **Events go through the one catalog in `packages/events`**, emitted in the same unit of work as the write. A handler reacting to another module's event lives in the reacting module and subscribes by event type, never by importing the emitter.
@@ -33,7 +33,7 @@ modules/<name>/
 
 ## Boundaries
 
-`pnpm check:boundaries` scans `apps packages modules` with `.dependency-cruiser.cjs`: no cross-module import (tests may reach another module's `schemas/` only, schemas reach only other schemas), only apps import `*.module.ts`, `packages/` never reaches a module or an app, a module never imports an app, the fronts never import a module, `domain/` and `application/` stay free of infrastructure, schemas, database and frameworks, host queries read modules through `schemas/` and `application/ports/` only, no runtime cycle. Each module adds `src/__TESTS__/layering.test.ts` on `@packages/test/source-scan` for what imports cannot express (no env read, no write from `infrastructure/http`, no transaction parameter).
+`pnpm check:boundaries` scans `apps packages modules` with `.dependency-cruiser.cjs`: no cross-module import (tests may reach another module's `schemas/` only, schemas reach only other schemas), only apps import `*.module.ts`, `packages/` never reaches a module or an app, a module never imports an app, the fronts never import a module, `domain/` and `application/` stay free of infrastructure, schemas, database and frameworks, host queries read modules through `schemas/` and `application/ports/` only, no runtime cycle. Each module adds `src/__TESTS__/layering.test.ts` calling `assertModuleLayering` from `@packages/test/source-scan` for what imports cannot express (no throw in domain or application, no write from a routes file, no transaction parameter or opener, no env read, no reach into the host).
 
 ## Moving a module here
 

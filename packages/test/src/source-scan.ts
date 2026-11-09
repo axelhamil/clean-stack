@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
 interface CodeViews {
@@ -194,7 +194,12 @@ export function createSourceScan(root: string) {
   }
 
   function transactionOpenersPerFile(layer: string): Record<string, number> {
-    return countPerFile(layer, ({ blanked }) => countOf(blanked, /\.transaction\s*\(\s*[^\s)]/g));
+    return countPerFile(
+      layer,
+      ({ code, blanked }) =>
+        countOf(blanked, /\.transaction\s*\(\s*[^\s)]/g) +
+        countOf(code, /\[\s*(["'`])transaction\1\s*\]\s*\(/g),
+    );
   }
 
   function envReadsPerFile(layer: string): Record<string, number> {
@@ -203,8 +208,12 @@ export function createSourceScan(root: string) {
       ({ code, blanked }) =>
         countOf(blanked, /\b(?:process|Bun)\s*\??\.\s*env\b/g) +
         countOf(blanked, /\bimport\.meta\.env\b/g) +
-        countOf(blanked, /\{[^{}]*\benv\b[^{}]*\}\s*=\s*(?:process|Bun)\b(?!\s*\??\.)/g) +
-        countOf(code, /\b(?:process|Bun)\s*\??\.?\s*\[\s*(["'`])env\1\s*\]/g),
+        countOf(
+          blanked,
+          /\{(?:[^{}]|\{[^{}]*\})*\benv\b(?:[^{}]|\{[^{}]*\})*\}\s*=\s*(?:process|Bun)\b(?!\s*\??\.)/g,
+        ) +
+        countOf(code, /\b(?:process|Bun)\s*\??\.?\s*\[\s*(["'`])env\1\s*\]/g) +
+        countOf(code, /\bimport\s*\{[^}]*\benv\b[^}]*\}\s*from\s*(["'])(?:node:)?process\1/g),
     );
   }
 
@@ -217,4 +226,60 @@ export function createSourceScan(root: string) {
     transactionOpenersPerFile,
     envReadsPerFile,
   };
+}
+
+const SPECIFIER = /\b(?:from|import|require)\s*\(?\s*(["'])([^"'\n]+)\1/g;
+const HOST_PATH =
+  /^(?:apps\/|(?:container|auth|composition)(?:\.ts)?(?:\/|$)|shared\/(?:env(?:\.ts)?$|middleware\/))/;
+const CONTAINER_AUGMENTATION = /declare\s+module\s+["']inwire["']/;
+
+function hostPathOf(specifier: string): string {
+  return specifier.replace(/^(?:@\/|(?:\.\.?\/)+)/, "");
+}
+
+export function reachesHost(code: string): boolean {
+  const specifiers = [...code.matchAll(SPECIFIER)].map((match) => match[2] ?? "");
+
+  return (
+    CONTAINER_AUGMENTATION.test(code) ||
+    specifiers.some((specifier) => HOST_PATH.test(hostPathOf(specifier)))
+  );
+}
+
+export function isRouteFile(file: string): boolean {
+  const name = file.split(sep).at(-1) ?? "";
+
+  return name === "routes.ts" || name.endsWith(".routes.ts");
+}
+
+function existingLayers(root: string, names: string[]): string[] {
+  return names.filter((name) => existsSync(join(root, name)));
+}
+
+export function assertModuleLayering(srcRoot: string): void {
+  const scan = createSourceScan(srcRoot);
+  const files = scan.sourceFiles(".");
+
+  if (files.length === 0) throw new Error(`module layering: no source file under ${srcRoot}`);
+
+  const throwing = existingLayers(srcRoot, ["domain", "application"]).flatMap((layer) =>
+    Object.keys(scan.throwsPerFile(layer)),
+  );
+
+  const guards: Record<string, string[]> = {
+    "domain and application never throw": throwing,
+    "routes never write": Object.keys(scan.writeCallsPerFile(".")).filter(isRouteFile),
+    "no tx parameter": Object.keys(scan.transactionParametersPerFile(".")),
+    "no transaction opened": Object.keys(scan.transactionOpenersPerFile(".")),
+    "no environment read": Object.keys(scan.envReadsPerFile(".")),
+    "no host reach": files.filter((file) => reachesHost(scan.codeOf(file))),
+  };
+
+  const violations = Object.entries(guards).flatMap(([guard, offenders]) =>
+    offenders.map((file) => `${guard}: ${file}`),
+  );
+
+  if (violations.length > 0) {
+    throw new Error(`module layering violated in ${srcRoot}:\n${violations.join("\n")}`);
+  }
 }
