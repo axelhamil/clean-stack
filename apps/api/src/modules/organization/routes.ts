@@ -1,3 +1,4 @@
+import { setSsoEnforcementBodySchema } from "@modules/admin/application/dto/set-sso-enforcement.dto";
 import { AppErrorException } from "@packages/ddd-kit";
 import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
@@ -8,7 +9,6 @@ import { denyImpersonated } from "../../shared/middleware/deny-impersonated.midd
 import { requireOrg, requireOrgPermission } from "../../shared/middleware/org.middleware";
 import { requireCurrentPolicies } from "../../shared/middleware/policy.middleware";
 import { ScimConnectionService } from "../../shared/services/scim-connection.service";
-import { setSsoEnforcementBodySchema } from "../../shared/services/set-sso-enforcement.dto";
 
 const scimSvc = new ScimConnectionService(
   di.IOutboxRepository,

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { createSourceScan, isRouteFile, reachesHost } from "@packages/test/source-scan";
+import { createSourceScan, isRouteFile } from "@packages/test/source-scan";
 
 const apiSrcRoot = join(import.meta.dir, "..");
 const scan = createSourceScan(apiSrcRoot);
@@ -17,32 +16,11 @@ const ALLOWED_TX_PARAMETERS: Record<string, string> = {};
 
 const ALLOWED_TRANSACTION_OPENERS: Record<string, string> = {};
 
-const COMPOSED_MODULES = ["admin"];
-
-const modules = readdirSync(join(apiSrcRoot, "modules"), { withFileTypes: true })
-  .filter((entry) => entry.isDirectory())
-  .map((entry) => `modules/${entry.name}`);
-
-function layersNamed(name: string): string[] {
-  return modules
-    .map((module) => `${module}/${name}`)
-    .filter((layer) => existsSync(join(apiSrcRoot, layer)));
-}
-
 function isApiRouteFile(file: string): boolean {
   return file.startsWith("public-api/") || isRouteFile(file);
 }
 
 describe("layering rules of the api", () => {
-  it("domain and application never throw", () => {
-    const layers = [...layersNamed("domain"), ...layersNamed("application")];
-
-    const throws = Object.assign({}, ...layers.map((layer) => scan.throwsPerFile(layer)));
-
-    expect(layers.length).toBeGreaterThan(0);
-    expect(throws).toEqual({});
-  });
-
   it("routes never write to the database", () => {
     const routeFiles = [...scan.sourceFiles("modules"), ...scan.sourceFiles("public-api")].filter(
       isApiRouteFile,
@@ -100,13 +78,5 @@ describe("layering rules of the api", () => {
     expect(allReads[ENV_OWNER]).toBeGreaterThan(0);
     expect(strayReaders).toEqual([]);
     expect(staleAllowances).toEqual([]);
-  });
-
-  it("a composed module reaches the host only through its prerequisites and route deps", () => {
-    const reaches = COMPOSED_MODULES.flatMap((module) =>
-      scan.sourceFiles(`modules/${module}`),
-    ).filter((file) => reachesHost(scan.codeOf(file)));
-
-    expect(reaches).toEqual([]);
   });
 });

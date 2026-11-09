@@ -117,7 +117,7 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
   - **Rails**: every staff action emits a typed event carrying `actorUserId` in the same transaction, like any other state change. Today ban, role change and impersonation commit on the auth library's connection and emit afterwards, so a failed emit leaves the action with no audit row; this phase closes that.
 - **Out of scope**: moderation cases and lanes, QA calibration, moderator wellbeing, holds and takedowns, linked-account clusters, content workspace, growth prospects, integrations rollout, AI support assistant, Discord commands: all OpenUp business.
 - **Done when**: no admin route or screen remains in `apps/app`; a test covers each permission against each staff route, refusal included; the accessibility gate and `docs/SURFACE.md` parity cover the new app; a real two-person approval and a real step-up are proved in the browser at 390, 768 and 1440 px.
-- **References**: [`docs/FEATURES.md`](docs/FEATURES.md), `apps/api/src/modules/admin/`, `apps/api/src/shared/middleware/staff-guards.ts`.
+- **References**: [`docs/FEATURES.md`](docs/FEATURES.md), `modules/admin/`, `apps/api/src/shared/middleware/staff-guards.ts`.
 
 ---
 

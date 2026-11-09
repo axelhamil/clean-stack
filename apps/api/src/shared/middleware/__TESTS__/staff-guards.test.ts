@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
+import type { StaffStoreError } from "@modules/admin/application/ports/staff-store.port";
 import type { StaffAccess } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
 import { Hono } from "hono";
-import type { StaffStoreError } from "../../ports/staff-store.port";
 import { NoOpInstrumentation } from "../../services/noop-instrumentation";
 import { createErrorHandler } from "../error.middleware";
 import { staffGuards } from "../staff-guards";

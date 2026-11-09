@@ -65,6 +65,7 @@ export interface IWebhookDeliveryRepository {
     id: string,
     organizationId: string,
   ): Promise<Result<Option<WebhookDeliveryRecord>, WebhookRepoError>>;
+  countDeadLetters(): Promise<Result<number, WebhookRepoError>>;
   claim(request: DeliveryClaimRequest): Promise<Result<WebhookDeliveryRecord[], WebhookRepoError>>;
   markSuccess(
     lease: DeliveryLease,

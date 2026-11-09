@@ -7,6 +7,7 @@
  */
 
 import "./check-admin-ops.env";
+import { StripeReplayService } from "@modules/admin/application/services/stripe-replay.service";
 import { StripeEventGateway } from "@modules/billing/infrastructure/adapters/stripe-event.gateway";
 import { uuidv7 } from "@packages/ddd-kit";
 import {
@@ -27,7 +28,6 @@ import { Hono } from "hono";
 import type Stripe from "stripe";
 import { auth } from "../src/auth";
 import { di } from "../src/container";
-import { StripeReplayService } from "../src/modules/admin/application/services/stripe-replay.service";
 import { env } from "../src/shared/env";
 import { sweepStripeEventsRoutes } from "../src/shared/internal-routes/sweep-stripe-events.route";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
@@ -306,6 +306,7 @@ function replayOver(id: string, invoiceStatus = "open"): StripeReplayService {
     gateway,
     di.IOutboxRepository,
     di.ITransactionService,
+    di.isReplayableStripeEvent,
   );
 }
 

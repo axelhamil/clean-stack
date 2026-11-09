@@ -1,4 +1,5 @@
 import { setTimeout as sleep } from "node:timers/promises";
+
 /**
  * Proves against a real Postgres what a mocked unit of work cannot: a moderation write and its
  * audit event commit or roll back together, the sessions of a banned user and the sessions they
@@ -6,14 +7,14 @@ import { setTimeout as sleep } from "node:timers/promises";
  * written directly. Creates and removes its own probe users.
  */
 
+import { AdminModerationService } from "@modules/admin/application/services/admin-moderation.service";
+import { StaffService } from "@modules/admin/application/services/staff.service";
 import { Result } from "@packages/ddd-kit";
 import { authSchema, db, eq } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { auth } from "../src/auth";
 import { di } from "../src/container";
-import { AdminModerationService } from "../src/modules/admin/application/services/admin-moderation.service";
-import { StaffService } from "../src/modules/admin/application/services/staff.service";
 import { adminProbes, appCall, codeOf } from "./admin-probes";
 import { checkRecorder } from "./check-harness";
 import { requireLocalDatabase } from "./require-local-database";

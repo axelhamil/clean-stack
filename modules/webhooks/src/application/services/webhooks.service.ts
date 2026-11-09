@@ -235,6 +235,13 @@ export class WebhooksService {
     );
   }
 
+  async countDeadLetters(): Promise<Result<number, WebhookServiceError>> {
+    return this.instrumentation.startSpan(
+      { name: "WebhooksService > countDeadLetters", op: "function" },
+      () => this.deliveries.countDeadLetters(),
+    );
+  }
+
   async findDelivery(
     id: string,
     endpointId: string,

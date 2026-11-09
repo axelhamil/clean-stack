@@ -11,6 +11,8 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { StaffService } from "@modules/admin/application/services/staff.service";
+import { StaffAccessService } from "@modules/admin/application/services/staff-access.service";
 import { permissionsOfRole } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
 import {
@@ -27,8 +29,6 @@ import {
 import { EventTypes } from "@packages/events";
 import { hashPassword } from "better-auth/crypto";
 import { di } from "../src/container";
-import { StaffService } from "../src/modules/admin/application/services/staff.service";
-import { StaffAccessService } from "../src/modules/admin/application/services/staff-access.service";
 import { checkRecorder } from "./check-harness";
 import { requireLocalDatabase } from "./require-local-database";
 
@@ -120,6 +120,7 @@ async function proveBootstrapEmitsOnce(): Promise<void> {
     di.IOutboxRepository,
     di.ITransactionService,
     { PLATFORM_ADMIN_IDS: [listedId], PLATFORM_ADMIN_REQUIRE_MFA: false },
+    di.staffLookupOnce,
   );
   const user = { id: listedId, twoFactorEnabled: false };
 
@@ -596,6 +597,7 @@ async function proveReviveAndRegrant(): Promise<void> {
     di.IOutboxRepository,
     di.ITransactionService,
     { PLATFORM_ADMIN_IDS: [revivedId], PLATFORM_ADMIN_REQUIRE_MFA: false },
+    di.staffLookupOnce,
   );
   const user = { id: revivedId, twoFactorEnabled: false };
 
