@@ -1,5 +1,5 @@
-import type { ISweepRunStore, SweepOutcome } from "../ports/sweep-run.port";
 import { classifySweepResult } from "./sweep-result";
+import type { ISweepRunStore, SweepOutcome } from "./sweep-run.port";
 import type { SweepResponse } from "./sweep-runner";
 import type { SweepSpans } from "./sweep-span";
 

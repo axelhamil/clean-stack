@@ -1,5 +1,6 @@
 export * from "./application/db-failure";
 export * from "./application/error-code";
+export * from "./application/health-check";
 export * from "./application/instrumentation";
 export * from "./application/logger";
 export * from "./application/pagination";

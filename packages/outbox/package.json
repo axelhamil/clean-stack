@@ -12,6 +12,7 @@
     "./outbox-relay": "./src/outbox-relay.ts",
     "./outbox-dispatcher": "./src/outbox-dispatcher.ts",
     "./payload-parser": "./src/payload-parser.ts",
+    "./handler-idempotency": "./src/handler-idempotency.ts",
     "./pg-listener": "./src/pg-listener.ts",
     "./jitter": "./src/jitter.ts",
     "./lease-budget": "./src/lease-budget.ts",

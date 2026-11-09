@@ -95,7 +95,7 @@ are none, the digest is never an empty email.
 
 ### Late jobs
 
-The back office derives a `late` state from the last heartbeat rather than storing one (`shared/internal-routes/sweep-cadence.ts`): a daily sweep is late past 26 hours, the notification flush past 15 minutes. A job that never ran has no heartbeat and stays invisible, it shows up only once it reported at least once.
+The back office derives a `late` state from the last heartbeat rather than storing one (`packages/http/src/sweep-cadence.ts`): a daily sweep is late past 26 hours, the notification flush past 15 minutes. A job that never ran has no heartbeat and stays invisible, it shows up only once it reported at least once.
 
 ### Single-flight
 
@@ -226,7 +226,7 @@ dryRun, batchCount, deletedPerPass, stopReasons, truncated, skipped }`.
 
 `batchSize` bounds rows, not time. Each batch carries its own
 `statement_timeout`: 5 s for a purge, 10 s for a dry-run count (the shared
-`countEligibleWithTimeout` helper in `apps/api/src/shared/internal-routes/sweep-count.ts`,
+`countEligibleWithTimeout` helper in `packages/http/src/sweep-count.ts`,
 since an unbounded `COUNT(*)` on a large table would otherwise hold a pooled
 connection for the whole idle timeout): which is what makes checking the
 budget between batches sufficient.

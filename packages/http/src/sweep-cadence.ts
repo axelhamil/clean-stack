@@ -1,4 +1,4 @@
-import type { SweepRun } from "../ports/sweep-run.port";
+import type { SweepRun } from "./sweep-run.port";
 
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;

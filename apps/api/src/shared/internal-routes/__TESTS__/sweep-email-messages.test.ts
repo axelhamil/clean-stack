@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
+import { sweepSpans } from "@packages/http/sweep-span";
 import { NoOpInstrumentation } from "../../services/noop-instrumentation";
 import { buildEmailSweepPasses } from "../sweep-email-messages.route";
-import { sweepSpans } from "../sweep-span";
 
 describe("buildEmailSweepPasses", () => {
   it("declares a sent pass and a failed pass on separate retention knobs", () => {

@@ -1,8 +1,5 @@
+import { classifySweepResult, type SweepResponseShape } from "@packages/http/sweep-result";
 import { signedInternalFetch } from "../shared/internal-routes/internal-fetch";
-import {
-  classifySweepResult,
-  type SweepResponseShape,
-} from "../shared/internal-routes/sweep-result";
 import type { CronEnv } from "./env";
 import { HttpHeartbeat } from "./http-heartbeat";
 import { cronLogger } from "./logger";

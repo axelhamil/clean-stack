@@ -8,6 +8,14 @@
     "./error-handler": "./src/error-handler.ts",
     "./time-id-cursor": "./src/time-id-cursor.ts",
     "./route-guards": "./src/route-guards.ts",
+    "./sweep-cadence": "./src/sweep-cadence.ts",
+    "./sweep-count": "./src/sweep-count.ts",
+    "./sweep-heartbeat": "./src/sweep-heartbeat.ts",
+    "./sweep-purge": "./src/sweep-purge.ts",
+    "./sweep-result": "./src/sweep-result.ts",
+    "./sweep-run.port": "./src/sweep-run.port.ts",
+    "./sweep-runner": "./src/sweep-runner.ts",
+    "./sweep-span": "./src/sweep-span.ts",
     "./testing/route-guards": "./src/testing/route-guards.ts"
   },
   "scripts": {

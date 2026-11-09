@@ -1,6 +1,6 @@
 import { type IInstrumentation, Result } from "@packages/ddd-kit";
 import { asc, dbOperationFailure, resolveExecutor, sweepSchema } from "@packages/drizzle";
-import type { ISweepRunStore, SweepRun, SweepRunStoreError } from "../ports/sweep-run.port";
+import type { ISweepRunStore, SweepRun, SweepRunStoreError } from "@packages/http/sweep-run.port";
 
 const { sweepRun } = sweepSchema;
 const failure = dbOperationFailure("SWEEP_RUN_PROVIDER_FAILURE");

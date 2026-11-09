@@ -1,11 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import { Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import type { ISweepRunStore } from "@packages/http/sweep-run.port";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import type { ISweepRunStore } from "../../../shared/ports/sweep-run.port";
 import type { IOpsStore } from "../application/ports/ops-store.port";
 import { OpsService } from "../application/services/ops.service";
 

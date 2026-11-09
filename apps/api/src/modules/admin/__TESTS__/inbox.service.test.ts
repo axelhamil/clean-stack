@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { Result } from "@packages/ddd-kit";
+import type { ISweepRunStore, SweepOutcome } from "@packages/http/sweep-run.port";
 import { mockPort } from "@packages/test/bun";
-import type { ISweepRunStore, SweepOutcome } from "../../../shared/ports/sweep-run.port";
 import type { IApprovalStore } from "../application/ports/approval-store.port";
 import type { IOpsStore } from "../application/ports/ops-store.port";
 import { InboxService } from "../application/services/inbox.service";

@@ -1,15 +1,15 @@
 // `/internal/sweep-email-messages`: gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
 import { and, emailSchema, eq, inArray, lt } from "@packages/drizzle";
+import { requireFilter } from "@packages/http/sweep-purge";
+import { type RetentionPass, sweepBodySchema } from "@packages/http/sweep-runner";
+import type { SweepSpans } from "@packages/http/sweep-span";
 import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
 import { env } from "../env";
 import { internalLayers } from "./internal-layers";
-import { requireFilter } from "./sweep-purge";
 import { runSweepRequest, tableRetentionPass } from "./sweep-route";
-import { type RetentionPass, sweepBodySchema } from "./sweep-runner";
-import type { SweepSpans } from "./sweep-span";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
 

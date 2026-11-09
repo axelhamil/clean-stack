@@ -1,8 +1,8 @@
 import { uuidv7 } from "@packages/ddd-kit";
 import { and, eq, resolveExecutor, sql, sweepSchema } from "@packages/drizzle";
+import type { SweepLock } from "@packages/http/sweep-runner";
+import type { SweepSpans } from "@packages/http/sweep-span";
 import { env } from "../env";
-import type { SweepLock } from "./sweep-runner";
-import type { SweepSpans } from "./sweep-span";
 
 /**
  * Takes the lease for `label`, or reports that someone else holds it.

@@ -1,12 +1,14 @@
-import type { IInstrumentation } from "@packages/ddd-kit";
+import type {
+  HealthCheckFn,
+  HealthCheckResult,
+  HealthStatus,
+  IInstrumentation,
+} from "@packages/ddd-kit";
 import { raceWithTimeout } from "@packages/outbox/race-with-timeout";
 import type {
   AggregatedHealthCheck,
   AggregatedReport,
-  HealthCheckFn,
   HealthCheckRegistration,
-  HealthCheckResult,
-  HealthStatus,
   IHealthCheckRegistry,
 } from "../../../shared/ports/health.port";
 

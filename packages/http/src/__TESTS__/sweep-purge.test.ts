@@ -29,9 +29,9 @@ mock.module("@packages/drizzle", () => ({
   }),
 }));
 
-const { describe, expect, it, spyOn } = await import("bun:test");
+const { describe, expect, it } = await import("bun:test");
 const { mockUnitOfWork } = await import("@packages/test/bun/unit-of-work");
-const { NoOpInstrumentation } = await import("../../services/noop-instrumentation");
+const { mockInstrumentation } = await import("@packages/test/bun/instrumentation");
 const { sweepSpans } = await import("../sweep-span");
 const { purgeBatchWithTimeout, requireFilter } = await import("../sweep-purge");
 const { isNotNull } = await import("@packages/drizzle");
@@ -42,7 +42,7 @@ const someWhere = () => isNotNull({} as never) as never;
 
 describe("purgeBatchWithTimeout", () => {
   it("returns the number of deleted rows", async () => {
-    const spans = sweepSpans(new NoOpInstrumentation());
+    const spans = sweepSpans(mockInstrumentation());
     const deleted = await purgeBatchWithTimeout({
       table: {} as never,
       idColumn: {} as never,
@@ -57,7 +57,7 @@ describe("purgeBatchWithTimeout", () => {
   });
 
   it("refuses an unfiltered delete", async () => {
-    const spans = sweepSpans(new NoOpInstrumentation());
+    const spans = sweepSpans(mockInstrumentation());
 
     await expect(
       purgeBatchWithTimeout({
@@ -73,8 +73,8 @@ describe("purgeBatchWithTimeout", () => {
   });
 
   it("opens exactly one db span, carrying the delete sql", async () => {
-    const instrumentation = new NoOpInstrumentation();
-    const spy = spyOn(instrumentation, "startSpan");
+    const instrumentation = mockInstrumentation();
+    const spy = instrumentation.startSpan;
     const spans = sweepSpans(instrumentation);
 
     await purgeBatchWithTimeout({

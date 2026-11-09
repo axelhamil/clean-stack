@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { Result } from "@packages/ddd-kit";
 import { mockPort } from "@packages/test/bun";
-import type { ISweepRunStore, SweepRun } from "../../ports/sweep-run.port";
-import { NoOpInstrumentation } from "../../services/noop-instrumentation";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { beatOfSweep, withSweepHeartbeat } from "../sweep-heartbeat";
+import type { ISweepRunStore, SweepRun } from "../sweep-run.port";
 import type { SweepResponse } from "../sweep-runner";
 import { sweepSpans } from "../sweep-span";
 
@@ -23,7 +23,7 @@ function setup() {
   store.record.mockImplementation(async () => Result.ok());
   const written = () => store.record.mock.calls.map(([run]: [SweepRun]) => run);
 
-  return { store, written, spans: sweepSpans(new NoOpInstrumentation()) };
+  return { store, written, spans: sweepSpans(mockInstrumentation()) };
 }
 
 describe("sweep heartbeat", () => {
