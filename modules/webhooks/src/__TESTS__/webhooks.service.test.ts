@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
+import { isIP } from "node:net";
 import { type ILogger, Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
@@ -18,10 +19,14 @@ import type {
 } from "../application/ports/webhook-endpoint.port";
 import { type MasterKeyProvider, WebhooksService } from "../application/services/webhooks.service";
 import { aeadSecretCipher, masterKeyProvider } from "../infrastructure/crypto/aead-secret-cipher";
+import { dnsUrlGuard } from "../infrastructure/services/ssrf-guard";
 
 // ─── shared stubs ──────────────────────────────────────────────────────────
 
 const logger = mockPort<ILogger>();
+const urlGuard = dnsUrlGuard(false, async (hostname) => [
+  { address: isIP(hostname) ? hostname : "93.184.216.34" },
+]);
 const ORG_ID = "org-1";
 const USER_ID = "user-1";
 const ENDPOINT_ID = "ep-1";
@@ -144,8 +149,9 @@ function makeService(
     opts.masterKey ?? validMasterKey,
     mockInstrumentation(),
     aeadSecretCipher,
+    urlGuard,
     logger,
-    { secretGraceHours: 24, httpsOnly: false },
+    { secretGraceHours: 24 },
   );
 }
 
@@ -241,8 +247,9 @@ describe("WebhooksService", () => {
         validMasterKey,
         instrumentation,
         aeadSecretCipher,
+        urlGuard,
         logger,
-        { secretGraceHours: 24, httpsOnly: false },
+        { secretGraceHours: 24 },
       );
 
       await service.createEndpoint({
@@ -356,8 +363,9 @@ describe("WebhooksService", () => {
         validMasterKey,
         instrumentation,
         aeadSecretCipher,
+        urlGuard,
         logger,
-        { secretGraceHours: 24, httpsOnly: false },
+        { secretGraceHours: 24 },
       );
 
       await service.updateEndpoint({
@@ -420,8 +428,9 @@ describe("WebhooksService", () => {
         validMasterKey,
         instrumentation,
         aeadSecretCipher,
+        urlGuard,
         logger,
-        { secretGraceHours: 24, httpsOnly: false },
+        { secretGraceHours: 24 },
       );
 
       await service.deleteEndpoint(ENDPOINT_ID, ORG_ID, USER_ID);
@@ -479,8 +488,9 @@ describe("WebhooksService", () => {
         validMasterKey,
         instrumentation,
         aeadSecretCipher,
+        urlGuard,
         logger,
-        { secretGraceHours: 24, httpsOnly: false },
+        { secretGraceHours: 24 },
       );
 
       await service.listEndpoints(ORG_ID);
@@ -537,8 +547,9 @@ describe("WebhooksService", () => {
         validMasterKey,
         instrumentation,
         aeadSecretCipher,
+        urlGuard,
         logger,
-        { secretGraceHours: 24, httpsOnly: false },
+        { secretGraceHours: 24 },
       );
 
       await service.findEndpoint(ENDPOINT_ID, ORG_ID);
@@ -603,8 +614,9 @@ describe("WebhooksService", () => {
         validMasterKey,
         instrumentation,
         aeadSecretCipher,
+        urlGuard,
         logger,
-        { secretGraceHours: 24, httpsOnly: false },
+        { secretGraceHours: 24 },
       );
 
       await service.listDeliveries({ endpointId: ENDPOINT_ID, organizationId: ORG_ID });
@@ -659,8 +671,9 @@ describe("WebhooksService", () => {
         validMasterKey,
         mockInstrumentation(),
         aeadSecretCipher,
+        urlGuard,
         logger,
-        { secretGraceHours: 24, httpsOnly: false },
+        { secretGraceHours: 24 },
       );
       const r = await service.rotateSecret({
         id: ENDPOINT_ID,
@@ -744,8 +757,9 @@ describe("WebhooksService", () => {
         validMasterKey,
         mockInstrumentation(),
         aeadSecretCipher,
+        urlGuard,
         logger,
-        { secretGraceHours: 24, httpsOnly: false },
+        { secretGraceHours: 24 },
       );
 
       const result = await service.sendTest({
@@ -803,8 +817,9 @@ describe("WebhooksService", () => {
         validMasterKey,
         instrumentation,
         aeadSecretCipher,
+        urlGuard,
         logger,
-        { secretGraceHours: 24, httpsOnly: false },
+        { secretGraceHours: 24 },
       );
 
       await service.sendTest({ id: ENDPOINT_ID, organizationId: ORG_ID, actorUserId: USER_ID });
@@ -847,8 +862,9 @@ describe("WebhooksService", () => {
         validMasterKey,
         mockInstrumentation(),
         aeadSecretCipher,
+        urlGuard,
         logger,
-        { secretGraceHours: 24, httpsOnly: false },
+        { secretGraceHours: 24 },
       );
 
       await service.replayDelivery(DELIVERY_ID, ENDPOINT_ID, ORG_ID, USER_ID);
@@ -884,8 +900,9 @@ describe("WebhooksService", () => {
         validMasterKey,
         mockInstrumentation(),
         aeadSecretCipher,
+        urlGuard,
         logger,
-        { secretGraceHours: 24, httpsOnly: false },
+        { secretGraceHours: 24 },
       );
 
       await service.replayDelivery("nonexistent", ENDPOINT_ID, ORG_ID, USER_ID);
@@ -946,8 +963,9 @@ describe("WebhooksService", () => {
         validMasterKey,
         instrumentation,
         aeadSecretCipher,
+        urlGuard,
         logger,
-        { secretGraceHours: 24, httpsOnly: false },
+        { secretGraceHours: 24 },
       );
 
       await service.replayDelivery(DELIVERY_ID, ENDPOINT_ID, ORG_ID, USER_ID);
@@ -997,8 +1015,9 @@ describe("WebhooksService", () => {
         validMasterKey,
         instrumentation,
         aeadSecretCipher,
+        urlGuard,
         logger,
-        { secretGraceHours: 24, httpsOnly: false },
+        { secretGraceHours: 24 },
       );
 
       await service.findDelivery(DELIVERY_ID, ENDPOINT_ID, ORG_ID);

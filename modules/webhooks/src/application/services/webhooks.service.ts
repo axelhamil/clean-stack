@@ -11,8 +11,9 @@ import {
 import { EventTypes } from "@packages/events";
 import { emitEvent } from "@packages/outbox/event-emitter";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
-import type { WebhookDeliverySettings, WebhookSettings } from "../config/webhook-settings";
+import type { WebhookSettings } from "../config/webhook-settings";
 import type { ISecretCipher } from "../ports/secret-cipher.port";
+import type { IUrlGuard } from "../ports/url-guard.port";
 import type {
   DeliveryPage,
   IWebhookDeliveryRepository,
@@ -24,7 +25,6 @@ import type {
   WebhookEndpointRecord,
   WebhookRepoError,
 } from "../ports/webhook-endpoint.port";
-import { assertPublicUrl } from "./ssrf-guard";
 
 export type WebhookSecretGenerator = () => string;
 export type MasterKeyProvider = () => Option<Uint8Array>;
@@ -44,9 +44,9 @@ export class WebhooksService {
     private readonly masterKey: MasterKeyProvider,
     private readonly instrumentation: IInstrumentation,
     private readonly cipher: ISecretCipher,
+    private readonly urlGuard: IUrlGuard,
     private readonly logger: ILogger,
-    private readonly settings: Pick<WebhookSettings, "secretGraceHours"> &
-      Pick<WebhookDeliverySettings, "httpsOnly">,
+    private readonly settings: Pick<WebhookSettings, "secretGraceHours">,
     private readonly secretGen: WebhookSecretGenerator = defaultSecretGenerator,
   ) {}
 
@@ -62,7 +62,7 @@ export class WebhooksService {
     return this.instrumentation.startSpan(
       { name: "WebhooksService > createEndpoint", op: "function" },
       async () => {
-        const guard = await assertPublicUrl(args.url, undefined, this.settings.httpsOnly);
+        const guard = await this.urlGuard.assertPublic(args.url);
         if (guard.isFailure)
           return Result.fail({ code: "WEBHOOK_URL_FORBIDDEN", message: guard.getError().message });
 
@@ -143,7 +143,7 @@ export class WebhooksService {
       { name: "WebhooksService > updateEndpoint", op: "function" },
       async () => {
         if (args.url !== undefined) {
-          const guard = await assertPublicUrl(args.url, undefined, this.settings.httpsOnly);
+          const guard = await this.urlGuard.assertPublic(args.url);
           if (guard.isFailure)
             return Result.fail({
               code: "WEBHOOK_URL_FORBIDDEN",

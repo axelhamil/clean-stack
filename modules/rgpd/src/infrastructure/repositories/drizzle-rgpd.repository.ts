@@ -337,7 +337,13 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
           }
 
           const erased = await this.staffData.eraseDataOf(userId);
-          if (erased.isFailure) return Result.fail(repositoryFailure("executeWipe"));
+          if (erased.isFailure) {
+            this.logger.error(
+              { err: erased.getError(), userId },
+              "RgpdRepository.executeWipe failed",
+            );
+            return Result.fail(repositoryFailure("executeWipe"));
+          }
           const endedSessions = await exec
             .delete(schema.session)
             .where(eq(schema.session.userId, userId))
@@ -362,7 +368,13 @@ export class DrizzleRgpdRepository implements IRgpdRepository {
           await exec.delete(schema.invitation).where(eq(schema.invitation.inviterId, userId));
 
           const revokedTokens = await this.apiTokens.revokeAllOfUser(userId);
-          if (revokedTokens.isFailure) return Result.fail(repositoryFailure("executeWipe"));
+          if (revokedTokens.isFailure) {
+            this.logger.error(
+              { err: revokedTokens.getError(), userId },
+              "RgpdRepository.executeWipe failed",
+            );
+            return Result.fail(repositoryFailure("executeWipe"));
+          }
 
           const deletedOrgs =
             userOrgIds.length === 0

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { Option, Result } from "@packages/ddd-kit";
+import { Option, Result, UnitOfWorkContext } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
@@ -248,5 +248,25 @@ describe("ApiTokenService.revoke: already revoked", () => {
     await makeService(repo, outbox).revoke("mine-personal", owner, "user-1");
 
     expect(enqueuedEvents(outbox).map((e) => e.eventType)).toEqual([EventTypes.API_TOKEN_REVOKED]);
+  });
+});
+
+describe("ApiTokenService.revokeAllOfUser", () => {
+  it("revokes inside the caller's open transaction and returns what it revoked", async () => {
+    const callerTransaction = {};
+    const repo = makeRepo();
+    const seen: unknown[] = [];
+    repo.revokeAllOfUser.mockImplementation(async () => {
+      seen.push(UnitOfWorkContext.transaction());
+      return Result.ok([{ tokenId: "tok1", organizationId: Option.some("org1") }]);
+    });
+
+    const result = await UnitOfWorkContext.run(callerTransaction, () =>
+      makeService(repo).revokeAllOfUser("u1"),
+    );
+
+    expect(seen).toEqual([callerTransaction]);
+    expect(repo.revokeAllOfUser).toHaveBeenCalledWith("u1");
+    expect(result.getValue()).toEqual([{ tokenId: "tok1", organizationId: Option.some("org1") }]);
   });
 });

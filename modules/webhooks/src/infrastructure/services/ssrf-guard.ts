@@ -2,7 +2,8 @@ import { lookup } from "node:dns/promises";
 import { BlockList, isIPv4, isIPv6 } from "node:net";
 import { Result } from "@packages/ddd-kit";
 import { PRIVATE_V4, PRIVATE_V6 } from "@packages/http/private-ranges";
-import { WEBHOOK_DNS_TIMEOUT_SECONDS } from "../config/webhook-settings";
+import { WEBHOOK_DNS_TIMEOUT_SECONDS } from "../../application/config/webhook-settings";
+import type { IUrlGuard, SsrfError } from "../../application/ports/url-guard.port";
 
 let cachedList: BlockList | undefined;
 
@@ -37,10 +38,6 @@ export function isPrivateOrReservedAddress(ip: string): boolean {
   return true;
 }
 
-export type SsrfError = {
-  code: "WEBHOOK_URL_FORBIDDEN" | "WEBHOOK_HOST_LOOKUP_TIMEOUT";
-  message: string;
-};
 export type AddressResolver = (hostname: string) => Promise<Array<{ address: string }>>;
 
 const defaultResolver: AddressResolver = (hostname) => lookup(hostname, { all: true });
@@ -101,4 +98,14 @@ export async function assertPublicUrl(
     return forbidden("destination not publicly routable");
 
   return Result.ok(url);
+}
+
+export function dnsUrlGuard(
+  httpsOnly: boolean,
+  resolve: AddressResolver = defaultResolver,
+  lookupTimeoutMs?: number,
+): IUrlGuard {
+  return {
+    assertPublic: (rawUrl) => assertPublicUrl(rawUrl, resolve, httpsOnly, lookupTimeoutMs),
+  };
 }

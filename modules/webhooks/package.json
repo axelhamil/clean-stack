@@ -8,6 +8,7 @@
     "./application/config/webhook-settings": "./src/application/config/webhook-settings.ts",
     "./application/ports/webhook-delivery.port": "./src/application/ports/webhook-delivery.port.ts",
     "./application/ports/webhook-endpoint.port": "./src/application/ports/webhook-endpoint.port.ts",
+    "./application/ports/url-guard.port": "./src/application/ports/url-guard.port.ts",
     "./application/services/webhooks.service": "./src/application/services/webhooks.service.ts",
     "./infrastructure/repositories/drizzle-webhook-delivery.repository": "./src/infrastructure/repositories/drizzle-webhook-delivery.repository.ts",
     "./infrastructure/services/webhook-delivery-worker.service": "./src/infrastructure/services/webhook-delivery-worker.service.ts",

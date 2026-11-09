@@ -13,6 +13,7 @@ import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
 import { mockPort, type PortMock } from "@packages/test/bun";
 import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { mockUnitOfWork, type UnitOfWorkMock } from "@packages/test/bun/unit-of-work";
+import type { IUrlGuard } from "../application/ports/url-guard.port";
 import type {
   DeliveryFailure,
   IWebhookDeliveryRepository,
@@ -23,7 +24,6 @@ import type {
   WebhookEndpointRecord,
   WebhookRepoError,
 } from "../application/ports/webhook-endpoint.port";
-import * as realSsrfGuard from "../application/services/ssrf-guard";
 import * as realAead from "../infrastructure/crypto/aead";
 
 // ---------------------------------------------------------------------------
@@ -66,39 +66,6 @@ const fakeDb = {
   delete: () => makeQueryChain(() => []),
   execute: async () => {},
 };
-
-// ---------------------------------------------------------------------------
-// SSRF guard mock: avoids real DNS in tests; checks literal private IPs
-// ---------------------------------------------------------------------------
-mock.module("../application/services/ssrf-guard", () => {
-  const PRIVATE_HOSTS = ["127.0.0.1", "localhost", "0.0.0.0", "::1"];
-  return {
-    ...realSsrfGuard,
-    assertPublicUrl: async (rawUrl: string) => {
-      try {
-        const url = new URL(rawUrl);
-        if (url.hostname === "slow-dns.example.com") {
-          return Result.fail({
-            code: "WEBHOOK_HOST_LOOKUP_TIMEOUT",
-            message: "host lookup timed out",
-          });
-        }
-        const isPrivate =
-          PRIVATE_HOSTS.includes(url.hostname) ||
-          /^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)/.test(url.hostname);
-        if (isPrivate) {
-          return Result.fail({
-            code: "WEBHOOK_URL_FORBIDDEN",
-            message: "destination not publicly routable",
-          });
-        }
-        return Result.ok(url);
-      } catch {
-        return Result.fail({ code: "WEBHOOK_URL_FORBIDDEN", message: "invalid url" });
-      }
-    },
-  };
-});
 
 mock.module("@packages/drizzle", () => ({
   ...realDrizzle,
@@ -233,6 +200,37 @@ type WorkerDeps = {
   clock?: () => number;
 };
 
+const PRIVATE_HOSTS = ["127.0.0.1", "localhost", "0.0.0.0", "::1"];
+
+function makeUrlGuard(): PortMock<IUrlGuard> {
+  const guard = mockPort<IUrlGuard>();
+  guard.assertPublic.mockImplementation(async (rawUrl: string) => {
+    try {
+      const url = new URL(rawUrl);
+      if (url.hostname === "slow-dns.example.com") {
+        return Result.fail({
+          code: "WEBHOOK_HOST_LOOKUP_TIMEOUT",
+          message: "host lookup timed out",
+        });
+      }
+      const isPrivate =
+        PRIVATE_HOSTS.includes(url.hostname) ||
+        /^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)/.test(url.hostname);
+      if (isPrivate) {
+        return Result.fail({
+          code: "WEBHOOK_URL_FORBIDDEN",
+          message: "destination not publicly routable",
+        });
+      }
+      return Result.ok(url);
+    } catch {
+      return Result.fail({ code: "WEBHOOK_URL_FORBIDDEN", message: "invalid url" });
+    }
+  });
+
+  return guard;
+}
+
 function makeWorker(deps: WorkerDeps = {}) {
   return new WebhookDeliveryWorker(
     deliveries,
@@ -242,6 +240,7 @@ function makeWorker(deps: WorkerDeps = {}) {
     uow.unitOfWork,
     logger,
     deps.instrumentation ?? mockInstrumentation(),
+    makeUrlGuard(),
     deps.options ?? OPTIONS,
     deps.fetchImpl as typeof fetch | undefined,
     deps.clock,

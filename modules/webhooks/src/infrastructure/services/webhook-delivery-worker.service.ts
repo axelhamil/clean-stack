@@ -21,6 +21,7 @@ import {
   WEBHOOK_SETTLE_MARGIN_SECONDS,
   type WebhookDeliverySettings,
 } from "../../application/config/webhook-settings";
+import type { IUrlGuard } from "../../application/ports/url-guard.port";
 import type {
   DeliveryFailure,
   IWebhookDeliveryRepository,
@@ -31,7 +32,6 @@ import type {
   IWebhookEndpointRepository,
   WebhookRepoError,
 } from "../../application/ports/webhook-endpoint.port";
-import { assertPublicUrl } from "../../application/services/ssrf-guard";
 import type { MasterKeyProvider } from "../../application/services/webhooks.service";
 import { decryptSecret, deriveOrgSubKey } from "../crypto/aead";
 import { signWebhookPayload } from "./hmac-signer";
@@ -127,6 +127,7 @@ export class WebhookDeliveryWorker {
     private readonly uow: IUnitOfWork,
     private readonly logger: ILogger,
     private readonly instrumentation: IInstrumentation,
+    private readonly urlGuard: IUrlGuard,
     private readonly options: WebhookDeliveryOptions,
     fetchImpl: typeof fetch = fetch,
     private readonly clock: Clock = monotonicClock,
@@ -260,7 +261,7 @@ export class WebhookDeliveryWorker {
         const endpointAndOrg = enabledEndpoint.unwrap();
         const organizationId = Option.some(endpointAndOrg.organizationId);
 
-        const guard = await assertPublicUrl(endpointAndOrg.url, undefined, this.options.httpsOnly);
+        const guard = await this.urlGuard.assertPublic(endpointAndOrg.url);
         if (guard.isFailure && guard.getError().code === "WEBHOOK_HOST_LOOKUP_TIMEOUT") {
           return failed(guard.getError().message, { organizationId });
         }

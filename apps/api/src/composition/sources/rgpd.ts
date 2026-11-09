@@ -1,4 +1,4 @@
-import type { IApiTokenRepository } from "@modules/api-token/application/ports/api-token.port";
+import type { ApiTokenService } from "@modules/api-token/application/services/api-token.service";
 import type { IApiTokenRevoker } from "@modules/rgpd/application/ports/api-token-revoker.port";
 import type { IEndedSessionsReader } from "@modules/rgpd/application/ports/ended-sessions.port";
 import type { IStaffAccessRules } from "@modules/rgpd/application/ports/staff-access-rules.port";
@@ -30,7 +30,7 @@ export function staffAccessRules(
 
 export interface RgpdSourcesPrerequisites {
   IInstrumentation: IInstrumentation;
-  IApiTokenRepository: IApiTokenRepository;
+  ApiTokenService: ApiTokenService;
   IOutboxRepository: IOutboxRepository;
   staffSettings: StaffListing;
 }
@@ -41,7 +41,7 @@ export const rgpdSources = defineModule<RgpdSourcesPrerequisites>()((b) =>
       "IStaffAccessRules",
       (c): IStaffAccessRules => staffAccessRules(c.IOutboxRepository, c.staffSettings),
     )
-    .add("IApiTokenRevoker", (c): IApiTokenRevoker => c.IApiTokenRepository)
+    .add("IApiTokenRevoker", (c): IApiTokenRevoker => c.ApiTokenService)
     .add(
       "IStaffDataEraser",
       (c): IStaffDataEraser => new DrizzleStaffDataEraser(c.IInstrumentation),

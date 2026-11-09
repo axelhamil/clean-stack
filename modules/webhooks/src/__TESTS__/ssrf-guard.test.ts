@@ -3,7 +3,7 @@ import {
   type AddressResolver,
   assertPublicUrl,
   isPrivateOrReservedAddress,
-} from "../application/services/ssrf-guard";
+} from "../infrastructure/services/ssrf-guard";
 
 describe("isPrivateOrReservedAddress", () => {
   it("blocks private/reserved v4", () => {
