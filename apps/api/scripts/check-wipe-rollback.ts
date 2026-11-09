@@ -32,6 +32,7 @@ import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-wipe-rollback");
 
+import { NoOpStorageService } from "@modules/uploads/infrastructure/services/noop-storage.service";
 import type { IInstrumentation } from "@packages/ddd-kit";
 import {
   apiTokenSchema,
@@ -55,7 +56,6 @@ import { DrizzleStaffStore } from "../src/modules/admin/infrastructure/repositor
 import { DrizzleApiTokenRepository } from "../src/modules/api-token/infrastructure/repositories/drizzle-api-token.repository";
 import { RgpdService } from "../src/modules/rgpd/application/services/rgpd.service";
 import { DrizzleRgpdRepository } from "../src/modules/rgpd/infrastructure/repositories/drizzle-rgpd.repository";
-import { NoOpStorageService } from "../src/modules/uploads/infrastructure/services/noop-storage.service";
 import { authSecretKey } from "../src/shared/auth/auth-secrets";
 import { generateToken, hmacToken } from "../src/shared/crypto/api-token";
 import { env } from "../src/shared/env";
@@ -137,7 +137,7 @@ function buildService(): RgpdService {
   const uow = new TransactionService(instrumentation);
   return new RgpdService(
     new DrizzleRgpdRepository(logger, instrumentation),
-    new NoOpStorageService(),
+    new NoOpStorageService(logger),
     email,
     uow,
     outbox,

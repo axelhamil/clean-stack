@@ -1,0 +1,256 @@
+import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { type ILogger, Option } from "@packages/ddd-kit";
+import * as realDrizzle from "@packages/drizzle";
+import { mockPort } from "@packages/test/bun";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
+import { computeAuditHash, GENESIS_HASH } from "../infrastructure/services/audit-hash";
+
+// ── Mock @packages/drizzle ─────────────────────────────────────────────────
+const insertExecute = mock(async () => {});
+const selectExecute = mock(async () => [] as unknown[]);
+
+function makeQueryChain(executeMock: ReturnType<typeof mock>) {
+  const leaf = {
+    execute: executeMock,
+    toSQL: () => ({ sql: "SELECT 1" }),
+  };
+  const proxy: unknown = new Proxy(leaf, {
+    get(target, prop) {
+      if (prop === "execute" || prop === "toSQL") return Reflect.get(target, prop);
+      return () => proxy;
+    },
+  });
+  return proxy;
+}
+
+const fakeDb = {
+  insert: () => makeQueryChain(insertExecute),
+  select: () => makeQueryChain(selectExecute),
+};
+
+mock.module("@packages/drizzle", () => ({
+  ...realDrizzle,
+  db: fakeDb,
+  resolveExecutor: () => fakeDb,
+}));
+
+// ── Imports after mocks ────────────────────────────────────────────────────
+const { DrizzleAuditRepository } = await import(
+  "../infrastructure/repositories/drizzle-audit.service"
+);
+
+// ── Chain helpers ──────────────────────────────────────────────────────────
+function chainRow(seq: number, prevHash: string, over: Partial<Record<string, unknown>> = {}) {
+  const base = {
+    id: `audit-${seq}`,
+    action: "user.created",
+    actorId: null,
+    actorType: "system",
+    organizationId: null,
+    targetType: "user",
+    targetId: `u${seq}`,
+    metadata: { n: seq },
+    occurredAt: new Date("2026-07-10T00:00:00.000Z"),
+    requestId: null,
+    retention: "compliance",
+    prevHash,
+    sequence: seq,
+  };
+  const row = { ...base, ...over };
+  const hash = computeAuditHash({
+    id: row.id as string,
+    action: row.action as string,
+    actorId: row.actorId as string | null,
+    actorType: row.actorType as string,
+    organizationId: row.organizationId as string | null,
+    targetType: row.targetType as string,
+    targetId: row.targetId as string,
+    metadata: row.metadata,
+    occurredAt: row.occurredAt.toISOString(),
+    requestId: (row.requestId as string | null) ?? null,
+    retention: row.retention as string,
+    prevHash: row.prevHash as string,
+  });
+  return { ...row, hash };
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+const baseEntry = {
+  actorId: Option.some("u1"),
+  actorType: "user" as const,
+  organizationId: Option.some("org-1"),
+  action: "user.deleted",
+  targetType: "user",
+  targetId: "u2",
+  metadata: { reason: "test" },
+  retention: "compliance" as const,
+};
+
+const baseFilters = {};
+
+// ── Tests ──────────────────────────────────────────────────────────────────
+describe("DrizzleAuditRepository", () => {
+  beforeEach(() => {
+    insertExecute.mockReset();
+    insertExecute.mockResolvedValue(undefined);
+    selectExecute.mockReset();
+    selectExecute.mockResolvedValue([]);
+  });
+
+  describe("record", () => {
+    it("calls outer startSpan with name 'DrizzleAuditRepository > record'", async () => {
+      const instr = mockInstrumentation();
+      const spy = instr.startSpan;
+      const repo = new DrizzleAuditRepository(instr, mockPort<ILogger>());
+      await repo.record(baseEntry);
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "DrizzleAuditRepository > record" }),
+        expect.any(Function),
+      );
+    });
+
+    it("calls inner startSpan with op: 'db.query'", async () => {
+      const instr = mockInstrumentation();
+      const spy = instr.startSpan;
+      const repo = new DrizzleAuditRepository(instr, mockPort<ILogger>());
+      await repo.record(baseEntry);
+      const innerCall = spy.mock.calls.find((c) => c[0]?.op === "db.query");
+      expect(innerCall).toBeDefined();
+    });
+
+    it("returns Result.ok with id and occurredAt on success", async () => {
+      const repo = new DrizzleAuditRepository(mockInstrumentation(), mockPort<ILogger>());
+      const result = await repo.record(baseEntry);
+      expect(result.isSuccess).toBe(true);
+      const val = result.getValue();
+      expect(typeof val.id).toBe("string");
+      expect(val.id.length).toBeGreaterThan(0);
+      expect(val.occurredAt).toBeInstanceOf(Date);
+      expect(val.action).toBe(baseEntry.action);
+    });
+
+    it("calls instrumentation.capture and returns Result.fail on DB error", async () => {
+      const instr = mockInstrumentation();
+      const captureSpy = instr.capture;
+      let callCount = 0;
+      instr.startSpan.mockImplementation((_opts, work) => {
+        callCount++;
+        if (callCount === 2) throw new Error("db fail");
+        return work();
+      });
+      const repo = new DrizzleAuditRepository(instr, mockPort<ILogger>());
+      const result = await repo.record(baseEntry);
+      expect(result.isFailure).toBe(true);
+      expect(result.getError().code).toBe("AUDIT_PERSISTENCE_PROVIDER_FAILURE");
+      expect(captureSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe("list", () => {
+    it("calls outer startSpan with name 'DrizzleAuditRepository > list'", async () => {
+      const instr = mockInstrumentation();
+      const spy = instr.startSpan;
+      const repo = new DrizzleAuditRepository(instr, mockPort<ILogger>());
+      await repo.list(baseFilters);
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "DrizzleAuditRepository > list" }),
+        expect.any(Function),
+      );
+    });
+
+    it("calls inner startSpan with op: 'db.query'", async () => {
+      const instr = mockInstrumentation();
+      const spy = instr.startSpan;
+      const repo = new DrizzleAuditRepository(instr, mockPort<ILogger>());
+      await repo.list(baseFilters);
+      const innerCall = spy.mock.calls.find((c) => c[0]?.op === "db.query");
+      expect(innerCall).toBeDefined();
+    });
+
+    it("returns Result.ok with empty items and None nextCursor when no rows", async () => {
+      const repo = new DrizzleAuditRepository(mockInstrumentation(), mockPort<ILogger>());
+      const result = await repo.list(baseFilters);
+      expect(result.isSuccess).toBe(true);
+      expect(result.getValue().items).toEqual([]);
+      expect(result.getValue().nextCursor.isNone()).toBe(true);
+    });
+
+    it("paginates: sets nextCursor when rows exceed limit", async () => {
+      // Return limit+1 rows to trigger hasMore
+      const limit = 2;
+      const row = {
+        id: "r1",
+        actorId: "u1",
+        actorType: "user",
+        organizationId: "org-1",
+        action: "x",
+        targetType: "user",
+        targetId: "u2",
+        metadata: {},
+        requestId: null,
+        retention: "compliance",
+        occurredAt: new Date("2024-01-01"),
+        prevHash: null,
+        hash: null,
+      };
+      const rows = [
+        { row: { ...row, id: "r1" }, cursorAt: "2024-01-03 00:00:00.000001" },
+        { row: { ...row, id: "r2" }, cursorAt: "2024-01-02 00:00:00.000001" },
+        { row: { ...row, id: "r3" }, cursorAt: "2024-01-01 00:00:00.000001" }, // this is the extra one
+      ];
+      selectExecute.mockResolvedValueOnce(rows);
+      const repo = new DrizzleAuditRepository(mockInstrumentation(), mockPort<ILogger>());
+      const result = await repo.list({ limit });
+      expect(result.isSuccess).toBe(true);
+      const page = result.getValue();
+      expect(page.items).toHaveLength(2);
+      expect(page.nextCursor.isSome()).toBe(true);
+      expect(page.nextCursor.unwrap()).toBe("2024-01-02 00:00:00.000001~r2");
+    });
+
+    it("calls instrumentation.capture and returns Result.fail on DB error", async () => {
+      const instr = mockInstrumentation();
+      const captureSpy = instr.capture;
+      let callCount = 0;
+      instr.startSpan.mockImplementation((_opts, work) => {
+        callCount++;
+        if (callCount === 2) throw new Error("db fail");
+        return work();
+      });
+      const repo = new DrizzleAuditRepository(instr, mockPort<ILogger>());
+      const result = await repo.list(baseFilters);
+      expect(result.isFailure).toBe(true);
+      expect(result.getError().code).toBe("AUDIT_PERSISTENCE_PROVIDER_FAILURE");
+      expect(captureSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe("verifyChain", () => {
+    it("returns verified: true for a valid two-row chain", async () => {
+      const row1 = chainRow(1, GENESIS_HASH);
+      const row2 = chainRow(2, row1.hash);
+      selectExecute.mockResolvedValueOnce([row1, row2]);
+      const repo = new DrizzleAuditRepository(mockInstrumentation(), mockPort<ILogger>());
+      const result = await repo.verifyChain();
+      expect(result.isSuccess).toBe(true);
+      const v = result.getValue();
+      expect(v.verified).toBe(true);
+      expect(v.rowCount).toBe(2);
+      expect(v.brokenAtId.isNone()).toBe(true);
+    });
+
+    it("returns verified: false when a row's hash is tampered", async () => {
+      const row1 = chainRow(1, GENESIS_HASH);
+      const row2 = chainRow(2, row1.hash);
+      const tampered = { ...row2, targetId: "TAMPERED" };
+      selectExecute.mockResolvedValueOnce([row1, tampered]);
+      const repo = new DrizzleAuditRepository(mockInstrumentation(), mockPort<ILogger>());
+      const result = await repo.verifyChain();
+      expect(result.isSuccess).toBe(true);
+      const v = result.getValue();
+      expect(v.verified).toBe(false);
+      expect(v.brokenAtId.isSome()).toBe(true);
+      expect(v.brokenAtId.unwrap()).toBe(row2.id);
+    });
+  });
+});

@@ -1,3 +1,4 @@
+import { NotificationFanoutSubscriber } from "@modules/notifications/infrastructure/services/notification-fanout-subscriber";
 import type { IInstrumentation } from "@packages/ddd-kit";
 import {
   db,
@@ -8,7 +9,6 @@ import {
   TransactionService,
 } from "@packages/drizzle";
 import type { DeliveredEvent } from "@packages/outbox/outbox.port";
-import { NotificationFanoutSubscriber } from "../src/modules/notifications/infrastructure/services/notification-fanout-subscriber";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 import { checkRecorder, findSeededUserId } from "./check-harness";
 import { requireLocalDatabase } from "./require-local-database";

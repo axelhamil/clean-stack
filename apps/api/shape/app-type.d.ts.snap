@@ -1093,13 +1093,13 @@ declare const routes: import("hono/hono-base").HonoBase<AppEnv, import("hono/typ
                     organizationId: string | null;
                     prevHash: string | null;
                     hash: string | null;
-                    actorType: import("@packages/drizzle").AuditActorType;
+                    actorType: "user" | "system" | "admin";
                     action: string;
                     targetType: string;
                     targetId: string;
                     metadata: import("hono/utils/types").JSONValue;
                     requestId?: string | undefined;
-                    retention: import("@packages/drizzle").AuditRetention;
+                    retention: "operational" | "compliance";
                     id: string;
                     occurredAt: string;
                 }[];

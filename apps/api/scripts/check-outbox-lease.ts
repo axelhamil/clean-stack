@@ -15,6 +15,7 @@ import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-outbox-lease");
 
+import { AuditEventSubscriber } from "@modules/audit-log/infrastructure/services/audit-event-subscriber";
 import { Result, uuidv7 } from "@packages/ddd-kit";
 import {
   and,
@@ -34,7 +35,6 @@ import {
 import { emitEvent } from "@packages/outbox/event-emitter";
 import type { OutboxRecord } from "@packages/outbox/outbox.port";
 import { Client } from "pg";
-import { AuditEventSubscriber } from "../src/modules/audit-log/infrastructure/services/audit-event-subscriber";
 import { buildPurgeFilter } from "../src/shared/internal-routes/sweep-outbox.route";
 import { purgeBatchWithTimeout, requireFilter } from "../src/shared/internal-routes/sweep-purge";
 import { sweepSpans } from "../src/shared/internal-routes/sweep-span";

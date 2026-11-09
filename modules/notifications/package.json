@@ -1,0 +1,41 @@
+{
+  "name": "@modules/notifications",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./notifications.module": "./src/notifications.module.ts",
+    "./application/config/notification-settings": "./src/application/config/notification-settings.ts",
+    "./application/ports/notification.port": "./src/application/ports/notification.port.ts",
+    "./application/ports/notification-digest.port": "./src/application/ports/notification-digest.port.ts",
+    "./infrastructure/services/notification-fanout-subscriber": "./src/infrastructure/services/notification-fanout-subscriber.ts",
+    "./infrastructure/services/notification-stream-hub": "./src/infrastructure/services/notification-stream-hub.ts",
+    "./infrastructure/services/staff-recipients": "./src/infrastructure/services/staff-recipients.ts",
+    "./infrastructure/http/notifications.routes": "./src/infrastructure/http/notifications.routes.ts"
+  },
+  "scripts": {
+    "format": "biome format . --write",
+    "lint": "biome lint .",
+    "check": "biome check .",
+    "fix": "biome check --write .",
+    "type-check": "tsc --noEmit",
+    "test": "bun test --isolate"
+  },
+  "dependencies": {
+    "@packages/access-control": "workspace:*",
+    "@packages/ddd-kit": "workspace:*",
+    "@packages/drizzle": "workspace:*",
+    "@packages/events": "workspace:*",
+    "@packages/http": "workspace:*",
+    "@packages/outbox": "workspace:*",
+    "hono": "^4.13.14",
+    "inwire": "^4.0.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@packages/test": "workspace:*",
+    "@packages/typescript-config": "workspace:*",
+    "@types/bun": "^1.4.4",
+    "typescript": "^7.0.2"
+  }
+}
