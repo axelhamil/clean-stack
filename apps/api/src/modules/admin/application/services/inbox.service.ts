@@ -1,7 +1,7 @@
 import type { StaffPermission } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
-import { isSweepLate } from "@packages/http/sweep-cadence";
 import type { ISweepRunStore, SweepRun, SweepRunStoreError } from "@packages/http/sweep-run.port";
+import { isSweepLate } from "../../../../shared/internal-routes/sweep-cadence";
 import type {
   ApprovalStoreError,
   IApprovalStore,

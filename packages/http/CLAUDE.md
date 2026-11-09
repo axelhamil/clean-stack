@@ -13,7 +13,6 @@ src/
   sweep-runner.ts              `runRetentionSweep`, `runBatchedSweep`, `sweepBodySchema`, `releaseLease`: the batched, time-boxed, single-flight sweep loop
   sweep-heartbeat.ts           `withSweepHeartbeat`, `beatOfSweep`: one `SweepRun` row per run
   sweep-result.ts              `classifySweepResult`: skipped, batch error, truncated or ok
-  sweep-cadence.ts             `isSweepLate`: the late threshold per label
   sweep-run.port.ts            `ISweepRunStore`, `SweepRun`, `SweepOutcome`
   testing/route-guards.ts      `openRouteGuards(requester)`: every gate open, for a module's route tests
 ```

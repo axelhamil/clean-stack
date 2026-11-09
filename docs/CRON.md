@@ -95,7 +95,7 @@ are none, the digest is never an empty email.
 
 ### Late jobs
 
-The back office derives a `late` state from the last heartbeat rather than storing one (`packages/http/src/sweep-cadence.ts`): a daily sweep is late past 26 hours, the notification flush past 15 minutes. A job that never ran has no heartbeat and stays invisible, it shows up only once it reported at least once.
+The back office derives a `late` state from the last heartbeat rather than storing one (`shared/internal-routes/sweep-cadence.ts`): a daily sweep is late past 26 hours, the notification flush past 15 minutes. A job that never ran has no heartbeat and stays invisible, it shows up only once it reported at least once.
 
 ### Single-flight
 
