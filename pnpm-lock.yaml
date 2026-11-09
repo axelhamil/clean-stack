@@ -676,6 +676,9 @@ importers:
       '@packages/outbox':
         specifier: workspace:*
         version: link:../../packages/outbox
+      drizzle-orm:
+        specifier: ^0.45.4
+        version: 0.45.4(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.6)(pg@8.23.1)
       hono:
         specifier: ^4.13.14
         version: 4.13.14
@@ -716,6 +719,9 @@ importers:
       '@packages/http':
         specifier: workspace:*
         version: link:../../packages/http
+      drizzle-orm:
+        specifier: ^0.45.4
+        version: 0.45.4(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.6)(pg@8.23.1)
       hono:
         specifier: ^4.13.14
         version: 4.13.14
@@ -1063,6 +1069,9 @@ importers:
       '@packages/outbox':
         specifier: workspace:*
         version: link:../../packages/outbox
+      drizzle-orm:
+        specifier: ^0.45.4
+        version: 0.45.4(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.6)(pg@8.23.1)
       hono:
         specifier: ^4.13.14
         version: 4.13.14
@@ -1082,9 +1091,6 @@ importers:
       '@types/bun':
         specifier: ^1.4.4
         version: 1.4.4
-      drizzle-orm:
-        specifier: ^0.45.4
-        version: 0.45.4(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.6)(pg@8.23.1)
       typescript:
         specifier: ^7.0.2
         version: 7.0.2

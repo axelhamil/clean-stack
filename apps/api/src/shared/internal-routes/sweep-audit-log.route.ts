@@ -1,6 +1,7 @@
 // `/internal/sweep-audit-log`: gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
-import { and, auditLogSchema, eq, lt } from "@packages/drizzle";
+import * as auditLogSchema from "@modules/audit-log/schemas/audit-log";
+import { and, eq, lt } from "@packages/drizzle";
 import { requireFilter } from "@packages/drizzle/sweep-purge";
 import type { AuditRetention } from "@packages/events";
 import { sweepBodySchema } from "@packages/http/sweep-runner";

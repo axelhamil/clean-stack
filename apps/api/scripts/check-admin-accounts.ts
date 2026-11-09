@@ -6,10 +6,10 @@
  * deletes an organization. Creates and removes its own rows.
  */
 
+import * as billingSchema from "@modules/billing/schemas/billing";
 import { uuidv7 } from "@packages/ddd-kit";
 import {
   authSchema,
-  billingSchema,
   db,
   eq,
   inArray,

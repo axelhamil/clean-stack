@@ -1,3 +1,4 @@
+import * as webhooksSchema from "@modules/webhooks/schemas/webhooks";
 import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import {
   count,
@@ -7,7 +8,6 @@ import {
   eq,
   outboxSchema,
   resolveExecutor,
-  webhooksSchema,
 } from "@packages/drizzle";
 import type {
   DeadOutboxPage,

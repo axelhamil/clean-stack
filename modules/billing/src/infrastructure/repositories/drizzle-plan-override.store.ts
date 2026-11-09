@@ -1,14 +1,6 @@
 import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
-import {
-  and,
-  billingSchema,
-  dbNow,
-  dbOperationFailure,
-  eq,
-  gt,
-  isNull,
-  resolveExecutor,
-} from "@packages/drizzle";
+import { and, dbNow, dbOperationFailure, eq, gt, isNull, resolveExecutor } from "@packages/drizzle";
+import * as billingSchema from "../../../schemas/billing";
 import type {
   ActivePlanOverride,
   IPlanOverrideStore,

@@ -9,15 +9,9 @@ import type {
 } from "@modules/webhooks/application/ports/webhook-delivery.port";
 import { DrizzleWebhookDeliveryRepository } from "@modules/webhooks/infrastructure/repositories/drizzle-webhook-delivery.repository";
 import { WebhookFanoutSubscriber } from "@modules/webhooks/infrastructure/services/webhook-fanout-subscriber";
+import * as webhooksSchema from "@modules/webhooks/schemas/webhooks";
 import { Option, uuidv7 } from "@packages/ddd-kit";
-import {
-  db,
-  eq,
-  multiTenantSchema,
-  outboxSchema,
-  TransactionService,
-  webhooksSchema,
-} from "@packages/drizzle";
+import { db, eq, multiTenantSchema, outboxSchema, TransactionService } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { logger } from "../src/shared/logger";
 import { checkRun, probeClaims, recordingInstrumentation, withClockAhead } from "./check-harness";

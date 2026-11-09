@@ -15,10 +15,10 @@ import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-scim-connection");
 
+import * as billingSchema from "@modules/billing/schemas/billing";
 import {
   and,
   authSchema,
-  billingSchema,
   db,
   eq,
   inArray,

@@ -1,12 +1,6 @@
 import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
-import {
-  and,
-  billingSchema,
-  dbOperationFailure,
-  eq,
-  inArray,
-  resolveExecutor,
-} from "@packages/drizzle";
+import { and, dbOperationFailure, eq, inArray, resolveExecutor } from "@packages/drizzle";
+import * as billingSchema from "../../../schemas/billing";
 import type {
   BillingError,
   ISubscriptionReadStore,

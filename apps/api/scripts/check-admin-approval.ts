@@ -5,12 +5,12 @@
  * the decision, and who the notification reaches. Creates and removes its own probe users.
  */
 
+import * as auditLogSchema from "@modules/audit-log/schemas/audit-log";
 import { staffRecipients } from "@modules/notifications/infrastructure/services/staff-recipients";
 import { APPROVAL_ACTIONS, authorizeStaff } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
 import {
   and,
-  auditLogSchema,
   authSchema,
   db,
   eq,

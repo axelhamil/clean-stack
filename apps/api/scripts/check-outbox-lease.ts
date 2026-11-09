@@ -16,17 +16,9 @@ import { requireLocalDatabase } from "./require-local-database";
 requireLocalDatabase("check-outbox-lease");
 
 import { AuditEventSubscriber } from "@modules/audit-log/infrastructure/services/audit-event-subscriber";
+import * as auditLogSchema from "@modules/audit-log/schemas/audit-log";
 import { Result, uuidv7 } from "@packages/ddd-kit";
-import {
-  and,
-  auditLogSchema,
-  db,
-  eq,
-  like,
-  or,
-  outboxSchema,
-  TransactionService,
-} from "@packages/drizzle";
+import { and, db, eq, like, or, outboxSchema, TransactionService } from "@packages/drizzle";
 import { purgeBatchWithTimeout, requireFilter } from "@packages/drizzle/sweep-purge";
 import { sweepSpans } from "@packages/drizzle/sweep-span";
 import { EventTypes } from "@packages/events";

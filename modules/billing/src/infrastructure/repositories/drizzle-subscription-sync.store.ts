@@ -1,12 +1,6 @@
 import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
-import {
-  authSchema,
-  billingSchema,
-  dbOperationFailure,
-  eq,
-  or,
-  resolveExecutor,
-} from "@packages/drizzle";
+import { authSchema, dbOperationFailure, eq, or, resolveExecutor } from "@packages/drizzle";
+import * as billingSchema from "../../../schemas/billing";
 import type { BillingError } from "../../application/ports/subscription-read.port";
 import type {
   ISubscriptionSyncStore,

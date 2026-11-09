@@ -3,6 +3,7 @@ import * as realDrizzle from "@packages/drizzle";
 import type { DeliveredEvent } from "@packages/outbox/outbox.port";
 import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
+import { auditLog } from "../../schemas/audit-log";
 
 type AuditRow = Record<string, unknown> & { id: string };
 
@@ -30,7 +31,7 @@ const executor = {
         return chain;
       },
       onConflictDoNothing(options: { target?: unknown }) {
-        ignoreConflictOnId = options.target === realDrizzle.auditLogSchema.auditLog.id;
+        ignoreConflictOnId = options.target === auditLog.id;
         return chain;
       },
       toSQL: () => ({ sql: "insert into audit_log" }),
