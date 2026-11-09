@@ -331,6 +331,18 @@ importers:
       '@better-auth/utils':
         specifier: 0.5.1
         version: 0.5.1
+      '@modules/consents':
+        specifier: workspace:*
+        version: link:../../modules/consents
+      '@modules/policies':
+        specifier: workspace:*
+        version: link:../../modules/policies
+      '@modules/profile':
+        specifier: workspace:*
+        version: link:../../modules/profile
+      '@modules/quotas':
+        specifier: workspace:*
+        version: link:../../modules/quotas
       '@noble/ciphers':
         specifier: ^2.4.0
         version: 2.4.0
@@ -367,9 +379,6 @@ importers:
       '@packages/outbox':
         specifier: workspace:*
         version: link:../../packages/outbox
-      '@packages/policies':
-        specifier: workspace:*
-        version: link:../../packages/policies
       '@packages/sentry-scrub':
         specifier: workspace:*
         version: link:../../packages/sentry-scrub
@@ -591,6 +600,160 @@ importers:
       zod:
         specifier: ^4.6.7
         version: 4.6.7
+
+  modules/consents:
+    dependencies:
+      '@packages/cookie-consent':
+        specifier: workspace:*
+        version: link:../../packages/cookie-consent
+      '@packages/ddd-kit':
+        specifier: workspace:*
+        version: link:../../packages/ddd-kit
+      '@packages/drizzle':
+        specifier: workspace:*
+        version: link:../../packages/drizzle
+      '@packages/events':
+        specifier: workspace:*
+        version: link:../../packages/events
+      '@packages/http':
+        specifier: workspace:*
+        version: link:../../packages/http
+      '@packages/outbox':
+        specifier: workspace:*
+        version: link:../../packages/outbox
+      hono:
+        specifier: ^4.13.14
+        version: 4.13.14
+      inwire:
+        specifier: ^4.0.1
+        version: 4.0.1
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@packages/test':
+        specifier: workspace:*
+        version: link:../../packages/test
+      '@packages/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/bun':
+        specifier: ^1.4.4
+        version: 1.4.4
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  modules/policies:
+    dependencies:
+      '@packages/ddd-kit':
+        specifier: workspace:*
+        version: link:../../packages/ddd-kit
+      '@packages/drizzle':
+        specifier: workspace:*
+        version: link:../../packages/drizzle
+      '@packages/events':
+        specifier: workspace:*
+        version: link:../../packages/events
+      '@packages/http':
+        specifier: workspace:*
+        version: link:../../packages/http
+      '@packages/outbox':
+        specifier: workspace:*
+        version: link:../../packages/outbox
+      '@packages/policies':
+        specifier: workspace:*
+        version: link:../../packages/policies
+      hono:
+        specifier: ^4.13.14
+        version: 4.13.14
+      inwire:
+        specifier: ^4.0.1
+        version: 4.0.1
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@packages/test':
+        specifier: workspace:*
+        version: link:../../packages/test
+      '@packages/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/bun':
+        specifier: ^1.4.4
+        version: 1.4.4
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  modules/profile:
+    dependencies:
+      '@packages/ddd-kit':
+        specifier: workspace:*
+        version: link:../../packages/ddd-kit
+      '@packages/drizzle':
+        specifier: workspace:*
+        version: link:../../packages/drizzle
+      '@packages/events':
+        specifier: workspace:*
+        version: link:../../packages/events
+      '@packages/http':
+        specifier: workspace:*
+        version: link:../../packages/http
+      '@packages/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
+      '@packages/outbox':
+        specifier: workspace:*
+        version: link:../../packages/outbox
+      hono:
+        specifier: ^4.13.14
+        version: 4.13.14
+      inwire:
+        specifier: ^4.0.1
+        version: 4.0.1
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@packages/test':
+        specifier: workspace:*
+        version: link:../../packages/test
+      '@packages/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/bun':
+        specifier: ^1.4.4
+        version: 1.4.4
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  modules/quotas:
+    dependencies:
+      '@packages/ddd-kit':
+        specifier: workspace:*
+        version: link:../../packages/ddd-kit
+      '@packages/drizzle':
+        specifier: workspace:*
+        version: link:../../packages/drizzle
+      inwire:
+        specifier: ^4.0.1
+        version: 4.0.1
+    devDependencies:
+      '@packages/test':
+        specifier: workspace:*
+        version: link:../../packages/test
+      '@packages/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/bun':
+        specifier: ^1.4.4
+        version: 1.4.4
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
 
   packages/access-control:
     dependencies:

@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
 interface CodeViews {
@@ -217,4 +217,52 @@ export function createSourceScan(root: string) {
     transactionOpenersPerFile,
     envReadsPerFile,
   };
+}
+
+const HOST_REACH = [
+  /from\s+["'][./]*container["']/,
+  /from\s+["'][./]*auth["']/,
+  /from\s+["'][./]*shared\/env["']/,
+  /from\s+["'][./]*shared\/middleware\//,
+  /declare\s+module\s+["']inwire["']/,
+];
+
+function isRouteFile(file: string): boolean {
+  const name = file.split(sep).at(-1) ?? "";
+
+  return name === "routes.ts" || name.endsWith(".routes.ts");
+}
+
+function existingLayers(root: string, names: string[]): string[] {
+  return names.filter((name) => existsSync(join(root, name)));
+}
+
+export function assertModuleLayering(srcRoot: string): void {
+  const scan = createSourceScan(srcRoot);
+  const files = scan.sourceFiles(".");
+
+  if (files.length === 0) throw new Error(`module layering: no source file under ${srcRoot}`);
+
+  const throwing = existingLayers(srcRoot, ["domain", "application"]).flatMap((layer) =>
+    Object.keys(scan.throwsPerFile(layer)),
+  );
+
+  const guards: Record<string, string[]> = {
+    "domain and application never throw": throwing,
+    "routes never write": Object.keys(scan.writeCallsPerFile(".")).filter(isRouteFile),
+    "no tx parameter": Object.keys(scan.transactionParametersPerFile(".")),
+    "no transaction opened": Object.keys(scan.transactionOpenersPerFile(".")),
+    "no environment read": Object.keys(scan.envReadsPerFile(".")),
+    "no host reach": files.filter((file) =>
+      HOST_REACH.some((pattern) => pattern.test(scan.codeOf(file))),
+    ),
+  };
+
+  const violations = Object.entries(guards).flatMap(([guard, offenders]) =>
+    offenders.map((file) => `${guard}: ${file}`),
+  );
+
+  if (violations.length > 0) {
+    throw new Error(`module layering violated in ${srcRoot}:\n${violations.join("\n")}`);
+  }
 }

@@ -1,0 +1,36 @@
+{
+  "name": "@modules/profile",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./profile.module": "./src/profile.module.ts",
+    "./application/ports/profile.port": "./src/application/ports/profile.port.ts",
+    "./infrastructure/http/profile.routes": "./src/infrastructure/http/profile.routes.ts"
+  },
+  "scripts": {
+    "format": "biome format . --write",
+    "lint": "biome lint .",
+    "check": "biome check .",
+    "fix": "biome check --write .",
+    "type-check": "tsc --noEmit",
+    "test": "bun test --isolate"
+  },
+  "dependencies": {
+    "@packages/ddd-kit": "workspace:*",
+    "@packages/drizzle": "workspace:*",
+    "@packages/events": "workspace:*",
+    "@packages/http": "workspace:*",
+    "@packages/i18n": "workspace:*",
+    "@packages/outbox": "workspace:*",
+    "hono": "^4.13.14",
+    "inwire": "^4.0.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@packages/test": "workspace:*",
+    "@packages/typescript-config": "workspace:*",
+    "@types/bun": "^1.4.4",
+    "typescript": "^7.0.2"
+  }
+}

@@ -8,7 +8,7 @@
 modules/<name>/
   package.json        exports per layer pointing at src/ and schemas/, no build
   tsconfig.json       noEmit
-  bunfig.toml         preload from @packages/test
+  bunfig.toml         preload from @packages/test, only when a test needs one
   schemas/            the tables this module owns
   scripts/            check-*.ts against a real database, about this module only
   src/
@@ -33,7 +33,7 @@ modules/<name>/
 
 ## Boundaries
 
-`pnpm check:boundaries` scans `apps packages modules` with `.dependency-cruiser.cjs`: no cross-module import (tests may reach another module's `schemas/` only, schemas reach only other schemas), only apps import `*.module.ts`, `packages/` never reaches a module or an app, a module never imports an app, the fronts never import a module, `domain/` and `application/` stay free of infrastructure, schemas, database and frameworks, host queries read modules through `schemas/` and `application/ports/` only, no runtime cycle. Each module adds `src/__TESTS__/layering.test.ts` on `@packages/test/source-scan` for what imports cannot express (no env read, no write from `infrastructure/http`, no transaction parameter).
+`pnpm check:boundaries` scans `apps packages modules` with `.dependency-cruiser.cjs`: no cross-module import (tests may reach another module's `schemas/` only, schemas reach only other schemas), only apps import `*.module.ts`, `packages/` never reaches a module or an app, a module never imports an app, the fronts never import a module, `domain/` and `application/` stay free of infrastructure, schemas, database and frameworks, host queries read modules through `schemas/` and `application/ports/` only, no runtime cycle. Each module adds `src/__TESTS__/layering.test.ts` calling `assertModuleLayering` from `@packages/test/source-scan` for what imports cannot express (no throw in domain or application, no write from a routes file, no transaction parameter or opener, no env read, no reach into the host).
 
 ## Moving a module here
 
