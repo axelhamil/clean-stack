@@ -1,6 +1,6 @@
 import type { ConsentCategory } from "@packages/cookie-consent";
+import { user } from "@packages/drizzle/schema/auth";
 import { index, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
-import { user } from "./auth";
 
 export const consentRecord = pgTable(
   "consent_record",

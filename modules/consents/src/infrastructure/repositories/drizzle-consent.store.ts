@@ -1,7 +1,6 @@
 import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import {
   and,
-  consentSchema,
   dbOperationFailure,
   desc,
   eq,
@@ -10,6 +9,7 @@ import {
   resolveExecutor,
   type SQL,
 } from "@packages/drizzle";
+import * as consentSchema from "../../../schemas/consent";
 import type {
   ConsentError,
   ConsentRecordRow,

@@ -1,6 +1,6 @@
+import { user } from "@packages/drizzle/schema/auth";
 import { POLICY_TYPES } from "@packages/policies";
 import { index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
-import { user } from "./auth";
 
 export const policyAcceptance = pgTable(
   "policy_acceptance",

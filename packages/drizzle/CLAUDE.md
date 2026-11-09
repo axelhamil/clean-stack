@@ -1,15 +1,15 @@
 # drizzle rules
 
-The database package: Drizzle client, schema, migrations and the transaction service. Auto-loaded under `packages/drizzle/`. Consumers: `apps/api` (stores, repositories, `auth-queries.ts`). Cross-cutting rules: `/CLAUDE.md`; server usage: `apps/api/CLAUDE.md`.
+The database package: Drizzle client, schema, migrations and the transaction service. Auto-loaded under `packages/drizzle/`. Consumers: `apps/api` (stores, repositories, `auth-queries.ts`) and `modules/*`. Business tables live in their owner's `modules/<name>/schemas/`; this package keeps the kit tables and the one migration history, and drizzle-kit reads both folders. Cross-cutting rules: `/CLAUDE.md`; server usage: `apps/api/CLAUDE.md`.
 
 ## Layout
 
 ```
-drizzle.config.ts              drizzle-kit config (schema "./src/schema/*", out "./migrations")
+drizzle.config.ts              drizzle-kit config (schema "./src/schema/*" plus "../../modules/*/schemas/*.ts", out "./migrations")
 migrations/                    generated SQL, committed
 src/
   config.ts                    `db`, `DbClient`, `Transaction`, `closeDb()` (ends the pool, called by the api shutdown)
-  schema/<topic>.ts            one file per topic (auth, multi-tenant, outbox, audit-log, webhooks, billing, ...), re-exported as `<topic>Schema` from `index.ts`
+  schema/<topic>.ts            one file per topic (auth, multi-tenant, outbox, audit-log, webhooks, billing, ...), re-exported as `<topic>Schema` from `index.ts`; each is also a sub-path export (`@packages/drizzle/schema/<topic>`) for module schemas
   db-failure.ts                `dbOperationFailure(code)`: the error a store returns when a query throws
   advisory-lock.ts             `lockForTransaction`, `tryLockForTransaction` (transaction scoped advisory lock)
   sweep-purge.ts               `purgeBatchWithTimeout`, `withSweepGuards`, `requireFilter`: the batched retention delete under its `SET LOCAL` guards
@@ -22,7 +22,7 @@ src/
 
 ## Rules
 
-1. **The package is the only importer of `drizzle-orm`.** Query helpers (`and`, `eq`, `inArray`, `isNull`, `arrayContains`, `sql`, ...) are re-exported from `index.ts`; a consumer imports them from `@packages/drizzle`. A missing helper is added to the re-export list, never imported from `drizzle-orm` in an app. **Why**: one place to swap or pin the ORM, and the workspace boundary stays checkable.
+1. **The package is the only importer of `drizzle-orm`, besides the table builders of a module's `schemas/`.** Query helpers (`and`, `eq`, `inArray`, `isNull`, `arrayContains`, `sql`, ...) are re-exported from `index.ts`; a consumer imports them from `@packages/drizzle`. A missing helper is added to the re-export list, never imported from `drizzle-orm` in an app. A module schema imports a kit table through its sub-path (`@packages/drizzle/schema/auth`), never the package root. **Why**: one place to swap or pin the ORM, and the workspace boundary stays checkable; when the migration tool loads a schema, the root would load the client (`config.ts`, dotenv, the pool) and the whole barrel with it, while the sub-path loads only the table.
 2. **Typed builder first, raw SQL last.** `select`/`insert`/`update`/`delete` and the helpers cover filters, array operators and row locks (`.for("update", { skipLocked: true })`). A `sql` fragment is acceptable only for DDL, session-scoped tuning (`SET LOCAL ...`) or an operator with no helper (search the exports first), and keeps its columns typed (`${table.col}`). **Why**: the typed builder catches rename and type drift at compile time; raw SQL rots until a runtime exception.
 3. **Every business table owns `organizationId NOT NULL` + FK `organization(id) ON DELETE CASCADE` from its first migration.** **Why**: retrofitting multi-tenancy is the most expensive refactor class, and a missing cascade leaves orphans after an org deletion. The audit log and the outbox are the exception: their `organization_id` is a plain column so the trail outlives the org.
 4. **A schema change ships with its migration**: `db:push` is dev only, anything reaching `main` goes through `db:generate` + `db:migrate`. Touch an existing schema as little as possible.

@@ -181,7 +181,7 @@ What's in `docker-compose.yaml`, what's optional, and how dev maps to prod.
 | **In-network** | `postgres:5432` (used by the api container) |
 | **Volume** | `postgres_data` (persistent across `compose down`: **not** across a Postgres major bump, see below) |
 | **Healthcheck** | `pg_isready` every 5 s: api waits for healthy before starting |
-| **Schema** | [Drizzle ORM](https://orm.drizzle.team): sources in `packages/drizzle/src/schema/` |
+| **Schema** | [Drizzle ORM](https://orm.drizzle.team): kit tables in `packages/drizzle/src/schema/`, business tables in `modules/<name>/schemas/` |
 
 > **Action required if you already had `postgres_data` populated before this branch**: the volume mount moved from `/var/lib/postgresql/data` to `/var/lib/postgresql` (Postgres 18+ images store `PGDATA` in a major-version-specific subdirectory: [docker-library/postgres#1259](https://github.com/docker-library/postgres/pull/1259)). An existing volume won't crash on `docker compose up`: it will **silently reinitialize as an empty database**, since the image finds nothing at the new mount point and just creates a fresh one. Run `docker volume rm clean-stack_postgres_data` once before the first `up` on this branch, then rebuild dev data with `pnpm db:push && pnpm db:seed`.
 

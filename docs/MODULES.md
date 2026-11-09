@@ -20,7 +20,7 @@ Postgres 18 (`docker-compose.yaml`) ships a native `uuidv7()`: time-ordered, so 
 uuid("id").primaryKey().default(sql`uuidv7()`)
 ```
 
-**Every existing table stays `text("id").primaryKey()`**: every PK in `packages/drizzle/src/schema/` is filled by BetterAuth, which generates its own ids on its own schema. Converting those is a BetterAuth question, not a Postgres one, and is deliberately out of scope here.
+**Every existing table stays `text("id").primaryKey()`**: every PK in `packages/drizzle/src/schema/` and `modules/<name>/schemas/` is filled by BetterAuth, which generates its own ids on its own schema. Converting those is a BetterAuth question, not a Postgres one, and is deliberately out of scope here.
 
 ---
 

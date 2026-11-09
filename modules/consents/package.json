@@ -8,7 +8,8 @@
     "./application/ports/consent.port": "./src/application/ports/consent.port.ts",
     "./application/services/consent.service": "./src/application/services/consent.service.ts",
     "./application/config/consent-settings": "./src/application/config/consent-settings.ts",
-    "./infrastructure/http/consents.routes": "./src/infrastructure/http/consents.routes.ts"
+    "./infrastructure/http/consents.routes": "./src/infrastructure/http/consents.routes.ts",
+    "./schemas/*": "./schemas/*.ts"
   },
   "scripts": {
     "format": "biome format . --write",
@@ -25,6 +26,7 @@
     "@packages/events": "workspace:*",
     "@packages/http": "workspace:*",
     "@packages/outbox": "workspace:*",
+    "drizzle-orm": "^0.45.4",
     "hono": "^4.13.14",
     "inwire": "^4.0.1",
     "zod": "^4.6.7"
