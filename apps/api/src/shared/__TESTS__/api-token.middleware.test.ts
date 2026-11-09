@@ -1,4 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
+import type { ApiTokenRecord } from "@modules/api-token/application/ports/api-token.port";
+import { generateToken, hmacToken } from "@modules/api-token/domain/api-token-crypto";
 import {
   type IInstrumentation,
   type ILogger,
@@ -10,8 +12,6 @@ import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { Hono } from "hono";
-import { generateToken, hmacToken } from "../crypto/api-token";
-import type { ApiTokenRecord } from "../ports/api-token.port";
 import { NoOpInstrumentation } from "../services/noop-instrumentation";
 
 const PREFIX = "clean_";

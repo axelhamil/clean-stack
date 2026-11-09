@@ -14,6 +14,7 @@ src/
   outbox-relay.ts              `OutboxRelay`, `OUTBOX_SETTLE_MARGIN_SECONDS`
   outbox-dispatcher.ts         `OutboxDispatcher` (LISTEN wake, `pendingState().dueInMs`, 30 s poll)
   pg-listener.ts               `PgListener` (dedicated LISTEN connection, keepalive, reconnect)
+  payload-parser.ts            `payloadParser(schema)`, the `onEvent` payload parser built from a catalog Zod schema
   jitter.ts, lease-budget.ts, race-with-timeout.ts   retry schedule, lease budget, timeout race shared by every lease worker
   testing/                     test doubles (`enqueuedEvents`, fake listen client), imported by tests only
 ```

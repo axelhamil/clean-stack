@@ -8,7 +8,20 @@ import { passkey } from "@better-auth/passkey";
 import { type SCIMEndpoints, type SCIMPlugin, scim } from "@better-auth/scim";
 import { sso } from "@better-auth/sso";
 import { stripe } from "@better-auth/stripe";
-import { ac, isPersonalOrg, ORG_ROLES, roles } from "@packages/access-control";
+import {
+  authorizeSubscriptionAction,
+  subscriptionEventSource,
+  subscriptionEventType,
+} from "@modules/billing/application/subscription-events";
+import { paymentFailureOf } from "@modules/billing/infrastructure/adapters/stripe-payment-failure";
+import {
+  ac,
+  hasFeature,
+  hasSeatAvailable,
+  isPersonalOrg,
+  ORG_ROLES,
+  roles,
+} from "@packages/access-control";
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
 import { AppErrorException, Option } from "@packages/ddd-kit";
 import { ambientTransaction, db, lockForTransaction } from "@packages/drizzle";
@@ -59,12 +72,6 @@ import {
 } from "./auth-queries";
 import { buildSessionPayload } from "./auth-session-payload";
 import { di } from "./container";
-import {
-  authorizeSubscriptionAction,
-  subscriptionEventSource,
-  subscriptionEventType,
-} from "./modules/billing/application/subscription-events";
-import { paymentFailureOf } from "./modules/billing/infrastructure/adapters/stripe-payment-failure";
 import { redirectQuery } from "./shared/auth/email-redirect";
 import { IMPERSONATION_TTL_SECONDS } from "./shared/auth/impersonation-ttl";
 import { organizationSeatGate } from "./shared/auth/organization-seats";
@@ -83,7 +90,6 @@ import {
 } from "./shared/auth/sso-paths";
 import { TOTP_OPTIONS } from "./shared/auth/totp-options";
 import { asUnitOfWork } from "./shared/auth/unit-of-work-adapter";
-import { hasFeature, hasSeatAvailable } from "./shared/entitlements";
 import { env, FRONT_ORIGINS } from "./shared/env";
 import { logger } from "./shared/logger";
 import {

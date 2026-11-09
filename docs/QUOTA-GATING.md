@@ -1,7 +1,7 @@
 # Quota gating (B.2)
 
 Dormant, complete skeleton extending B.1 billing. Quotas are **config-in-code** in
-`apps/api/src/shared/entitlements.ts` (`ENTITLEMENTS[tier].quotas`): a gate change is
+`packages/access-control/src/entitlements.ts` (`ENTITLEMENTS[tier].quotas`): a gate change is
 a code change + deploy, never a Stripe dashboard toggle.
 
 ## Activate a quota on a resource

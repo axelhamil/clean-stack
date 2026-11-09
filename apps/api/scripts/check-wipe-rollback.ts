@@ -32,6 +32,8 @@ import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-wipe-rollback");
 
+import { generateToken, hmacToken } from "@modules/api-token/domain/api-token-crypto";
+import { DrizzleApiTokenRepository } from "@modules/api-token/infrastructure/repositories/drizzle-api-token.repository";
 import { NoOpStorageService } from "@modules/uploads/infrastructure/services/noop-storage.service";
 import type { IInstrumentation } from "@packages/ddd-kit";
 import {
@@ -53,11 +55,9 @@ import { DrizzleOutboxRepository } from "@packages/outbox/drizzle-outbox.reposit
 import { Hono } from "hono";
 import { staffAccessRules } from "../src/composition/sources/rgpd";
 import { DrizzleStaffStore } from "../src/modules/admin/infrastructure/repositories/drizzle-staff.store";
-import { DrizzleApiTokenRepository } from "../src/modules/api-token/infrastructure/repositories/drizzle-api-token.repository";
 import { RgpdService } from "../src/modules/rgpd/application/services/rgpd.service";
 import { DrizzleRgpdRepository } from "../src/modules/rgpd/infrastructure/repositories/drizzle-rgpd.repository";
 import { authSecretKey } from "../src/shared/auth/auth-secrets";
-import { generateToken, hmacToken } from "../src/shared/crypto/api-token";
 import { env } from "../src/shared/env";
 import { logger } from "../src/shared/logger";
 import { requireApiToken } from "../src/shared/middleware/api-token.middleware";

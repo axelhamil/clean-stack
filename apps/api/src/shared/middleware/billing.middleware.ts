@@ -1,9 +1,3 @@
-import { AppErrorException } from "@packages/ddd-kit";
-import { EventTypes } from "@packages/events";
-import { emitEvent } from "@packages/outbox/event-emitter";
-import type { Context } from "hono";
-import { createMiddleware } from "hono/factory";
-import { di } from "../../container";
 import {
   type EntitlementsView,
   type Feature,
@@ -12,7 +6,13 @@ import {
   meetsPlan,
   type QuotaKey,
   type Tier,
-} from "../entitlements";
+} from "@packages/access-control";
+import { AppErrorException } from "@packages/ddd-kit";
+import { EventTypes } from "@packages/events";
+import { emitEvent } from "@packages/outbox/event-emitter";
+import type { Context } from "hono";
+import { createMiddleware } from "hono/factory";
+import { di } from "../../container";
 import { logger } from "../logger";
 
 function paymentRequired(message: string): never {

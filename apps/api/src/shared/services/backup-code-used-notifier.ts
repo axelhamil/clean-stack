@@ -1,10 +1,10 @@
 import { type EventHandler, type IDomainEvent, onEvent } from "@packages/ddd-kit";
 import type { IEmailService } from "@packages/email/email.port";
 import { EventTypes, PayloadByEventType } from "@packages/events";
+import { payloadParser } from "@packages/outbox/payload-parser";
 import { env } from "../env";
 import { handlerIdempotency } from "../handler-idempotency";
 import { localeForUser } from "../locale-for-user";
-import { payloadParser } from "../payload-parser";
 import type { IProfileStore } from "../ports/profile.port";
 
 interface BackupCodeUsedNotifierDeps {

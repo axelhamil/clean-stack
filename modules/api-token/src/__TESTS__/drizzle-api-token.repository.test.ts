@@ -1,0 +1,300 @@
+import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { type IInstrumentation, Option } from "@packages/ddd-kit";
+import * as realDrizzle from "@packages/drizzle";
+import type { PortMock } from "@packages/test/bun";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
+import type { ApiTokenRecord } from "../application/ports/api-token.port";
+
+// ---------------------------------------------------------------------------
+// DB mock state (mutable per test via beforeEach)
+// ---------------------------------------------------------------------------
+
+let dbBehavior: () => Promise<unknown[]> = async () => [];
+
+function buildQuery(result: () => Promise<unknown[]>) {
+  const q: Record<string, unknown> = {
+    toSQL: () => ({ sql: "SELECT 1", params: [] }),
+    execute: result,
+  };
+  for (const m of [
+    "returning",
+    "set",
+    "where",
+    "values",
+    "from",
+    "limit",
+    "innerJoin",
+    "insert",
+    "update",
+    "delete",
+    "select",
+    "for",
+    "orderBy",
+  ]) {
+    q[m] = () => buildQuery(result);
+  }
+  return q;
+}
+
+function makeDbQuery() {
+  return buildQuery(async () => dbBehavior());
+}
+
+// Declared before the dynamic import below so the repository binds this `db` at
+// module-load time. The replacement stays inside this file's module registry.
+const fakeDb = {
+  select: () => makeDbQuery(),
+  insert: () => makeDbQuery(),
+  update: () => makeDbQuery(),
+  delete: () => makeDbQuery(),
+};
+
+mock.module("@packages/drizzle", () => ({
+  ...realDrizzle,
+  db: fakeDb,
+  resolveExecutor: () => fakeDb,
+}));
+
+const { DrizzleApiTokenRepository } = await import(
+  "../infrastructure/repositories/drizzle-api-token.repository"
+);
+type InstrType = PortMock<IInstrumentation>;
+
+// ---------------------------------------------------------------------------
+// Shared fake rows
+// ---------------------------------------------------------------------------
+
+const fakeRow = {
+  id: "tok-1",
+  userId: "user-1",
+  organizationId: null as string | null,
+  name: "ci",
+  scopes: ["read:profile"],
+  tokenHmac: "hmac-abc",
+  pepperVersion: 1,
+  tokenStart: "clean_abcd",
+  lastUsedAt: null as Date | null,
+  expiresAt: null as Date | null,
+  revokedAt: null as Date | null,
+  revokedReason: null as "user" | "membership_lost" | "leaked" | null,
+  createdAt: new Date("2024-01-01"),
+};
+
+const fakeRecord: ApiTokenRecord = {
+  ...fakeRow,
+  organizationId: Option.none(),
+  lastUsedAt: Option.none(),
+  expiresAt: Option.none(),
+  revokedAt: Option.none(),
+  revokedReason: Option.none(),
+};
+
+// ---------------------------------------------------------------------------
+// Helper: inject DB error via startSpan spy (same pattern as webhook repo tests)
+// ---------------------------------------------------------------------------
+function injectDbError(instr: InstrType, boom: Error) {
+  let callCount = 0;
+  instr.startSpan.mockImplementation((_opts, work) => {
+    callCount++;
+    if (callCount === 2) throw boom;
+    return work();
+  });
+}
+
+describe("DrizzleApiTokenRepository", () => {
+  let instrumentation: InstrType;
+  let repo: InstanceType<typeof DrizzleApiTokenRepository>;
+
+  beforeEach(() => {
+    instrumentation = mockInstrumentation();
+    repo = new DrizzleApiTokenRepository(instrumentation);
+    dbBehavior = async () => [];
+  });
+
+  // -------------------------------------------------------------------------
+  // findByHmac
+  // -------------------------------------------------------------------------
+
+  describe("findByHmac", () => {
+    it("returns Option.none for an unknown hmac", async () => {
+      dbBehavior = async () => [];
+
+      const found = await repo.findByHmac("unknown-hmac");
+
+      expect(found.isSuccess).toBe(true);
+      expect(found.getValue().isNone()).toBe(true);
+    });
+
+    it("returns Option.some when hmac is found", async () => {
+      dbBehavior = async () => [fakeRow];
+
+      const found = await repo.findByHmac("hmac-abc");
+
+      expect(found.isSuccess).toBe(true);
+      expect(found.getValue().isSome()).toBe(true);
+      expect(found.getValue().unwrap().id).toBe("tok-1");
+    });
+
+    it("failure path: DB throws → Result.fail", async () => {
+      const boom = new Error("db boom");
+      injectDbError(instrumentation, boom);
+
+      const found = await repo.findByHmac("hmac-abc");
+
+      expect(found.isFailure).toBe(true);
+      expect(found.getError().code).toBe("API_TOKEN_PROVIDER_FAILURE");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // findByIdForOwner: wrong owner returns Option.none
+  // -------------------------------------------------------------------------
+
+  describe("findByIdForOwner", () => {
+    it("hides a token from a different owner behind Option.none", async () => {
+      // First call (correct owner) returns the row; second call (different owner) returns nothing.
+      // This mirrors the repository WHERE clause: AND userId = ? AND organizationId IS NULL.
+      let call = 0;
+      dbBehavior = async () => {
+        call++;
+        return call === 1 ? [fakeRow] : [];
+      };
+
+      const mine = await repo.findByIdForOwner("tok-1", { kind: "personal", userId: "user-1" });
+      expect(mine.getValue().isSome()).toBe(true);
+
+      const theirs = await repo.findByIdForOwner("tok-1", {
+        kind: "personal",
+        userId: "user-other",
+      });
+      expect(theirs.getValue().isNone()).toBe(true);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // touchLastUsed: bucket write once
+  // -------------------------------------------------------------------------
+
+  describe("touchLastUsed", () => {
+    it("only touches last_used_at once per bucket", async () => {
+      // Simulates stateful DB: first touchLastUsed updates the row (returns 1 id),
+      // then findByHmac returns a row with lastUsedAt set. Second touchLastUsed
+      // finds the WHERE condition no longer satisfied (returns 0 rows). The second
+      // findByHmac returns the same row → timestamps must be equal.
+      const floor = new Date(Date.now() - 15 * 60_000);
+      const lastUsed = new Date();
+      const updatedRow = { ...fakeRow, lastUsedAt: lastUsed };
+
+      let call = 0;
+      dbBehavior = async () => {
+        call++;
+        if (call === 1) return [{ id: fakeRow.id }]; // touchLastUsed → 1 row updated
+        if (call === 2) return [updatedRow]; // findByHmac after first touch
+        if (call === 3) return []; // touchLastUsed → 0 rows (already set)
+        return [updatedRow]; // findByHmac after second touch (unchanged)
+      };
+
+      await repo.touchLastUsed(fakeRow.id, floor);
+      const first = (await repo.findByHmac(fakeRow.tokenHmac)).getValue().unwrap().lastUsedAt;
+      expect(first.isSome()).toBe(true);
+
+      await repo.touchLastUsed(fakeRow.id, floor);
+      const second = (await repo.findByHmac(fakeRow.tokenHmac)).getValue().unwrap().lastUsedAt;
+
+      expect(second.unwrap().getTime()).toBe(first.unwrap().getTime());
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // revokeAllForMembership: limited to the target org
+  // -------------------------------------------------------------------------
+
+  describe("revokeAllForMembership", () => {
+    it("revokes only the tokens of the lost membership", async () => {
+      // The repository WHERE clause scopes the update to userId + organizationId.
+      // First call (revokeAllForMembership for org-a) returns only tok-a's id.
+      // Second call (findByHmac for tok-b) returns tok-b still live (revokedAt null).
+      const fakeRowB = { ...fakeRow, id: "tok-b", organizationId: "org-b", tokenHmac: "hmac-b" };
+
+      let call = 0;
+      dbBehavior = async () => {
+        call++;
+        return call === 1
+          ? [{ id: "tok-a" }] // revokeAllForMembership → only tok-a revoked
+          : [fakeRowB]; // findByHmac(tok-b) → still live
+      };
+
+      const revoked = await repo.revokeAllForMembership("user-1", "org-a");
+      expect(revoked.getValue()).toEqual(["tok-a"]);
+
+      const stillLive = (await repo.findByHmac("hmac-b")).getValue().unwrap();
+      expect(stillLive.revokedAt.isNone()).toBe(true);
+    });
+
+    it("failure path: DB throws → Result.fail", async () => {
+      const boom = new Error("revoke boom");
+      injectDbError(instrumentation, boom);
+
+      const result = await repo.revokeAllForMembership("user-1", "org-a");
+
+      expect(result.isFailure).toBe(true);
+      expect(result.getError().code).toBe("API_TOKEN_PROVIDER_FAILURE");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // insert
+  // -------------------------------------------------------------------------
+
+  describe("insert", () => {
+    it("happy path: returns Result.ok", async () => {
+      dbBehavior = async () => [];
+
+      const result = await repo.insert(fakeRecord);
+
+      expect(result.isSuccess).toBe(true);
+    });
+
+    it("failure path: DB throws → Result.fail", async () => {
+      const boom = new Error("insert boom");
+      injectDbError(instrumentation, boom);
+
+      const result = await repo.insert(fakeRecord);
+
+      expect(result.isFailure).toBe(true);
+      expect(result.getError().code).toBe("API_TOKEN_PROVIDER_FAILURE");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // revoke
+  // -------------------------------------------------------------------------
+
+  describe("revoke", () => {
+    it("reports a write when a live token was revoked", async () => {
+      dbBehavior = async () => [{ id: "tok-1" }];
+
+      const result = await repo.revoke("tok-1", "user");
+
+      expect(result.getValue()).toBe(true);
+    });
+
+    it("reports no write when the token was already revoked", async () => {
+      dbBehavior = async () => [];
+
+      const result = await repo.revoke("tok-1", "user");
+
+      expect(result.getValue()).toBe(false);
+    });
+
+    it("failure path: DB throws → Result.fail", async () => {
+      const boom = new Error("revoke boom");
+      injectDbError(instrumentation, boom);
+
+      const result = await repo.revoke("tok-1", "user");
+
+      expect(result.isFailure).toBe(true);
+      expect(result.getError().code).toBe("API_TOKEN_PROVIDER_FAILURE");
+    });
+  });
+});

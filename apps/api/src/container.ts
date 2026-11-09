@@ -1,4 +1,6 @@
+import { apiTokenModule } from "@modules/api-token/api-token.module";
 import { auditLogModule } from "@modules/audit-log/audit-log.module";
+import { billingModule } from "@modules/billing/billing.module";
 import { consentModule } from "@modules/consents/consents.module";
 import { notificationsModule } from "@modules/notifications/notifications.module";
 import { policyModule } from "@modules/policies/policies.module";
@@ -27,8 +29,6 @@ import { Resend } from "resend";
 import { apiSettings } from "./composition/settings";
 import { rgpdSources } from "./composition/sources/rgpd";
 import { adminModule } from "./modules/admin/module";
-import { apiTokenModule } from "./modules/api-token/module";
-import { billingModule } from "./modules/billing/module";
 import { healthModule } from "./modules/health/module";
 import { rgpdModule } from "./modules/rgpd/module";
 import { webhooksModule } from "./modules/webhooks/module";

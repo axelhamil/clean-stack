@@ -18,10 +18,10 @@ requireLocalDatabase("check-scim-seats");
 
 import { getCurrentAdapter, runWithTransaction } from "@better-auth/core/context";
 import type { SCIMTransactionContext } from "@better-auth/scim";
+import { ENTITLEMENTS } from "@packages/access-control";
 import { authSchema, db, eq, inArray, multiTenantSchema } from "@packages/drizzle";
 import { auth, scimMembershipDeps } from "../src/auth";
 import { scimMembershipProjection } from "../src/shared/auth/scim-membership";
-import { ENTITLEMENTS } from "../src/shared/entitlements";
 
 const CONCURRENT_PROVISIONINGS = 5;
 const RACE_WINDOW_MS = 150;
