@@ -44,7 +44,6 @@ export {
   getRateLimitDbClient,
   type RateLimitDbClient,
 } from "./rate-limit-client";
-export type { AuditActorType, AuditRetention } from "./schema/audit-log";
 
 import * as authSchema from "./schema/auth";
 import * as multiTenantSchema from "./schema/multi-tenant";

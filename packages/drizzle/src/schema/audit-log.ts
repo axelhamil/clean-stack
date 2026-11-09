@@ -1,10 +1,5 @@
+import { AUDIT_ACTOR_TYPES, AUDIT_RETENTIONS } from "@packages/events";
 import { bigserial, index, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
-
-export const AUDIT_ACTOR_TYPES = ["user", "system", "admin"] as const;
-export const AUDIT_RETENTIONS = ["operational", "compliance"] as const;
-
-export type AuditActorType = (typeof AUDIT_ACTOR_TYPES)[number];
-export type AuditRetention = (typeof AUDIT_RETENTIONS)[number];
 
 export const auditLog = pgTable(
   "audit_log",

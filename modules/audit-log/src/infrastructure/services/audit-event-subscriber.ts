@@ -1,5 +1,4 @@
 import type { IInstrumentation, IUnitOfWork } from "@packages/ddd-kit";
-import type { AuditActorType } from "@packages/drizzle";
 import {
   auditLogSchema,
   desc,
@@ -7,6 +6,7 @@ import {
   lockForTransaction,
   resolveExecutor,
 } from "@packages/drizzle";
+import type { AuditActorType } from "@packages/events";
 import { retentionFor } from "@packages/events";
 import { readActorId } from "@packages/outbox/event-actor";
 import type { BuiltInEventHandler } from "@packages/outbox/event-handlers";

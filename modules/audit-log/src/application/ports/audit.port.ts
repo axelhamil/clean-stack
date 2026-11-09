@@ -1,17 +1,18 @@
 import type { AppError, Option, Result } from "@packages/ddd-kit";
+import type { AuditActorType, AuditRetention } from "@packages/events";
 
 export type AuditError = AppError<"AUDIT_PERSISTENCE_PROVIDER_FAILURE">;
 
 export type AuditEntry = {
   actorId: Option<string>;
-  actorType: "user" | "system" | "admin";
+  actorType: AuditActorType;
   organizationId: Option<string>;
   action: string;
   targetType: string;
   targetId: string;
   metadata: unknown;
   requestId?: string;
-  retention: "operational" | "compliance";
+  retention: AuditRetention;
 };
 
 export type AuditRecord = AuditEntry & {

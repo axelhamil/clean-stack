@@ -2,6 +2,12 @@ import { type EventType, EventTypes, isKnownEventType } from "./event-types";
 
 export type RetentionPolicy = "operational" | "compliance" | "none";
 
+export const AUDIT_ACTOR_TYPES = ["user", "system", "admin"] as const;
+export type AuditActorType = (typeof AUDIT_ACTOR_TYPES)[number];
+
+export const AUDIT_RETENTIONS = ["operational", "compliance"] as const;
+export type AuditRetention = (typeof AUDIT_RETENTIONS)[number];
+
 export const RETENTION_MAP: Record<EventType, RetentionPolicy> = {
   [EventTypes.USER_CREATED]: "compliance",
   [EventTypes.USER_SIGNED_IN]: "compliance",

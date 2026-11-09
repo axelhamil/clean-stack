@@ -32,6 +32,7 @@ Framework-free: it imports only Node built-ins, nothing from Drizzle, Hono, Zod 
 | `BaseRepository<T>` | A genuinely global aggregate (audit logs, system config). Rare. |
 | `ScopedRepository<T, TScope>` | An owned aggregate carrying `userId`/`organizationId`; the scope is a `RepoScope` argument, so ownership lives in the repository's `WHERE`, not in a route. |
 | `IInstrumentation`, `ILogger` | Constructor-injected into every I/O class, app or package. |
+| `createDbFailure(code, logger)` | A service or repository `catch` that must log the driver error and return `Result.fail` with its typed code; built once in the constructor from the injected `ILogger`, never per call. |
 
 ## Rules
 
