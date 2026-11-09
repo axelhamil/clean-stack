@@ -2,6 +2,13 @@ import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-webhook-lease");
 
+import type {
+  DeliveryClaimRequest,
+  DeliveryFailure,
+  WebhookDeliveryRecord,
+} from "@modules/webhooks/application/ports/webhook-delivery.port";
+import { DrizzleWebhookDeliveryRepository } from "@modules/webhooks/infrastructure/repositories/drizzle-webhook-delivery.repository";
+import { WebhookFanoutSubscriber } from "@modules/webhooks/infrastructure/services/webhook-fanout-subscriber";
 import { Option, uuidv7 } from "@packages/ddd-kit";
 import {
   db,
@@ -12,13 +19,7 @@ import {
   webhooksSchema,
 } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
-import type {
-  DeliveryClaimRequest,
-  DeliveryFailure,
-  WebhookDeliveryRecord,
-} from "../src/modules/webhooks/application/ports/webhook-delivery.port";
-import { DrizzleWebhookDeliveryRepository } from "../src/modules/webhooks/infrastructure/repositories/drizzle-webhook-delivery.repository";
-import { WebhookFanoutSubscriber } from "../src/modules/webhooks/infrastructure/services/webhook-fanout-subscriber";
+import { logger } from "../src/shared/logger";
 import { checkRun, probeClaims, recordingInstrumentation, withClockAhead } from "./check-harness";
 
 const PROBE = `check-webhook-lease-${crypto.randomUUID()}`;
@@ -26,7 +27,7 @@ const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
 
 const { instrumentation, spans } = recordingInstrumentation();
-const repository = new DrizzleWebhookDeliveryRepository(instrumentation);
+const repository = new DrizzleWebhookDeliveryRepository(instrumentation, logger);
 const wd = webhooksSchema.webhookDelivery;
 const we = webhooksSchema.webhookEndpoint;
 const org = multiTenantSchema.organization;

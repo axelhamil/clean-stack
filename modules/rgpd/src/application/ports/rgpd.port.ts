@@ -1,0 +1,123 @@
+import type { AppError, Option, Result } from "@packages/ddd-kit";
+import type { Locale } from "@packages/i18n";
+import type { EndedImpersonation } from "./staff-store.port";
+
+export type RgpdError = AppError<
+  | "ACCOUNT_DELETION_BLOCKED"
+  | "ACCOUNT_DELETION_LAST_MANAGER_FORBIDDEN"
+  | "ACCOUNT_DELETION_NOT_FOUND"
+  | "ACCOUNT_EXPORT_RATE_LIMITED"
+  | "ACCOUNT_PASSWORD_INVALID"
+  | "ACCOUNT_PASSWORD_REQUIRED"
+  | "ACCOUNT_WIPE_NOTIFY_PROVIDER_FAILURE"
+  | "ACCOUNT_WIPE_PROVIDER_FAILURE"
+  | "ADMIN_STAFF_PROVIDER_FAILURE"
+  | "RGPD_REPOSITORY_PROVIDER_FAILURE"
+  | "TOTP_VERIFIER_PROVIDER_FAILURE"
+  | "TWO_FACTOR_REQUIRED"
+  | "TWO_FACTOR_INVALID"
+>;
+
+export interface SoleOwnedOrgWithMembers {
+  orgId: string;
+  orgName: string;
+  otherMembersCount: number;
+}
+
+// Wire-format DTO serialized to JSON in the user's data export archive (RGPD).
+// `null` is intentional here: this leaves the application boundary as raw JSON,
+// where `null` is the canonical representation of absence: `Option<T>` would
+// serialize to `{ _tag: "None" }` and break consumers reading the export file.
+export interface UserExportPayload {
+  exportedAt: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    emailVerified: boolean;
+    image: string | null;
+    createdAt: string;
+    updatedAt: string;
+    twoFactorEnabled: boolean | null;
+  };
+  sessions: Array<{
+    id: string;
+    createdAt: string;
+    expiresAt: string;
+    ipAddress: string | null;
+    country: string | null;
+    userAgent: string | null;
+  }>;
+  memberships: Array<{
+    organizationId: string;
+    organizationName: string;
+    organizationSlug: string;
+    role: string;
+    joinedAt: string;
+  }>;
+  invitationsSent: Array<{
+    id: string;
+    organizationId: string;
+    email: string;
+    role: string | null;
+    status: string;
+    createdAt: string;
+  }>;
+}
+
+export interface RemovedMembership {
+  memberId: string;
+  organizationId: string;
+}
+
+export interface RevokedApiToken {
+  tokenId: string;
+  organizationId: Option<string>;
+}
+
+export interface ExecuteWipeOutput {
+  deletedOrgIds: string[];
+  anonymizedEmail: string;
+  alreadyWiped: boolean;
+  endedImpersonations: EndedImpersonation[];
+  removedMemberships: RemovedMembership[];
+  revokedTokens: RevokedApiToken[];
+}
+
+export interface PendingDeletionRow {
+  userId: string;
+  email: string;
+  pendingDeletionUntil: Date;
+}
+
+export interface UserDeletionState {
+  email: string;
+  name: string;
+  locale: Option<Locale>;
+  twoFactorEnabled: boolean;
+  pendingDeletionUntil: Option<Date>;
+  deletedAt: Option<Date>;
+  lastExportRequestedAt: Option<Date>;
+}
+
+export interface IRgpdRepository {
+  findSoleOwnedNonPersonalOrgsWithMembers(
+    userId: string,
+  ): Promise<Result<SoleOwnedOrgWithMembers[], RgpdError>>;
+
+  collectUserDataForExport(userId: string): Promise<Result<UserExportPayload, RgpdError>>;
+
+  markPendingDeletion(userId: string, until: Date): Promise<Result<void, RgpdError>>;
+
+  clearPendingDeletion(userId: string): Promise<Result<void, RgpdError>>;
+
+  findUsersReadyForWipe(limit: number): Promise<Result<PendingDeletionRow[], RgpdError>>;
+
+  executeWipe(userId: string): Promise<Result<ExecuteWipeOutput, RgpdError>>;
+
+  verifyPassword(userId: string, password: string): Promise<Result<boolean, RgpdError>>;
+
+  touchExportRequestedAt(userId: string): Promise<Result<void, RgpdError>>;
+
+  getUserDeletionState(userId: string): Promise<Result<Option<UserDeletionState>, RgpdError>>;
+}

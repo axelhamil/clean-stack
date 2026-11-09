@@ -220,6 +220,37 @@ export class DrizzleApiTokenRepository implements IApiTokenRepository {
     );
   }
 
+  async revokeAllOfUser(
+    userId: string,
+  ): Promise<Result<Array<{ tokenId: string; organizationId: Option<string> }>, ApiTokenError>> {
+    const exec = resolveExecutor();
+    return this.instrumentation.startSpan(
+      { name: "DrizzleApiTokenRepository > revokeAllOfUser" },
+      async () => {
+        try {
+          const query = exec
+            .update(t)
+            .set({ revokedAt: new Date(), revokedReason: "user" })
+            .where(and(eq(t.userId, userId), isNull(t.revokedAt)))
+            .returning({ tokenId: t.id, organizationId: t.organizationId });
+          const rows = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+          return Result.ok(
+            rows.map((row) => ({
+              tokenId: row.tokenId,
+              organizationId: Option.fromNullable(row.organizationId),
+            })),
+          );
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail(storeFailure("revokeAllOfUser"));
+        }
+      },
+    );
+  }
+
   async touchLastUsed(id: string, bucketFloor: Date): Promise<Result<boolean, ApiTokenError>> {
     const exec = resolveExecutor();
     return this.instrumentation.startSpan(

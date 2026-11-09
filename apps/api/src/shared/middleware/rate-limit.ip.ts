@@ -1,8 +1,8 @@
 import { BlockList, isIPv4, isIPv6 } from "node:net";
+import { PRIVATE_V4, PRIVATE_V6 } from "@packages/http/private-ranges";
 import type { Context } from "hono";
 import { getConnInfo } from "hono/bun";
 import { env } from "../env";
-import { PRIVATE_V4, PRIVATE_V6 } from "../private-ranges";
 
 /**
  * Strip IPv4 `:port` suffix (a.b.c.d:port) and IPv6 zone-id (%...) so

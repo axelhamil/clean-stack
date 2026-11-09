@@ -108,6 +108,7 @@ function makeRepo(): IApiTokenRepository {
     findByIdForOwner: async () => Result.ok(Option.none()),
     revoke: async () => Result.ok(true),
     revokeAllForMembership: async () => Result.ok([]),
+    revokeAllOfUser: async () => Result.ok([]),
   } as IApiTokenRepository;
 }
 

@@ -6,7 +6,10 @@ import { createConsentRoutes } from "@modules/consents/infrastructure/http/conse
 import { createNotificationsRoutes } from "@modules/notifications/infrastructure/http/notifications.routes";
 import { createPolicyRoutes } from "@modules/policies/infrastructure/http/policies.routes";
 import { createProfileRoutes } from "@modules/profile/infrastructure/http/profile.routes";
+import { createRgpdRoutes } from "@modules/rgpd/infrastructure/http/rgpd.routes";
+import { createRgpdInternalRoutes } from "@modules/rgpd/infrastructure/http/rgpd-internal.routes";
 import { createUploadsRoutes } from "@modules/uploads/infrastructure/http/uploads.routes";
+import { createWebhooksRoutes } from "@modules/webhooks/infrastructure/http/webhooks.routes";
 import type { RouteGuard } from "@packages/http/route-guards";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -28,9 +31,6 @@ import { createAdminWorkspaceRoutes } from "./modules/admin/workspace.routes";
 import { healthInternalRoutes } from "./modules/health/internal.routes";
 import { healthRoutes } from "./modules/health/routes";
 import { organizationSettingsRoutes } from "./modules/organization/routes";
-import { createRgpdInternalRoutes } from "./modules/rgpd/internal.routes";
-import { createRgpdRoutes } from "./modules/rgpd/routes";
-import { createWebhooksRoutes } from "./modules/webhooks/routes";
 import { createPublicApiV1 } from "./public-api";
 import { env, FRONT_ORIGINS } from "./shared/env";
 import { cspReportCors, makeCspReportApp } from "./shared/internal-routes/csp-report.route";
@@ -278,4 +278,4 @@ app.onError(createErrorHandler(di.IInstrumentation));
 
 export { app, routes };
 export type AppType = typeof routes;
-export type { WebhookDeliveryStatus } from "./modules/webhooks/application/ports/webhook-delivery.port";
+export type { WebhookDeliveryStatus } from "@modules/webhooks/application/ports/webhook-delivery.port";

@@ -361,7 +361,7 @@ Three surfaces consume the visibility map simultaneously:
 
 | Consumer | Where | Effect |
 |---|---|---|
-| `WebhookFanoutSubscriber` | `apps/api/src/modules/webhooks/infrastructure/services/webhook-fanout-subscriber.ts` | Only public events are fanned out to customer webhook endpoints. Internal events skip fanout entirely. |
+| `WebhookFanoutSubscriber` | `modules/webhooks/src/infrastructure/services/webhook-fanout-subscriber.ts` | Only public events are fanned out to customer webhook endpoints. Internal events skip fanout entirely. |
 | `EventTypePicker` + `webhookFormSchema` | `apps/app/src/features/webhooks/forms/event-type-picker.tsx` + `webhooks.schema.ts` | The subscription picker shows only `SUBSCRIBABLE_EVENT_TYPES` (public events). The Zod schema rejects any internal event type as a selector. |
 | `/developers/events` catalog | `apps/app/src/features/developers/components/event-types-table.tsx` | Only public events are listed in the public-facing event catalog page. |
 
@@ -612,9 +612,9 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 | `packages/outbox/src/drizzle-outbox.repository.ts` | Outbox repository: enqueue, claim, `pendingState`, `markDelivered`, `markFailed` |
 | `packages/outbox/src/event-handlers.ts` | Subscribes the built-in handlers to every catalog type, then the discovered `onEvent` handlers |
 | `modules/audit-log/src/infrastructure/services/audit-event-subscriber.ts` | Built-in `audit-log` handler |
-| `apps/api/src/modules/webhooks/infrastructure/services/webhook-fanout-subscriber.ts` | Built-in `webhook-fanout` handler (org-scoped) |
-| `apps/api/src/modules/webhooks/infrastructure/services/webhook-delivery-worker.service.ts` | HMAC POST + claim window + retry |
-| `apps/api/src/shared/aead.ts` | AEAD encrypt/decrypt for webhook secrets |
+| `modules/webhooks/src/infrastructure/services/webhook-fanout-subscriber.ts` | Built-in `webhook-fanout` handler (org-scoped) |
+| `modules/webhooks/src/infrastructure/services/webhook-delivery-worker.service.ts` | HMAC POST + claim window + retry |
+| `modules/webhooks/src/infrastructure/crypto/aead.ts` | AEAD encrypt/decrypt for webhook secrets |
 | `packages/outbox/src/jitter.ts` | Decorrelated jitter math |
 | `packages/outbox/src/event-emitter.ts` | `emitEvent()` shared helper (used by RGPD, uploads, BetterAuth bridge) |
 | `apps/api/src/auth.ts` | BetterAuth bridge (23 events: 15 user + 8 org) |

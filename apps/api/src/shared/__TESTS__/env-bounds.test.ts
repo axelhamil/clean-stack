@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import {
+  WEBHOOK_DNS_TIMEOUT_SECONDS,
+  WEBHOOK_FETCH_TIMEOUT_SECONDS,
+  WEBHOOK_SETTLE_MARGIN_SECONDS,
+} from "@modules/webhooks/application/config/webhook-settings";
+import {
   EMAIL_SEND_TIMEOUT_SECONDS,
   EMAIL_SETTLE_MARGIN_SECONDS,
 } from "@packages/email/email-timing";
@@ -10,9 +15,6 @@ import {
   validateApprovalEnv,
   validateEnvBounds,
   validateHostsEnv,
-  WEBHOOK_DNS_TIMEOUT_SECONDS,
-  WEBHOOK_FETCH_TIMEOUT_SECONDS,
-  WEBHOOK_SETTLE_MARGIN_SECONDS,
 } from "../env-bounds";
 
 // Exercises the real guard (`superRefine` in env.ts) against plain literals. Never

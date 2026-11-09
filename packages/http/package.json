@@ -8,6 +8,7 @@
     "./error-handler": "./src/error-handler.ts",
     "./time-id-cursor": "./src/time-id-cursor.ts",
     "./route-guards": "./src/route-guards.ts",
+    "./private-ranges": "./src/private-ranges.ts",
     "./sweep-heartbeat": "./src/sweep-heartbeat.ts",
     "./sweep-result": "./src/sweep-result.ts",
     "./sweep-run.port": "./src/sweep-run.port.ts",

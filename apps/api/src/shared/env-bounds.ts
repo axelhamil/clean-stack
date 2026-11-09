@@ -1,5 +1,10 @@
 import { isIP } from "node:net";
 import {
+  WEBHOOK_DNS_TIMEOUT_SECONDS,
+  WEBHOOK_FETCH_TIMEOUT_SECONDS,
+  WEBHOOK_SETTLE_MARGIN_SECONDS,
+} from "@modules/webhooks/application/config/webhook-settings";
+import {
   EMAIL_SEND_TIMEOUT_SECONDS,
   EMAIL_SETTLE_MARGIN_SECONDS,
 } from "@packages/email/email-timing";
@@ -15,9 +20,6 @@ import {
 } from "./shutdown";
 
 const EMAIL_IDEMPOTENCY_KEY_TTL_HOURS = 24;
-export const WEBHOOK_DNS_TIMEOUT_SECONDS = 5;
-export const WEBHOOK_FETCH_TIMEOUT_SECONDS = 30;
-export const WEBHOOK_SETTLE_MARGIN_SECONDS = 30;
 
 /**
  * The sweep-timeout bounds only work nested: the sweep must be able to finish and

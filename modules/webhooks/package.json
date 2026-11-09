@@ -1,0 +1,45 @@
+{
+  "name": "@modules/webhooks",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./webhooks.module": "./src/webhooks.module.ts",
+    "./application/config/webhook-settings": "./src/application/config/webhook-settings.ts",
+    "./application/ports/webhook-delivery.port": "./src/application/ports/webhook-delivery.port.ts",
+    "./application/ports/webhook-endpoint.port": "./src/application/ports/webhook-endpoint.port.ts",
+    "./application/ports/url-guard.port": "./src/application/ports/url-guard.port.ts",
+    "./application/services/webhooks.service": "./src/application/services/webhooks.service.ts",
+    "./infrastructure/repositories/drizzle-webhook-delivery.repository": "./src/infrastructure/repositories/drizzle-webhook-delivery.repository.ts",
+    "./infrastructure/services/webhook-delivery-worker.service": "./src/infrastructure/services/webhook-delivery-worker.service.ts",
+    "./infrastructure/services/webhook-fanout-subscriber": "./src/infrastructure/services/webhook-fanout-subscriber.ts",
+    "./infrastructure/http/webhooks.routes": "./src/infrastructure/http/webhooks.routes.ts"
+  },
+  "scripts": {
+    "format": "biome format . --write",
+    "lint": "biome lint .",
+    "check": "biome check .",
+    "fix": "biome check --write .",
+    "type-check": "tsc --noEmit",
+    "test": "bun test --isolate"
+  },
+  "dependencies": {
+    "@noble/ciphers": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@packages/ddd-kit": "workspace:*",
+    "@packages/drizzle": "workspace:*",
+    "@packages/events": "workspace:*",
+    "@packages/http": "workspace:*",
+    "@packages/outbox": "workspace:*",
+    "hono": "^4.13.14",
+    "inwire": "^4.0.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@packages/test": "workspace:*",
+    "@packages/typescript-config": "workspace:*",
+    "@types/bun": "^1.4.4",
+    "drizzle-orm": "^0.45.4",
+    "typescript": "^7.0.2"
+  }
+}

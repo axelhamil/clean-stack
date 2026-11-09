@@ -60,7 +60,7 @@ The RGPD module was used as the first leaf to validate the contract end-to-end. 
 
 | Axis | Touch-points |
 |---|---|
-| 1. Back code | `apps/api/src/modules/rgpd/` (10 files: application/dto, application/ports, application/services, infrastructure/repositories, routes, internal.routes, module, tests). `container.ts:6,72`. `index.ts:12-13,55,62`. |
+| 1. Back code | `modules/rgpd/` (`@modules/rgpd`: application/dto, application/ports, application/services, infrastructure/repositories, infrastructure/http, `rgpd.module.ts`, tests) and its host bindings in `apps/api/src/composition/sources/rgpd.ts`. `container.ts:6,72`. `index.ts:12-13,55,62`. |
 | 2. Events | 5 events in `packages/events`: `USER_DELETION_{REQUESTED,CANCELLED}`, `USER_DELETED`, `USER_EXPORT_{REQUESTED,COMPLETED}`. 5 payloads, 5 `RETENTION_MAP` entries. |
 | 3. Ports | `packages/email/src/email.port.ts`: 3 template keys (`data_export_ready`, `delete_requested`, `delete_cancelled`, `delete_completed`: 4 keys, one is unused even without rgpd, kept for parity). `packages/email/src/email-delivery-worker.ts`: matching `TEMPLATE_IDS`. |
 | 4. Env vars | `RGPD_GRACE_PERIOD_DAYS`, `RGPD_EXPORT_RATE_LIMIT_HOURS`, `RGPD_SWEEP_BATCH_SIZE` in `shared/env.ts` + `.env.example`. |
@@ -137,7 +137,7 @@ Reference cartography for removing the Personal Access Tokens module. Walk the 6
 | 6. **Access-control + front + docs** | `packages/access-control/src/index.ts`: remove `apiToken: ["create", "read", "revoke"]` from `statement` and all role definitions. `packages/emails/src/components/api-token-leaked.tsx`: delete. `packages/emails/src/render.tsx` + `src/templates.ts`: remove `api-token-leaked` entries. `apps/app/src/features/api-tokens/`: delete entirely (6 files). `apps/app/routes.ts`: remove the `route("/api-tokens", ...)` entry. `apps/app/src/shared/components/contextual-tabs.tsx`: remove "Tokens" tab entry. Docs: `FEATURES.md` (api-token section), `MODULES.md` (api-token row in shipped table), `REMOVABILITY.md` (this section), `OVERVIEW.md` (PAT paragraph), `EVENT_PIPELINE.md` (visibility-map section), `INTEGRATIONS.md` (GitHub Secret Scanning section), `README.md` (M4 note), `ROADMAP.md` (C.4 spec). |
 
 **What you do NOT touch**:
-- `modules/webhooks/infrastructure/services/webhook-fanout-subscriber.ts`: the `isPublicEvent` guard (from `visibility-map.ts`) is called here. Once `visibility-map.ts` is gone you must inline the equivalent filtering or remove the feature guard entirely, decide before committing.
+- `modules/webhooks/src/infrastructure/services/webhook-fanout-subscriber.ts`: the `isPublicEvent` guard (from `visibility-map.ts`) is called here. Once `visibility-map.ts` is gone you must inline the equivalent filtering or remove the feature guard entirely, decide before committing.
 - `apps/app/src/features/developers/` (`/developers/events` catalog): it reads `VISIBILITY` from `packages/events`. Once removed, the catalog page shows all events again (no longer filtered); this is a UI regression, not a crash. Either remove the page or drop the filter guard.
 
 ---

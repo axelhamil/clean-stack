@@ -11,6 +11,8 @@ import {
   type TokenOwner,
 } from "../ports/api-token.port";
 
+type RevokedToken = { tokenId: string; organizationId: Option<string> };
+
 export type CreateTokenServiceInput = {
   userId: string;
   actorUserId: string;
@@ -165,6 +167,12 @@ export class ApiTokenService {
         });
       }
     });
+  }
+
+  async revokeAllOfUser(userId: string): Promise<Result<RevokedToken[], ApiTokenError>> {
+    return this.instrumentation.startSpan({ name: "ApiTokenService > revokeAllOfUser" }, async () =>
+      this.repo.revokeAllOfUser(userId),
+    );
   }
 
   async list(owner: TokenOwner): Promise<Result<ApiTokenRecord[], ApiTokenError>> {
