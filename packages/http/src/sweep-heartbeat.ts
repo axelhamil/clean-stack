@@ -1,7 +1,7 @@
+import type { SweepSpans } from "@packages/drizzle/sweep-span";
 import { classifySweepResult } from "./sweep-result";
 import type { ISweepRunStore, SweepOutcome } from "./sweep-run.port";
 import type { SweepResponse } from "./sweep-runner";
-import type { SweepSpans } from "./sweep-span";
 
 export type SweepBeat = { outcome: SweepOutcome; count: number };
 

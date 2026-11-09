@@ -1,6 +1,6 @@
 import { mock } from "bun:test";
 
-const realDrizzle = await import("@packages/drizzle");
+const realExecutor = await import("../services/transaction-manager.service");
 
 const executed: string[] = [];
 
@@ -20,8 +20,8 @@ function fakeQuery(sql: string, rows: Array<{ id: string }>) {
   };
 }
 
-mock.module("@packages/drizzle", () => ({
-  ...realDrizzle,
+mock.module("../services/transaction-manager.service", () => ({
+  ...realExecutor,
   resolveExecutor: () => ({
     execute: async () => {},
     select: () => fakeQuery("select id", []),
@@ -34,7 +34,7 @@ const { mockUnitOfWork } = await import("@packages/test/bun/unit-of-work");
 const { mockInstrumentation } = await import("@packages/test/bun/instrumentation");
 const { sweepSpans } = await import("../sweep-span");
 const { purgeBatchWithTimeout, requireFilter } = await import("../sweep-purge");
-const { isNotNull } = await import("@packages/drizzle");
+const { isNotNull } = await import("drizzle-orm");
 
 // A present predicate, mirroring what every route passes: `where: undefined` would be
 // refused by the guard `purgeBatchWithTimeout` fails closed on.

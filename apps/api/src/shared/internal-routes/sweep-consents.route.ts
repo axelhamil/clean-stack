@@ -2,7 +2,7 @@
 // Purges ONLY guest (userId IS NULL) expired consent records. Authed records are compliance evidence, never purged.
 
 import { and, consentSchema, isNull, lt } from "@packages/drizzle";
-import { requireFilter } from "@packages/http/sweep-purge";
+import { requireFilter } from "@packages/drizzle/sweep-purge";
 import { sweepBodySchema } from "@packages/http/sweep-runner";
 import { zV } from "@packages/http/validator";
 import { Hono } from "hono";

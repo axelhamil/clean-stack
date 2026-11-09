@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
+import { sweepSpans } from "@packages/drizzle/sweep-span";
 import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { MAX_BATCHES, releaseLease, runRetentionSweep } from "../sweep-runner";
-import { sweepSpans } from "../sweep-span";
 
 const logger = { info: () => {}, warn: () => {}, error: () => {} } as never;
 

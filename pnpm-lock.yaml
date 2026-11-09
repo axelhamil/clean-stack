@@ -1052,9 +1052,15 @@ importers:
         specifier: ^8.23.1
         version: 8.23.1
     devDependencies:
+      '@packages/test':
+        specifier: workspace:*
+        version: link:../test
       '@packages/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@types/bun':
+        specifier: ^1.4.4
+        version: 1.4.4
       '@types/node':
         specifier: ^26.6.5
         version: 26.6.5

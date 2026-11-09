@@ -27,7 +27,7 @@ mock.module("@packages/drizzle", () => ({
 
 const { describe, expect, it, spyOn } = await import("bun:test");
 const { NoOpInstrumentation } = await import("../../services/noop-instrumentation");
-const { sweepSpans } = await import("@packages/http/sweep-span");
+const { sweepSpans } = await import("@packages/drizzle/sweep-span");
 const { sweepLockFor } = await import("../sweep-lock");
 
 describe("sweepLockFor", () => {

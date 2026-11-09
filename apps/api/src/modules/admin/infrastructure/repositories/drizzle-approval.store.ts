@@ -17,9 +17,9 @@ import {
   sql,
   staffSchema,
 } from "@packages/drizzle";
-import { countEligibleWithTimeout } from "@packages/http/sweep-count";
-import { lockedBatch, requireFilter, withSweepGuards } from "@packages/http/sweep-purge";
-import { sweepSpans } from "@packages/http/sweep-span";
+import { countEligibleWithTimeout } from "@packages/drizzle/sweep-count";
+import { lockedBatch, requireFilter, withSweepGuards } from "@packages/drizzle/sweep-purge";
+import { sweepSpans } from "@packages/drizzle/sweep-span";
 import { afterTimeIdCursor } from "@packages/http/time-id-cursor";
 import { createDbFailure } from "../../../../shared/db-failure";
 import type { ListApprovalsInput } from "../../application/dto/list-approvals.dto";

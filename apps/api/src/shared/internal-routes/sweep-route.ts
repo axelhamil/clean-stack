@@ -1,7 +1,8 @@
 import type { AnyPgColumn, AnyPgTable, SQL } from "@packages/drizzle";
-import { countEligibleWithTimeout } from "@packages/http/sweep-count";
+import { countEligibleWithTimeout } from "@packages/drizzle/sweep-count";
+import { purgeBatchWithTimeout } from "@packages/drizzle/sweep-purge";
+import { type SweepSpans, sweepSpans } from "@packages/drizzle/sweep-span";
 import { beatOfSweep, withSweepHeartbeat } from "@packages/http/sweep-heartbeat";
-import { purgeBatchWithTimeout } from "@packages/http/sweep-purge";
 import {
   type RetentionPass,
   runRetentionSweep,
@@ -9,7 +10,6 @@ import {
   type SweepBody,
   type SweepResponse,
 } from "@packages/http/sweep-runner";
-import { type SweepSpans, sweepSpans } from "@packages/http/sweep-span";
 import type { PinoLogger } from "hono-pino";
 import { di } from "../../container";
 import { env } from "../env";

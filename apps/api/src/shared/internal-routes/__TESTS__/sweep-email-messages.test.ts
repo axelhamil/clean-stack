@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { sweepSpans } from "@packages/http/sweep-span";
+import { sweepSpans } from "@packages/drizzle/sweep-span";
 import { NoOpInstrumentation } from "../../services/noop-instrumentation";
 import { buildEmailSweepPasses } from "../sweep-email-messages.route";
 

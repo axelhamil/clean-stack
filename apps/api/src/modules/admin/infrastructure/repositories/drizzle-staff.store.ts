@@ -19,9 +19,9 @@ import {
   resolveExecutor,
   staffSchema,
 } from "@packages/drizzle";
-import { countEligibleWithTimeout } from "@packages/http/sweep-count";
-import { lockedBatch, requireFilter, withSweepGuards } from "@packages/http/sweep-purge";
-import { sweepSpans } from "@packages/http/sweep-span";
+import { countEligibleWithTimeout } from "@packages/drizzle/sweep-count";
+import { lockedBatch, requireFilter, withSweepGuards } from "@packages/drizzle/sweep-purge";
+import { sweepSpans } from "@packages/drizzle/sweep-span";
 import {
   ENDED_SESSION_COLUMNS,
   endedImpersonationsOf,

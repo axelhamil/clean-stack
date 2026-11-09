@@ -1,11 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import { Result } from "@packages/ddd-kit";
+import { sweepSpans } from "@packages/drizzle/sweep-span";
 import { mockPort } from "@packages/test/bun";
 import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { beatOfSweep, withSweepHeartbeat } from "../sweep-heartbeat";
 import type { ISweepRunStore, SweepRun } from "../sweep-run.port";
 import type { SweepResponse } from "../sweep-runner";
-import { sweepSpans } from "../sweep-span";
 
 const COMPLETED: SweepResponse = {
   deleted: 7,

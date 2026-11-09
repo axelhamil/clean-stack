@@ -1,6 +1,6 @@
 import type { ILogger } from "@packages/ddd-kit";
+import type { SweepSpans } from "@packages/drizzle/sweep-span";
 import { z } from "zod";
-import type { SweepSpans } from "./sweep-span";
 
 export const MAX_BATCHES = 1000;
 export const INTER_BATCH_SLEEP_MS = 50;

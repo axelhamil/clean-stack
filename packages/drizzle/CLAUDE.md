@@ -12,6 +12,9 @@ src/
   schema/<topic>.ts            one file per topic (auth, multi-tenant, outbox, audit-log, webhooks, billing, ...), re-exported as `<topic>Schema` from `index.ts`
   db-failure.ts                `dbOperationFailure(code)`: the error a store returns when a query throws
   advisory-lock.ts             `lockForTransaction`, `tryLockForTransaction` (transaction scoped advisory lock)
+  sweep-purge.ts               `purgeBatchWithTimeout`, `withSweepGuards`, `requireFilter`: the batched retention delete under its `SET LOCAL` guards
+  sweep-count.ts               `countEligibleWithTimeout`: the bounded dry-run count of a sweep
+  sweep-span.ts                `sweepSpans(instrumentation)`: the per-request span facade of a sweep, with its batch budget
   services/                    `TransactionService` (the `IUnitOfWork` impl)
   seeds/                       dev seeds
   rate-limit-client.ts         dedicated pool for the rate-limiter store, `closeRateLimitDb()`

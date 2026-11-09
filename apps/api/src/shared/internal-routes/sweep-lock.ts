@@ -1,7 +1,7 @@
 import { uuidv7 } from "@packages/ddd-kit";
 import { and, eq, resolveExecutor, sql, sweepSchema } from "@packages/drizzle";
+import type { SweepSpans } from "@packages/drizzle/sweep-span";
 import type { SweepLock } from "@packages/http/sweep-runner";
-import type { SweepSpans } from "@packages/http/sweep-span";
 import { env } from "../env";
 
 /**

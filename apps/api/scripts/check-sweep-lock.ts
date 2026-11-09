@@ -12,8 +12,8 @@
 // sweep-lock.ts (see docs/FEATURES.md and docs/REMOVABILITY.md).
 
 import { db, eq, resolveExecutor, sql, sweepSchema } from "@packages/drizzle";
-import { purgeBatchWithTimeout } from "@packages/http/sweep-purge";
-import { sweepSpans } from "@packages/http/sweep-span";
+import { purgeBatchWithTimeout } from "@packages/drizzle/sweep-purge";
+import { sweepSpans } from "@packages/drizzle/sweep-span";
 import type { Hono } from "hono";
 import { di } from "../src/container";
 import { env } from "../src/shared/env";

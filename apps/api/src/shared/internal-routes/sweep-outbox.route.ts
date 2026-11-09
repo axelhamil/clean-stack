@@ -2,7 +2,7 @@
 
 import type { SQL } from "@packages/drizzle";
 import { and, isNotNull, lt, outboxSchema } from "@packages/drizzle";
-import { requireFilter } from "@packages/http/sweep-purge";
+import { requireFilter } from "@packages/drizzle/sweep-purge";
 import { sweepBodySchema } from "@packages/http/sweep-runner";
 import { zV } from "@packages/http/validator";
 import { Hono } from "hono";

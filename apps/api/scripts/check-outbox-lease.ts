@@ -27,9 +27,9 @@ import {
   outboxSchema,
   TransactionService,
 } from "@packages/drizzle";
+import { purgeBatchWithTimeout, requireFilter } from "@packages/drizzle/sweep-purge";
+import { sweepSpans } from "@packages/drizzle/sweep-span";
 import { EventTypes } from "@packages/events";
-import { purgeBatchWithTimeout, requireFilter } from "@packages/http/sweep-purge";
-import { sweepSpans } from "@packages/http/sweep-span";
 import {
   DrizzleOutboxRepository,
   OUTBOX_CHANNEL,
