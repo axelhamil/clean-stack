@@ -1,0 +1,47 @@
+{
+  "name": "@modules/rgpd",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./rgpd.module": "./src/rgpd.module.ts",
+    "./application/config/rgpd-settings": "./src/application/config/rgpd-settings.ts",
+    "./application/ports/api-token-revoker.port": "./src/application/ports/api-token-revoker.port.ts",
+    "./application/ports/ended-sessions.port": "./src/application/ports/ended-sessions.port.ts",
+    "./application/ports/rgpd.port": "./src/application/ports/rgpd.port.ts",
+    "./application/ports/staff-access-rules.port": "./src/application/ports/staff-access-rules.port.ts",
+    "./application/ports/staff-data-eraser.port": "./src/application/ports/staff-data-eraser.port.ts",
+    "./application/services/rgpd.service": "./src/application/services/rgpd.service.ts",
+    "./infrastructure/repositories/drizzle-rgpd.repository": "./src/infrastructure/repositories/drizzle-rgpd.repository.ts",
+    "./infrastructure/http/rgpd.routes": "./src/infrastructure/http/rgpd.routes.ts",
+    "./infrastructure/http/rgpd-internal.routes": "./src/infrastructure/http/rgpd-internal.routes.ts"
+  },
+  "scripts": {
+    "format": "biome format . --write",
+    "lint": "biome lint .",
+    "check": "biome check .",
+    "fix": "biome check --write .",
+    "type-check": "tsc --noEmit",
+    "test": "bun test --isolate"
+  },
+  "dependencies": {
+    "@packages/access-control": "workspace:*",
+    "@packages/ddd-kit": "workspace:*",
+    "@packages/drizzle": "workspace:*",
+    "@packages/email": "workspace:*",
+    "@packages/events": "workspace:*",
+    "@packages/http": "workspace:*",
+    "@packages/i18n": "workspace:*",
+    "@packages/outbox": "workspace:*",
+    "better-auth": "1.7.14",
+    "hono": "^4.13.14",
+    "inwire": "^4.0.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@packages/test": "workspace:*",
+    "@packages/typescript-config": "workspace:*",
+    "@types/bun": "^1.4.4",
+    "typescript": "^7.0.2"
+  }
+}

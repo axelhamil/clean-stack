@@ -41,7 +41,7 @@ if (env.NODE_ENV === "production" && !env.TRUSTED_PROXIES) {
   );
 }
 
-export type { WebhookDeliveryStatus } from "./modules/webhooks/application/ports/webhook-delivery.port";
+export type { WebhookDeliveryStatus } from "@modules/webhooks/application/ports/webhook-delivery.port";
 
 const serveOptions = {
   ...buildServerOptions({ port: env.PORT, idleTimeoutSeconds: env.SERVER_IDLE_TIMEOUT_SECONDS }),

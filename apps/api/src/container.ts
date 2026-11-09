@@ -6,7 +6,9 @@ import { notificationsModule } from "@modules/notifications/notifications.module
 import { policyModule } from "@modules/policies/policies.module";
 import { profileModule } from "@modules/profile/profile.module";
 import { quotaModule } from "@modules/quotas/quotas.module";
+import { rgpdModule } from "@modules/rgpd/rgpd.module";
 import { uploadsModule } from "@modules/uploads/uploads.module";
+import { webhooksModule } from "@modules/webhooks/webhooks.module";
 import type { EventHandler, IInstrumentation, ILogger, IUnitOfWork } from "@packages/ddd-kit";
 import { getRateLimitDbClient, TransactionService } from "@packages/drizzle";
 import { DrizzleEmailQueue } from "@packages/email/drizzle-email-queue";
@@ -31,8 +33,6 @@ import { apiSettings } from "./composition/settings";
 import { rgpdSources } from "./composition/sources/rgpd";
 import { adminModule } from "./modules/admin/module";
 import { healthModule } from "./modules/health/module";
-import { rgpdModule } from "./modules/rgpd/module";
-import { webhooksModule } from "./modules/webhooks/module";
 import { authSecretKey } from "./shared/auth/auth-secrets";
 import type { OutermostUnitOfWork } from "./shared/auth/unit-of-work-adapter";
 import { env } from "./shared/env";

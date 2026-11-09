@@ -34,6 +34,8 @@ requireLocalDatabase("check-wipe-rollback");
 
 import { generateToken, hmacToken } from "@modules/api-token/domain/api-token-crypto";
 import { DrizzleApiTokenRepository } from "@modules/api-token/infrastructure/repositories/drizzle-api-token.repository";
+import { RgpdService } from "@modules/rgpd/application/services/rgpd.service";
+import { DrizzleRgpdRepository } from "@modules/rgpd/infrastructure/repositories/drizzle-rgpd.repository";
 import { NoOpStorageService } from "@modules/uploads/infrastructure/services/noop-storage.service";
 import type { IInstrumentation } from "@packages/ddd-kit";
 import {
@@ -55,9 +57,9 @@ import { DrizzleOutboxRepository } from "@packages/outbox/drizzle-outbox.reposit
 import { Hono } from "hono";
 import { staffAccessRules } from "../src/composition/sources/rgpd";
 import { DrizzleStaffStore } from "../src/modules/admin/infrastructure/repositories/drizzle-staff.store";
-import { RgpdService } from "../src/modules/rgpd/application/services/rgpd.service";
-import { DrizzleRgpdRepository } from "../src/modules/rgpd/infrastructure/repositories/drizzle-rgpd.repository";
+import { DrizzleStaffDataEraser } from "../src/modules/admin/infrastructure/repositories/drizzle-staff-data-eraser";
 import { authSecretKey } from "../src/shared/auth/auth-secrets";
+import { endedImpersonationsOf } from "../src/shared/db/ended-sessions";
 import { env } from "../src/shared/env";
 import { logger } from "../src/shared/logger";
 import { requireApiToken } from "../src/shared/middleware/api-token.middleware";
@@ -128,6 +130,16 @@ async function cleanup(): Promise<void> {
   await db.execute(sql`DELETE FROM outbox_event WHERE aggregate_id = ${userId}`);
 }
 
+function buildRepository(): DrizzleRgpdRepository {
+  return new DrizzleRgpdRepository(
+    logger,
+    instrumentation,
+    new DrizzleApiTokenRepository(instrumentation),
+    new DrizzleStaffDataEraser(instrumentation),
+    { impersonationsOf: endedImpersonationsOf },
+  );
+}
+
 function buildService(): RgpdService {
   const outbox = new DrizzleOutboxRepository(instrumentation, () => undefined);
   const email = new QueuedEmailService(
@@ -136,7 +148,7 @@ function buildService(): RgpdService {
   );
   const uow = new TransactionService(instrumentation);
   return new RgpdService(
-    new DrizzleRgpdRepository(logger, instrumentation),
+    buildRepository(),
     new NoOpStorageService(logger),
     email,
     uow,
@@ -335,10 +347,7 @@ async function main(): Promise<void> {
     .where(eq(staffSchema.staffNote.userId, userId));
   check("the staff notes come back with the rolled back wipe", notes.length === 1, notes);
 
-  const readyForWipe = await new DrizzleRgpdRepository(
-    logger,
-    instrumentation,
-  ).findUsersReadyForWipe(50);
+  const readyForWipe = await buildRepository().findUsersReadyForWipe(50);
   const stillPending =
     readyForWipe.isSuccess && readyForWipe.getValue().some((r) => r.userId === userId);
   console.log("[3] still returned by findUsersReadyForWipe ->", stillPending);

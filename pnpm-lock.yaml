@@ -349,15 +349,15 @@ importers:
       '@modules/quotas':
         specifier: workspace:*
         version: link:../../modules/quotas
+      '@modules/rgpd':
+        specifier: workspace:*
+        version: link:../../modules/rgpd
       '@modules/uploads':
         specifier: workspace:*
         version: link:../../modules/uploads
-      '@noble/ciphers':
-        specifier: ^2.4.0
-        version: 2.4.0
-      '@noble/hashes':
-        specifier: ^2.4.0
-        version: 2.4.0
+      '@modules/webhooks':
+        specifier: workspace:*
+        version: link:../../modules/webhooks
       '@packages/access-control':
         specifier: workspace:*
         version: link:../../packages/access-control
@@ -933,6 +933,58 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
+  modules/rgpd:
+    dependencies:
+      '@packages/access-control':
+        specifier: workspace:*
+        version: link:../../packages/access-control
+      '@packages/ddd-kit':
+        specifier: workspace:*
+        version: link:../../packages/ddd-kit
+      '@packages/drizzle':
+        specifier: workspace:*
+        version: link:../../packages/drizzle
+      '@packages/email':
+        specifier: workspace:*
+        version: link:../../packages/email
+      '@packages/events':
+        specifier: workspace:*
+        version: link:../../packages/events
+      '@packages/http':
+        specifier: workspace:*
+        version: link:../../packages/http
+      '@packages/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
+      '@packages/outbox':
+        specifier: workspace:*
+        version: link:../../packages/outbox
+      better-auth:
+        specifier: 1.7.14
+        version: 1.7.14(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.11)(drizzle-orm@0.45.4(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.6)(pg@8.23.1))(pg@8.23.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(solid-js@1.9.15)(vitest@5.0.5)
+      hono:
+        specifier: ^4.13.14
+        version: 4.13.14
+      inwire:
+        specifier: ^4.0.1
+        version: 4.0.1
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@packages/test':
+        specifier: workspace:*
+        version: link:../../packages/test
+      '@packages/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/bun':
+        specifier: ^1.4.4
+        version: 1.4.4
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
   modules/uploads:
     dependencies:
       '@aws-sdk/client-s3':
@@ -972,6 +1024,55 @@ importers:
       '@types/bun':
         specifier: ^1.4.4
         version: 1.4.4
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  modules/webhooks:
+    dependencies:
+      '@noble/ciphers':
+        specifier: ^2.4.0
+        version: 2.4.0
+      '@noble/hashes':
+        specifier: ^2.4.0
+        version: 2.4.0
+      '@packages/ddd-kit':
+        specifier: workspace:*
+        version: link:../../packages/ddd-kit
+      '@packages/drizzle':
+        specifier: workspace:*
+        version: link:../../packages/drizzle
+      '@packages/events':
+        specifier: workspace:*
+        version: link:../../packages/events
+      '@packages/http':
+        specifier: workspace:*
+        version: link:../../packages/http
+      '@packages/outbox':
+        specifier: workspace:*
+        version: link:../../packages/outbox
+      hono:
+        specifier: ^4.13.14
+        version: 4.13.14
+      inwire:
+        specifier: ^4.0.1
+        version: 4.0.1
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@packages/test':
+        specifier: workspace:*
+        version: link:../../packages/test
+      '@packages/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/bun':
+        specifier: ^1.4.4
+        version: 1.4.4
+      drizzle-orm:
+        specifier: ^0.45.4
+        version: 0.45.4(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.6)(pg@8.23.1)
       typescript:
         specifier: ^7.0.2
         version: 7.0.2

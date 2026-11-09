@@ -89,6 +89,9 @@ export interface IApiTokenRepository {
     userId: string,
     organizationId: string,
   ): Promise<Result<string[], ApiTokenError>>;
+  revokeAllOfUser(
+    userId: string,
+  ): Promise<Result<Array<{ tokenId: string; organizationId: Option<string> }>, ApiTokenError>>;
   touchLastUsed(id: string, bucketFloor: Date): Promise<Result<boolean, ApiTokenError>>;
   rehash(id: string, hmac: string, pepperVersion: number): Promise<Result<void, ApiTokenError>>;
 }

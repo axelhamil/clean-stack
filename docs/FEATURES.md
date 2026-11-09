@@ -122,6 +122,8 @@ Module: `modules/uploads/` (`@modules/uploads`).
 
 Frontend cards: `DataExportCard` (→ `/settings/privacy`), `RgpdDeletionCard` + preflight list (→ `/settings/account` danger zone). Source: `features/rgpd/`.
 
+Module: `modules/rgpd/` (`@modules/rgpd`). The wipe revokes API tokens and erases staff data through `IApiTokenRevoker` and `IStaffDataEraser`, which the host binds to `api-token` and `admin` inside the same unit of work.
+
 **Events**: `user.deletion.{requested,cancelled}`, `user.deleted`, `user.export.{requested,completed}` (`compliance` retention).
 
 ---
@@ -293,6 +295,8 @@ Full operator surface for webhook endpoint management and delivery inspection, p
 - **Auto-disable failing endpoints**: after `WEBHOOK_AUTO_DISABLE_AFTER_DAYS` (default 5) with ≥ `WEBHOOK_AUTO_DISABLE_MIN_FAILURES` (default 2) consecutive failures. Re-enable is manual. Emits `webhook.endpoint.disabled`.
 - **Wildcard subscriptions**: `"*"`, `"<group>.*"`, or exact event names. Internal events never fan out.
 - **Test event** (`POST /settings/webhooks/:id/test`): also auto-fired on endpoint creation.
+
+Module: `modules/webhooks/` (`@modules/webhooks`), with its SSRF guard and the AEAD of secrets at rest; the private ranges it refuses are `@packages/http/private-ranges`.
 
 **Frontend** `apps/app/src/features/webhooks/`: `/settings/webhooks`: endpoint list (enabled / paused / auto-disabled badges), create/edit Sheet with `EventTypePicker` (namespace groups + wildcards, same SSOT as the public catalog), cursor-paginated delivery list, per-delivery timeline drawer, one-shot secret reveal, rotate + test actions.
 

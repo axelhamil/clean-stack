@@ -3,17 +3,17 @@ import type { AuditLogSettings } from "@modules/audit-log/application/config/aud
 import type { BillingSettings } from "@modules/billing/application/config/billing-settings";
 import type { ConsentSettings } from "@modules/consents/application/config/consent-settings";
 import type { NotificationSettings } from "@modules/notifications/application/config/notification-settings";
+import type { RgpdSettings } from "@modules/rgpd/application/config/rgpd-settings";
 import type {
   S3StorageSettings,
   StorageSettings,
   UploadSettings,
 } from "@modules/uploads/application/config/upload-settings";
+import type { WebhookSettings } from "@modules/webhooks/application/config/webhook-settings";
 import { Option } from "@packages/ddd-kit";
 import { defineModule } from "inwire";
 import type { AdminSettings } from "../modules/admin/application/config/admin-settings";
 import type { StaffEnv } from "../modules/admin/application/services/staff-access";
-import type { RgpdSettings } from "../modules/rgpd/application/config/rgpd-settings";
-import type { WebhookSettings } from "../modules/webhooks/application/config/webhook-settings";
 import type { env } from "../shared/env";
 
 type SettingsSource = Pick<
@@ -106,6 +106,7 @@ export const apiSettings = (source: SettingsSource) => {
       autoDisableMinFailures: source.WEBHOOK_AUTO_DISABLE_MIN_FAILURES,
       autoDisableAfterDays: source.WEBHOOK_AUTO_DISABLE_AFTER_DAYS,
       responseCaptureBytes: source.WEBHOOK_RESPONSE_CAPTURE_BYTES,
+      httpsOnly: source.NODE_ENV === "production",
     },
   };
   const rgpdSettings: RgpdSettings = {

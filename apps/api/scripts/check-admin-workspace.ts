@@ -6,6 +6,7 @@
  * heartbeat. Creates and removes its own rows.
  */
 
+import { createRgpdInternalRoutes } from "@modules/rgpd/infrastructure/http/rgpd-internal.routes";
 import { uuidv7 } from "@packages/ddd-kit";
 import {
   authSchema,
@@ -21,7 +22,6 @@ import {
 import { EventTypes } from "@packages/events";
 import { Hono } from "hono";
 import { di } from "../src/container";
-import { createRgpdInternalRoutes } from "../src/modules/rgpd/internal.routes";
 import { flushNotificationEmailsRoutes } from "../src/shared/internal-routes/flush-notification-emails.route";
 import { internalLayers } from "../src/shared/internal-routes/internal-layers";
 import { adminProbes, appCall, codeOf } from "./admin-probes";
