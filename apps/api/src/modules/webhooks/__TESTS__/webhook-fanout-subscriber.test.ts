@@ -48,8 +48,10 @@ const fakeTx = {
 // ---------------------------------------------------------------------------
 mock.module("@packages/drizzle", () => ({ ...realDrizzle, resolveExecutor: () => fakeTx }));
 
-const { WebhookFanoutSubscriber } = await import("../services/webhook-fanout-subscriber");
-const { NoOpInstrumentation } = await import("../services/noop-instrumentation");
+const { WebhookFanoutSubscriber } = await import(
+  "../infrastructure/services/webhook-fanout-subscriber"
+);
+const { NoOpInstrumentation } = await import("../../../shared/services/noop-instrumentation");
 
 const instrumentation = new NoOpInstrumentation();
 const subscriber = new WebhookFanoutSubscriber(mockUnitOfWork().unitOfWork, instrumentation);

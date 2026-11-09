@@ -18,7 +18,7 @@ import {
   exactInstant,
   timeIdCursorSchema,
 } from "@packages/http/time-id-cursor";
-import { createDbFailure } from "../db-failure";
+import { createDbFailure } from "../../../../shared/db-failure";
 import type {
   AuditEntry,
   AuditError,
@@ -27,8 +27,8 @@ import type {
   AuditRecord,
   ChainVerification,
   IAuditPort,
-} from "../ports/audit.port";
-import { computeAuditHash, GENESIS_HASH } from "./audit-hash";
+} from "../../../../shared/ports/audit.port";
+import { computeAuditHash, GENESIS_HASH } from "../services/audit-hash";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 500;

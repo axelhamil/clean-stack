@@ -5,9 +5,9 @@ import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import type { IStaffStore, StaffRecord } from "../../ports/staff-store.port";
-import { runWithRequestContext } from "../../request-context";
-import { StaffAccessService } from "../staff-access.service";
+import type { IStaffStore, StaffRecord } from "../../../shared/ports/staff-store.port";
+import { runWithRequestContext } from "../../../shared/request-context";
+import { StaffAccessService } from "../application/services/staff-access.service";
 
 const LISTED = { id: "op", twoFactorEnabled: false };
 const PLAIN = { id: "plain", twoFactorEnabled: true };

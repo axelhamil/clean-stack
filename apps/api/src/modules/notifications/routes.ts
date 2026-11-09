@@ -13,11 +13,11 @@ import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { streamSSE } from "hono/streaming";
+import type { INotificationStore, NotificationError } from "./application/ports/notification.port";
 import {
   MAX_STREAMS_PER_USER,
   type NotificationStreamHub,
-} from "../../shared/services/notification-stream-hub";
-import type { INotificationStore, NotificationError } from "./application/ports/notification.port";
+} from "./infrastructure/services/notification-stream-hub";
 import {
   listQuerySchema,
   markReadSchema,

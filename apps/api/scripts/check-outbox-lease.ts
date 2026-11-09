@@ -34,10 +34,10 @@ import {
 import { emitEvent } from "@packages/outbox/event-emitter";
 import type { OutboxRecord } from "@packages/outbox/outbox.port";
 import { Client } from "pg";
+import { AuditEventSubscriber } from "../src/modules/audit-log/infrastructure/services/audit-event-subscriber";
 import { buildPurgeFilter } from "../src/shared/internal-routes/sweep-outbox.route";
 import { purgeBatchWithTimeout, requireFilter } from "../src/shared/internal-routes/sweep-purge";
 import { sweepSpans } from "../src/shared/internal-routes/sweep-span";
-import { AuditEventSubscriber } from "../src/shared/services/audit-event-subscriber";
 import { checkRun, recordingInstrumentation } from "./check-harness";
 
 const PROBE = `check.outbox-lease.${crypto.randomUUID()}`;

@@ -8,9 +8,9 @@ import { AppErrorException, type Option, type Result } from "@packages/ddd-kit";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
 import type { SessionData, SessionUser } from "../../auth";
+import type { StaffUser } from "../../modules/admin/application/services/staff-access";
+import type { StaffSessionRef } from "../../modules/admin/application/services/staff-access.service";
 import type { StaffStoreError } from "../ports/staff-store.port";
-import type { StaffSessionRef } from "../services/staff-access.service";
-import type { StaffUser } from "../staff-access";
 
 export interface StaffGate {
   gate(

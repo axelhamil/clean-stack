@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { DEFAULT_DIGEST_HOUR_UTC, digestDueAt } from "../digest-schedule";
+import { DEFAULT_DIGEST_HOUR_UTC, digestDueAt } from "../application/services/digest-schedule";
 
 const at = (iso: string) => new Date(iso);
 const iso = (d: Date) => d.toISOString();

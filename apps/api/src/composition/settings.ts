@@ -1,9 +1,12 @@
 import { Option } from "@packages/ddd-kit";
 import { defineModule } from "inwire";
 import type { AdminSettings } from "../modules/admin/application/config/admin-settings";
+import type { StaffEnv } from "../modules/admin/application/services/staff-access";
 import type { ApiTokenSettings } from "../modules/api-token/application/config/api-token-settings";
+import type { AuditLogSettings } from "../modules/audit-log/application/config/audit-log-settings";
 import type { BillingSettings } from "../modules/billing/application/config/billing-settings";
 import type { ConsentSettings } from "../modules/consents/application/config/consent-settings";
+import type { NotificationSettings } from "../modules/notifications/application/config/notification-settings";
 import type { RgpdSettings } from "../modules/rgpd/application/config/rgpd-settings";
 import type {
   S3StorageSettings,
@@ -12,7 +15,6 @@ import type {
 } from "../modules/uploads/application/config/upload-settings";
 import type { WebhookSettings } from "../modules/webhooks/application/config/webhook-settings";
 import type { env } from "../shared/env";
-import type { StaffEnv } from "../shared/staff-access";
 
 type SettingsSource = Pick<
   typeof env,
@@ -53,6 +55,9 @@ type SettingsSource = Pick<
   | "ADMIN_APPROVAL_ACTIONS"
   | "ADMIN_APPROVAL_TTL_HOURS"
   | "OUTBOX_LEASE_SECONDS"
+  | "AUDIT_TAMPER_EVIDENCE"
+  | "NOTIFICATION_DIGEST_HOUR_UTC"
+  | "DATABASE_URL"
 >;
 
 function storageSettingsOf(source: SettingsSource): StorageSettings {
@@ -122,6 +127,11 @@ export const apiSettings = (source: SettingsSource) => {
     outboxLeaseSeconds: source.OUTBOX_LEASE_SECONDS,
     supportUrl: `${source.APP_URL}/support`,
   };
+  const auditLogSettings: AuditLogSettings = { tamperEvidence: source.AUDIT_TAMPER_EVIDENCE };
+  const notificationSettings: NotificationSettings = {
+    digestHourUtc: source.NOTIFICATION_DIGEST_HOUR_UTC,
+    databaseUrl: source.DATABASE_URL,
+  };
 
   return defineModule<Record<never, never>>()((b) =>
     b
@@ -133,6 +143,8 @@ export const apiSettings = (source: SettingsSource) => {
       .add("webhookSettings", (): WebhookSettings => webhookSettings)
       .add("rgpdSettings", (): RgpdSettings => rgpdSettings)
       .add("staffSettings", (): StaffEnv => staffSettings)
-      .add("adminSettings", (): AdminSettings => adminSettings),
+      .add("adminSettings", (): AdminSettings => adminSettings)
+      .add("auditLogSettings", (): AuditLogSettings => auditLogSettings)
+      .add("notificationSettings", (): NotificationSettings => notificationSettings),
   );
 };

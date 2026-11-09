@@ -13,6 +13,7 @@ import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork, type UnitOfWorkMock } from "@packages/test/bun/unit-of-work";
+import { staffAccessRules } from "../../../composition/sources/rgpd";
 import type {
   IStaffStore,
   StaffManagerRecord,
@@ -141,15 +142,17 @@ function buildService(deps: {
   listed?: string[];
   totp?: ITotpVerifier;
 }): RgpdService {
+  const outbox = deps.outbox ?? mockPort<IOutboxRepository>();
+
   return new RgpdService(
     deps.repo,
     deps.storage ?? makeStorage(),
     deps.email,
     deps.uow ?? uow.unitOfWork,
-    deps.outbox ?? mockPort<IOutboxRepository>(),
+    outbox,
     deps.instrumentation ?? new NoOpInstrumentation(),
     deps.staff ?? makeStaff(Option.none(), []),
-    { PLATFORM_ADMIN_IDS: deps.listed ?? [] },
+    staffAccessRules(outbox, { PLATFORM_ADMIN_IDS: deps.listed ?? [] }),
     deps.totp ?? acceptingTotp(),
     {
       appUrl: "https://app.example.com",

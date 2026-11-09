@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 import * as realDrizzle from "@packages/drizzle";
 import type { DeliveredEvent } from "@packages/outbox/outbox.port";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import { NoOpInstrumentation } from "../noop-instrumentation";
+import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 
 const executor = {
   execute: mock(() => ({
@@ -13,7 +13,9 @@ const executor = {
 
 mock.module("@packages/drizzle", () => ({ ...realDrizzle, resolveExecutor: () => executor }));
 
-const { NotificationFanoutSubscriber } = await import("../notification-fanout-subscriber");
+const { NotificationFanoutSubscriber } = await import(
+  "../infrastructure/services/notification-fanout-subscriber"
+);
 
 const event = (eventType: string, payload: unknown, organizationId?: string): DeliveredEvent => ({
   eventId: "01J000000000000000000000",

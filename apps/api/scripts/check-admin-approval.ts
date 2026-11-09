@@ -24,11 +24,11 @@ import { EventTypes } from "@packages/events";
 import { timeIdCursorSchema } from "@packages/http/time-id-cursor";
 import { Hono } from "hono";
 import { di } from "../src/container";
+import { staffAccessOf } from "../src/modules/admin/application/services/staff-access";
 import { createAdminInternalRoutes } from "../src/modules/admin/internal.routes";
+import { staffRecipients } from "../src/modules/notifications/infrastructure/services/staff-recipients";
 import { internalLayers } from "../src/shared/internal-routes/internal-layers";
 import { runSweepRequest } from "../src/shared/internal-routes/sweep-route";
-import { staffRecipients } from "../src/shared/services/staff-recipients";
-import { staffAccessOf } from "../src/shared/staff-access";
 import {
   type AdminProbe,
   type AppCall,

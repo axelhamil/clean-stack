@@ -49,8 +49,8 @@ const executor = {
 
 mock.module("@packages/drizzle", () => ({ ...realDrizzle, resolveExecutor: () => executor }));
 
-const { AuditEventSubscriber } = await import("../audit-event-subscriber");
-const { computeAuditHash } = await import("../audit-hash");
+const { AuditEventSubscriber } = await import("../infrastructure/services/audit-event-subscriber");
+const { computeAuditHash } = await import("../infrastructure/services/audit-hash");
 
 function event(eventId: string, payload: unknown = { actorUserId: "op-1", foo: "bar" }) {
   return {

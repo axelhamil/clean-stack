@@ -50,6 +50,7 @@ import { QueuedEmailService } from "@packages/email/email.service";
 import { EventTypes } from "@packages/events";
 import { DrizzleOutboxRepository } from "@packages/outbox/drizzle-outbox.repository";
 import { Hono } from "hono";
+import { staffAccessRules } from "../src/composition/sources/rgpd";
 import { DrizzleStaffStore } from "../src/modules/admin/infrastructure/repositories/drizzle-staff.store";
 import { DrizzleApiTokenRepository } from "../src/modules/api-token/infrastructure/repositories/drizzle-api-token.repository";
 import { RgpdService } from "../src/modules/rgpd/application/services/rgpd.service";
@@ -142,7 +143,7 @@ function buildService(): RgpdService {
     outbox,
     instrumentation,
     new DrizzleStaffStore(instrumentation, uow),
-    { PLATFORM_ADMIN_IDS: [] },
+    staffAccessRules(outbox, { PLATFORM_ADMIN_IDS: [] }),
     new DrizzleTotpVerifier(instrumentation, authSecretKey(env)),
     {
       appUrl: env.APP_URL,
