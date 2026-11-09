@@ -1,5 +1,5 @@
+import { organization } from "@packages/drizzle/schema/multi-tenant";
 import { index, integer, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
-import { organization } from "./multi-tenant";
 
 export const quotaUsage = pgTable(
   "quota_usage",

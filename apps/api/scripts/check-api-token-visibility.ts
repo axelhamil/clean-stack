@@ -17,7 +17,8 @@
 
 import type { TokenOwner } from "@modules/api-token/application/ports/api-token.port";
 import { DrizzleApiTokenRepository } from "@modules/api-token/infrastructure/repositories/drizzle-api-token.repository";
-import { apiTokenSchema, authSchema, db, multiTenantSchema, sql } from "@packages/drizzle";
+import * as apiTokenSchema from "@modules/api-token/schemas/api-token";
+import { authSchema, db, multiTenantSchema, sql } from "@packages/drizzle";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 import { checkRecorder, findSeededUserId } from "./check-harness";
 import { requireLocalDatabase } from "./require-local-database";

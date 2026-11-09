@@ -1,12 +1,6 @@
 import { type IInstrumentation, Result, uuidv7 } from "@packages/ddd-kit";
-import {
-  and,
-  dbOperationFailure,
-  eq,
-  quotaUsageSchema,
-  resolveExecutor,
-  sql,
-} from "@packages/drizzle";
+import { and, dbOperationFailure, eq, resolveExecutor, sql } from "@packages/drizzle";
+import * as quotaUsageSchema from "../../../schemas/quota-usage";
 import type {
   IQuotaUsageStore,
   QuotaError,

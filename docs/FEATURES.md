@@ -10,7 +10,7 @@ This is the file-level inventory: dense, path-anchored, meant for developers rea
 
 RGPD Art. 7 demonstrability: records which version each user accepted and when. Bump a version string in the shared SSOT → every user is re-prompted. 7-year compliance trail in `audit_log`.
 
-**SSOT** `@packages/policies`: `POLICY_TYPES`, `POLICY_VERSIONS`, `POLICY_CHANGELOG`. Schema: `packages/drizzle/src/schema/policies.ts` (`policy_acceptance`, append-only).
+**SSOT** `@packages/policies`: `POLICY_TYPES`, `POLICY_VERSIONS`, `POLICY_CHANGELOG`. Schema: `modules/policies/schemas/policies.ts` (`policy_acceptance`, append-only).
 
 **Backend** `modules/policies/` (`@modules/policies`): `PolicyAcceptanceService` (N rows + N events per `uow.run` TX; `getStaleTypes` predicate). Routes: `POST /me/policies/accept`, `GET /me/policies`. `requireCurrentPolicies` middleware (`shared/middleware/policy.middleware.ts`): `POLICY_ACCEPTANCE_REQUIRED` (409) on stale. It is an **allowlist, not a global mount with exclusions**: it is declared route by route on the 19 mutating business routes of `profile`, `webhooks`, `api-token`, `organization`, `notifications`, `billing` and `uploads`, plus `PATCH /api/v1/me` (Phase H.1). Everything else is ungated, and the reasons differ: the policy routes themselves (gating them would block the only route that clears the gate), RGPD Art. 17/20 (a data-subject right cannot be conditioned on accepting terms), sign-out and session reads (a user must always be able to leave), `/consents` (no `requireAuth` at all: the cookie banner records for anonymous visitors, and withdrawal is the same family of right as RGPD), the whole `/admin/*` surface (operator tooling: gating it would 409-wall an operator out of the console, `POST /admin/impersonation/stop` included), impersonated sessions (checked inside the middleware, not at the mount), and every read-only route. The front turns that 409 into the redirect to `/legal/accept` (`shared/api/errors/policy-refusal.ts`). Acceptance recorded at `/verify-email` hook, not `/sign-up/email` (no session there; see `HISTORY.md`).
 
@@ -24,7 +24,7 @@ RGPD Art. 7 demonstrability: records which version each user accepted and when. 
 
 CNIL/RGPD Art. 7 ePrivacy: dual-layer: server-side `consent_record` (timestamped, append-only, legally durable) linked to device via httpOnly `cc_sid` cookie. Four categories: `necessary` (always on), `functional`, `analytics`, `marketing` (default off). TTL 180 days (configurable).
 
-**SSOT** `@packages/cookie-consent`: `CONSENT_CATEGORIES`, `CONSENT_COOKIE_NAME="cc_sid"`, `CONSENT_GRANT_TTL_DAYS=180`. **DB** `packages/drizzle/src/schema/consent.ts`: `consent_record` (append-only; most-recent wins).
+**SSOT** `@packages/cookie-consent`: `CONSENT_CATEGORIES`, `CONSENT_COOKIE_NAME="cc_sid"`, `CONSENT_GRANT_TTL_DAYS=180`. **DB** `modules/consents/schemas/consent.ts`: `consent_record` (append-only; most-recent wins).
 
 **Backend** `modules/consents/` (`@modules/consents`): `ConsentService`: `record` / `withdraw` / `getActive` (with `subjectId` fallback) / `reconcile` (links device→account at login via `auth.ts` `hooks.after` on `newSession`, zero client round-trip). Routes: `POST /consents`, `GET /consents`, `DELETE /consents` (public, `optionalAuth`). Guest sweep: `shared/internal-routes/sweep-consents.route.ts` (HMAC-gated, `CONSENT_RETENTION_DAYS=365`).
 
@@ -179,7 +179,7 @@ Primitives for business domain only (never DDD for billing / auth / gating: see 
 ## Database: Drizzle + Postgres 18 ✅
 
 - Postgres on `localhost:5433` (dedicated port) via `docker compose up postgres -d`.
-- Schemas: `packages/drizzle/src/schema/*.ts`: auth, multi-tenant, policies, consent, billing, webhooks, audit-log, outbox, email, quota-usage, rate-limit.
+- Schemas: `packages/drizzle/src/schema/*.ts`: auth, multi-tenant, billing, webhooks, audit-log, outbox, email, rate-limit; business tables in `modules/<name>/schemas/*.ts` (policies, consent, quota-usage, api-token).
 - Org-scoped tables are NEVER queried without the owner in the `WHERE`: a `RepoScope` through `ScopedRepository`, or an explicit `organizationId` in a store (rule in `apps/api/CLAUDE.md`).
 - `TransactionService`: the use case, service or route opens `uow.run(...)`; the stores read the ambient transaction through `resolveExecutor()`, no `tx` parameter (rule in `packages/drizzle/CLAUDE.md`).
 
@@ -371,7 +371,7 @@ Machine-to-machine access with scoped, expirable tokens. Tokens are shown once a
 
 **Storage**: `HMAC-SHA256(pepper, raw_token)` in a unique-indexed column (`api_token.tokenHmac`). The pepper (`API_TOKEN_PEPPER`) is a server-side secret: a database dump alone yields no usable tokens. `pepperVersion` column enables rotation without downtime via `API_TOKEN_PEPPER_PREVIOUS`: tokens found by the old pepper are transparently rehashed on next use.
 
-**Schema** `packages/drizzle/src/schema/api-token.ts`: `api_token(id, userId FK, organizationId FK nullable, name, tokenHmac unique, pepperVersion, tokenStart, scopes jsonb, lastUsedAt, expiresAt, revokedAt, revokedReason, createdAt, updatedAt)`.
+**Schema** `modules/api-token/schemas/api-token.ts`: `api_token(id, userId FK, organizationId FK nullable, name, tokenHmac unique, pepperVersion, tokenStart, scopes jsonb, lastUsedAt, expiresAt, revokedAt, revokedReason, createdAt, updatedAt)`.
 
 **Backend** `modules/api-token/`:
 - `ApiTokenService`: `create`, `list`, `revoke`. `list` takes a `TokenOwner` (`{ kind: "personal" }` or `{ kind: "orgAndPersonal" }`): a caller with an active organization sees that organization's tokens *and* their own org-less personal tokens together; with no active organization, only the personal ones. One write per token (no per-request DB write: `lastUsedAt` updated via bucket: `WHERE last_used_at < now() - interval '15 min'`).

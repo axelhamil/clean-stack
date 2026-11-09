@@ -1,14 +1,6 @@
 import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
-import {
-  and,
-  apiTokenSchema,
-  dbOperationFailure,
-  eq,
-  isNull,
-  lt,
-  or,
-  resolveExecutor,
-} from "@packages/drizzle";
+import { and, dbOperationFailure, eq, isNull, lt, or, resolveExecutor } from "@packages/drizzle";
+import * as apiTokenSchema from "../../../schemas/api-token";
 import type {
   ApiTokenError,
   ApiTokenRecord,

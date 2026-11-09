@@ -1,7 +1,8 @@
 // `/internal/sweep-consents`: gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 // Purges ONLY guest (userId IS NULL) expired consent records. Authed records are compliance evidence, never purged.
 
-import { and, consentSchema, isNull, lt } from "@packages/drizzle";
+import * as consentSchema from "@modules/consents/schemas/consent";
+import { and, isNull, lt } from "@packages/drizzle";
 import { requireFilter } from "@packages/drizzle/sweep-purge";
 import { sweepBodySchema } from "@packages/http/sweep-runner";
 import { zV } from "@packages/http/validator";

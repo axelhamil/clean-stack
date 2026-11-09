@@ -5,6 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./schema/auth": "./src/schema/auth.ts",
+    "./schema/multi-tenant": "./src/schema/multi-tenant.ts",
     "./sweep-count": "./src/sweep-count.ts",
     "./sweep-purge": "./src/sweep-purge.ts",
     "./sweep-span": "./src/sweep-span.ts"
@@ -23,10 +25,8 @@
     "test": "bun test --isolate"
   },
   "dependencies": {
-    "@packages/cookie-consent": "workspace:*",
     "@packages/ddd-kit": "workspace:*",
     "@packages/events": "workspace:*",
-    "@packages/policies": "workspace:*",
     "dotenv": "^18.0.9",
     "drizzle-orm": "^0.45.4",
     "pg": "^8.23.1"
