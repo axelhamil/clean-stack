@@ -5,6 +5,8 @@
  * the decision, and who the notification reaches. Creates and removes its own probe users.
  */
 
+import { staffAccessOf } from "@modules/admin/application/services/staff-access";
+import { createAdminInternalRoutes } from "@modules/admin/infrastructure/http/admin-internal.routes";
 import * as auditLogSchema from "@modules/audit-log/schemas/audit-log";
 import { staffRecipients } from "@modules/notifications/infrastructure/services/staff-recipients";
 import { APPROVAL_ACTIONS, authorizeStaff } from "@packages/access-control";
@@ -25,8 +27,6 @@ import { EventTypes } from "@packages/events";
 import { timeIdCursorSchema } from "@packages/http/time-id-cursor";
 import { Hono } from "hono";
 import { di } from "../src/container";
-import { staffAccessOf } from "../src/modules/admin/application/services/staff-access";
-import { createAdminInternalRoutes } from "../src/modules/admin/internal.routes";
 import { internalLayers } from "../src/shared/internal-routes/internal-layers";
 import { runSweepRequest } from "../src/shared/internal-routes/sweep-route";
 import {

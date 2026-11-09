@@ -1,3 +1,5 @@
+import type { AdminSettings } from "@modules/admin/application/config/admin-settings";
+import type { StaffEnv } from "@modules/admin/application/services/staff-access";
 import type { ApiTokenSettings } from "@modules/api-token/application/config/api-token-settings";
 import type { AuditLogSettings } from "@modules/audit-log/application/config/audit-log-settings";
 import type { BillingSettings } from "@modules/billing/application/config/billing-settings";
@@ -12,8 +14,6 @@ import type {
 import type { WebhookSettings } from "@modules/webhooks/application/config/webhook-settings";
 import { Option } from "@packages/ddd-kit";
 import { defineModule } from "inwire";
-import type { AdminSettings } from "../modules/admin/application/config/admin-settings";
-import type { StaffEnv } from "../modules/admin/application/services/staff-access";
 import type { env } from "../shared/env";
 
 type SettingsSource = Pick<

@@ -32,6 +32,7 @@ import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-wipe-rollback");
 
+import { DrizzleStaffStore } from "@modules/admin/infrastructure/repositories/drizzle-staff.store";
 import { generateToken, hmacToken } from "@modules/api-token/domain/api-token-crypto";
 import { DrizzleApiTokenRepository } from "@modules/api-token/infrastructure/repositories/drizzle-api-token.repository";
 import * as apiTokenSchema from "@modules/api-token/schemas/api-token";
@@ -57,7 +58,6 @@ import { DrizzleOutboxRepository } from "@packages/outbox/drizzle-outbox.reposit
 import { Hono } from "hono";
 import { staffAccessRules } from "../src/composition/sources/rgpd";
 import { di } from "../src/container";
-import { DrizzleStaffStore } from "../src/modules/admin/infrastructure/repositories/drizzle-staff.store";
 import { authSecretKey } from "../src/shared/auth/auth-secrets";
 import { env } from "../src/shared/env";
 import { logger } from "../src/shared/logger";
@@ -153,7 +153,7 @@ function buildService(): RgpdService {
     uow,
     outbox,
     instrumentation,
-    new DrizzleStaffStore(instrumentation, uow),
+    new DrizzleStaffStore(instrumentation, uow, logger),
     staffAccessRules(outbox, { PLATFORM_ADMIN_IDS: [] }),
     new DrizzleTotpVerifier(instrumentation, authSecretKey(env)),
     {
