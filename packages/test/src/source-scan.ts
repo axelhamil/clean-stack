@@ -194,7 +194,12 @@ export function createSourceScan(root: string) {
   }
 
   function transactionOpenersPerFile(layer: string): Record<string, number> {
-    return countPerFile(layer, ({ blanked }) => countOf(blanked, /\.transaction\s*\(\s*[^\s)]/g));
+    return countPerFile(
+      layer,
+      ({ code, blanked }) =>
+        countOf(blanked, /\.transaction\s*\(\s*[^\s)]/g) +
+        countOf(code, /\[\s*(["'`])transaction\1\s*\]\s*\(/g),
+    );
   }
 
   function envReadsPerFile(layer: string): Record<string, number> {
@@ -203,8 +208,12 @@ export function createSourceScan(root: string) {
       ({ code, blanked }) =>
         countOf(blanked, /\b(?:process|Bun)\s*\??\.\s*env\b/g) +
         countOf(blanked, /\bimport\.meta\.env\b/g) +
-        countOf(blanked, /\{[^{}]*\benv\b[^{}]*\}\s*=\s*(?:process|Bun)\b(?!\s*\??\.)/g) +
-        countOf(code, /\b(?:process|Bun)\s*\??\.?\s*\[\s*(["'`])env\1\s*\]/g),
+        countOf(
+          blanked,
+          /\{(?:[^{}]|\{[^{}]*\})*\benv\b(?:[^{}]|\{[^{}]*\})*\}\s*=\s*(?:process|Bun)\b(?!\s*\??\.)/g,
+        ) +
+        countOf(code, /\b(?:process|Bun)\s*\??\.?\s*\[\s*(["'`])env\1\s*\]/g) +
+        countOf(code, /\bimport\s*\{[^}]*\benv\b[^}]*\}\s*from\s*(["'])(?:node:)?process\1/g),
     );
   }
 
@@ -219,15 +228,25 @@ export function createSourceScan(root: string) {
   };
 }
 
-const HOST_REACH = [
-  /from\s+["'][./]*container["']/,
-  /from\s+["'][./]*auth["']/,
-  /from\s+["'][./]*shared\/env["']/,
-  /from\s+["'][./]*shared\/middleware\//,
-  /declare\s+module\s+["']inwire["']/,
-];
+const SPECIFIER = /\b(?:from|import|require)\s*\(?\s*(["'])([^"'\n]+)\1/g;
+const HOST_PATH =
+  /^(?:apps\/|(?:container|auth|composition)(?:\.ts)?(?:\/|$)|shared\/(?:env(?:\.ts)?$|middleware\/))/;
+const CONTAINER_AUGMENTATION = /declare\s+module\s+["']inwire["']/;
 
-function isRouteFile(file: string): boolean {
+function hostPathOf(specifier: string): string {
+  return specifier.replace(/^(?:@\/|(?:\.\.?\/)+)/, "");
+}
+
+export function reachesHost(code: string): boolean {
+  const specifiers = [...code.matchAll(SPECIFIER)].map((match) => match[2] ?? "");
+
+  return (
+    CONTAINER_AUGMENTATION.test(code) ||
+    specifiers.some((specifier) => HOST_PATH.test(hostPathOf(specifier)))
+  );
+}
+
+export function isRouteFile(file: string): boolean {
   const name = file.split(sep).at(-1) ?? "";
 
   return name === "routes.ts" || name.endsWith(".routes.ts");
@@ -253,9 +272,7 @@ export function assertModuleLayering(srcRoot: string): void {
     "no tx parameter": Object.keys(scan.transactionParametersPerFile(".")),
     "no transaction opened": Object.keys(scan.transactionOpenersPerFile(".")),
     "no environment read": Object.keys(scan.envReadsPerFile(".")),
-    "no host reach": files.filter((file) =>
-      HOST_REACH.some((pattern) => pattern.test(scan.codeOf(file))),
-    ),
+    "no host reach": files.filter((file) => reachesHost(scan.codeOf(file))),
   };
 
   const violations = Object.entries(guards).flatMap(([guard, offenders]) =>

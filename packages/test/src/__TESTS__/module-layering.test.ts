@@ -16,8 +16,13 @@ const CLEAN_MODULE: Record<string, string> = {
     "export class FooService { run() { return Result.ok(this.store.insert(row)); } }\n",
   "infrastructure/repositories/foo.store.ts":
     "export class FooStore { save() { return resolveExecutor().insert(table).values(row); } }\n",
-  "infrastructure/http/foo.routes.ts":
-    'export const createFooRoutes = () => new Hono().get("/", () => { throw new HTTPException(404); });\n',
+  "infrastructure/http/foo.routes.ts": [
+    'import { zV } from "@packages/http/validator";',
+    'import { totpOptions } from "../../shared/auth/totp-options";',
+    'import { fooDto } from "../../application/dto/foo.dto";',
+    'export const createFooRoutes = () => new Hono().get("/", () => { throw new HTTPException(404); });',
+    "",
+  ].join("\n"),
   "__TESTS__/foo.test.ts":
     "throw new Error(process.env.X); db.transaction((tx) => tx.insert(t));\n",
 };
@@ -96,6 +101,56 @@ describe("assertModuleLayering", () => {
       "an import of a host middleware",
       { "domain/foo.ts": 'import { requireAuth } from "../shared/middleware/auth";\n' },
       /no host reach: domain\/foo\.ts/,
+    ],
+    [
+      "a relative import of the host container from modules",
+      { "foo.module.ts": 'import { di } from "../../../apps/api/src/container";\n' },
+      /no host reach: foo\.module\.ts/,
+    ],
+    [
+      "a relative import of the host env from modules",
+      { "domain/foo.ts": 'import { env } from "../../../../apps/api/src/shared/env";\n' },
+      /no host reach: domain\/foo\.ts/,
+    ],
+    [
+      "a dynamic import of the host container",
+      { "foo.module.ts": 'const { di } = await import("../container");\n' },
+      /no host reach: foo\.module\.ts/,
+    ],
+    [
+      "an import below the host auth instance",
+      { "domain/foo.ts": 'import { session } from "../../auth/session";\n' },
+      /no host reach: domain\/foo\.ts/,
+    ],
+    [
+      "a re-export of the host env with its extension",
+      { "domain/foo.ts": 'export * from "../shared/env.ts";\n' },
+      /no host reach: domain\/foo\.ts/,
+    ],
+    [
+      "an import of the host composition",
+      { "foo.module.ts": 'import { routeGuards } from "../../composition/route-guards";\n' },
+      /no host reach: foo\.module\.ts/,
+    ],
+    [
+      "an environment read through node:process",
+      { "domain/foo.ts": 'import { env } from "node:process";\nexport const key = env.FOO_KEY;\n' },
+      /no environment read: domain\/foo\.ts/,
+    ],
+    [
+      "an environment read through process",
+      { "domain/foo.ts": "import { env as vars } from 'process';\n" },
+      /no environment read: domain\/foo\.ts/,
+    ],
+    [
+      "an environment read by nested destructuring",
+      { "domain/foo.ts": "export const { env: { FOO_KEY } } = process;\n" },
+      /no environment read: domain\/foo\.ts/,
+    ],
+    [
+      "a transaction opened through a computed key",
+      { "infrastructure/repositories/foo.store.ts": 'db["transaction"](async () => {});\n' },
+      /no transaction opened: infrastructure\/repositories\/foo\.store\.ts/,
     ],
     [
       "an augmentation of the global container",
