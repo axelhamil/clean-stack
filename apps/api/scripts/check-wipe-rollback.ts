@@ -56,10 +56,9 @@ import { EventTypes } from "@packages/events";
 import { DrizzleOutboxRepository } from "@packages/outbox/drizzle-outbox.repository";
 import { Hono } from "hono";
 import { staffAccessRules } from "../src/composition/sources/rgpd";
+import { di } from "../src/container";
 import { DrizzleStaffStore } from "../src/modules/admin/infrastructure/repositories/drizzle-staff.store";
-import { DrizzleStaffDataEraser } from "../src/modules/admin/infrastructure/repositories/drizzle-staff-data-eraser";
 import { authSecretKey } from "../src/shared/auth/auth-secrets";
-import { endedImpersonationsOf } from "../src/shared/db/ended-sessions";
 import { env } from "../src/shared/env";
 import { logger } from "../src/shared/logger";
 import { requireApiToken } from "../src/shared/middleware/api-token.middleware";
@@ -134,9 +133,9 @@ function buildRepository(): DrizzleRgpdRepository {
   return new DrizzleRgpdRepository(
     logger,
     instrumentation,
-    new DrizzleApiTokenRepository(instrumentation),
-    new DrizzleStaffDataEraser(instrumentation),
-    { impersonationsOf: endedImpersonationsOf },
+    di.IApiTokenRevoker,
+    di.IStaffDataEraser,
+    di.IEndedSessionsReader,
   );
 }
 
