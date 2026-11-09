@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
+import { ENTITLEMENTS } from "@modules/billing/domain/entitlements";
 import { AppErrorException } from "@packages/ddd-kit";
-import { ENTITLEMENTS } from "../../entitlements";
 import { assertFeature, assertPlan } from "../billing.middleware";
 
 const proView = {

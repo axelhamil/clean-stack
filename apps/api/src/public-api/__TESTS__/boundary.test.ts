@@ -1,13 +1,16 @@
 import { describe, expect, it, mock } from "bun:test";
+import type {
+  ApiTokenRecord,
+  IApiTokenRepository,
+} from "@modules/api-token/application/ports/api-token.port";
+import { generateToken, hmacToken } from "@modules/api-token/domain/api-token-crypto";
 import { type ILogger, Option, Result } from "@packages/ddd-kit";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { Hono } from "hono";
 import * as realAuthQueries from "../../auth-queries";
-import { generateToken, hmacToken } from "../../shared/crypto/api-token";
 import { createErrorHandler } from "../../shared/middleware/error.middleware";
 import { API_TOKEN_IP_POLICY } from "../../shared/middleware/rate-limit.policies";
-import type { ApiTokenRecord, IApiTokenRepository } from "../../shared/ports/api-token.port";
 import type {
   IRateLimiter,
   RateLimitDecision,

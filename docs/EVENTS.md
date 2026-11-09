@@ -540,7 +540,7 @@ Emitted via `emitEvent(outbox, ...)` inside the `@better-auth/stripe` plugin cal
 - `BILLING_SUBSCRIPTION_CANCELLED` (`billing.subscription.cancelled`): emitted on `customer.subscription.deleted`, and on `customer.subscription.updated` when status is `canceled` / `incomplete_expired` / `unpaid`. A `canceled` one takes an id derived from the Stripe subscription, so both webhooks announce one end. Payload: `{ organizationId, subscriptionId, tier, status, actorUserId: null }`, retention `compliance`.
 - `BILLING_PAYMENT_FAILED` (`billing.payment.failed`): emitted on `invoice.payment_failed` Stripe webhook. Payload: `{ organizationId, subscriptionId, invoiceId, actorUserId: null }`, retention `compliance` (kept long-term as part of the billing/financial audit trail: the whole `billing.*` family is `compliance` so there is no retention divergence within it).
 
-**Status mapping**: `subscriptionEventType(status)` in `apps/api/src/modules/billing/application/subscription-events.ts` maps Stripe subscription statuses to the three state events: `canceled` / `incomplete_expired` / `unpaid` → `BILLING_SUBSCRIPTION_CANCELLED`; all other statuses → `BILLING_SUBSCRIPTION_UPDATED`. `BILLING_SUBSCRIPTION_CREATED` fires only on the initial `customer.subscription.created` webhook path.
+**Status mapping**: `subscriptionEventType(status)` in `modules/billing/src/application/subscription-events.ts` maps Stripe subscription statuses to the three state events: `canceled` / `incomplete_expired` / `unpaid` → `BILLING_SUBSCRIPTION_CANCELLED`; all other statuses → `BILLING_SUBSCRIPTION_UPDATED`. `BILLING_SUBSCRIPTION_CREATED` fires only on the initial `customer.subscription.created` webhook path.
 
 ### Via `requireQuota` middleware (Phase B.2)
 

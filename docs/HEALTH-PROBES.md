@@ -53,7 +53,7 @@ DB down (critical) = `fail` + 503. Resend / storage hiccup (non-critical) = `war
 Each module **owner of an external dependency** ships its own `XxxHealthProbe` class implementing `OnInit`. inwire's `preload()` (called once after `.build()`) fires `onInit()` and the probe self-registers, no manual wiring list to keep in sync.
 
 ```ts
-// modules/billing/infrastructure/stripe-health-probe.ts
+// modules/billing/src/infrastructure/stripe-health-probe.ts
 import type { OnInit } from "inwire";
 import type { HealthCheckFn, IHealthCheckRegistry } from "../../../shared/ports/health.port";
 import type { IBillingProvider } from "../../../shared/ports/billing.port";
@@ -80,7 +80,7 @@ export class StripeHealthProbe implements OnInit {
 ```
 
 ```ts
-// modules/billing/module.ts
+// modules/billing/src/billing.module.ts
 declare module "inwire" {
   interface AppDeps {
     StripeHealthProbe: StripeHealthProbe;

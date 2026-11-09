@@ -15,9 +15,9 @@
 // WARNING: writes real user, organization and api_token rows (all prefixed
 // and cleaned up). Local database only, `requireLocalDatabase` enforces it.
 
+import type { TokenOwner } from "@modules/api-token/application/ports/api-token.port";
+import { DrizzleApiTokenRepository } from "@modules/api-token/infrastructure/repositories/drizzle-api-token.repository";
 import { apiTokenSchema, authSchema, db, multiTenantSchema, sql } from "@packages/drizzle";
-import { DrizzleApiTokenRepository } from "../src/modules/api-token/infrastructure/repositories/drizzle-api-token.repository";
-import type { TokenOwner } from "../src/shared/ports/api-token.port";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 import { checkRecorder, findSeededUserId } from "./check-harness";
 import { requireLocalDatabase } from "./require-local-database";

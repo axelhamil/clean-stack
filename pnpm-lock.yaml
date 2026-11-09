@@ -325,9 +325,15 @@ importers:
       '@better-auth/utils':
         specifier: 0.5.1
         version: 0.5.1
+      '@modules/api-token':
+        specifier: workspace:*
+        version: link:../../modules/api-token
       '@modules/audit-log':
         specifier: workspace:*
         version: link:../../modules/audit-log
+      '@modules/billing':
+        specifier: workspace:*
+        version: link:../../modules/billing
       '@modules/consents':
         specifier: workspace:*
         version: link:../../modules/consents
@@ -604,6 +610,52 @@ importers:
         specifier: ^4.6.7
         version: 4.6.7
 
+  modules/api-token:
+    dependencies:
+      '@packages/ddd-kit':
+        specifier: workspace:*
+        version: link:../../packages/ddd-kit
+      '@packages/drizzle':
+        specifier: workspace:*
+        version: link:../../packages/drizzle
+      '@packages/email':
+        specifier: workspace:*
+        version: link:../../packages/email
+      '@packages/events':
+        specifier: workspace:*
+        version: link:../../packages/events
+      '@packages/http':
+        specifier: workspace:*
+        version: link:../../packages/http
+      '@packages/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
+      '@packages/outbox':
+        specifier: workspace:*
+        version: link:../../packages/outbox
+      hono:
+        specifier: ^4.13.14
+        version: 4.13.14
+      inwire:
+        specifier: ^4.0.1
+        version: 4.0.1
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@packages/test':
+        specifier: workspace:*
+        version: link:../../packages/test
+      '@packages/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/bun':
+        specifier: ^1.4.4
+        version: 1.4.4
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
   modules/audit-log:
     dependencies:
       '@packages/ddd-kit':
@@ -630,6 +682,46 @@ importers:
       zod:
         specifier: ^4.6.7
         version: 4.6.7
+    devDependencies:
+      '@packages/test':
+        specifier: workspace:*
+        version: link:../../packages/test
+      '@packages/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/bun':
+        specifier: ^1.4.4
+        version: 1.4.4
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  modules/billing:
+    dependencies:
+      '@packages/access-control':
+        specifier: workspace:*
+        version: link:../../packages/access-control
+      '@packages/ddd-kit':
+        specifier: workspace:*
+        version: link:../../packages/ddd-kit
+      '@packages/drizzle':
+        specifier: workspace:*
+        version: link:../../packages/drizzle
+      '@packages/events':
+        specifier: workspace:*
+        version: link:../../packages/events
+      '@packages/http':
+        specifier: workspace:*
+        version: link:../../packages/http
+      hono:
+        specifier: ^4.13.14
+        version: 4.13.14
+      inwire:
+        specifier: ^4.0.1
+        version: 4.0.1
+      stripe:
+        specifier: ^23.0.1
+        version: 23.0.1(@types/node@26.6.5)
     devDependencies:
       '@packages/test':
         specifier: workspace:*
@@ -1151,6 +1243,9 @@ importers:
       pg:
         specifier: ^8.23.1
         version: 8.23.1
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
     devDependencies:
       '@packages/test':
         specifier: workspace:*

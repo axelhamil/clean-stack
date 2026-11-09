@@ -267,14 +267,14 @@ Deploy-safe perimeter: rate-limit, strict CSP, and stateless CSRF, wired before 
 
 Per-organization subscriptions, zero billing backoffice. Stripe Checkout for upgrades, Stripe Billing Portal for management.
 
-**State**: `subscription` table (webhook-synced): never `organization.metadata` (untyped, diverges under out-of-order webhooks). **Hybrid catalog** (`apps/api/src/shared/entitlements.ts`): prices + copy in Stripe Products; entitlements + `maxMembers` in typed `ENTITLEMENTS` map; `metadata.tier` is the join key.
+**State**: `subscription` table (webhook-synced): never `organization.metadata` (untyped, diverges under out-of-order webhooks). **Hybrid catalog** (`modules/billing/src/domain/entitlements.ts`): prices + copy in Stripe Products; entitlements + `maxMembers` in typed `ENTITLEMENTS` map; `metadata.tier` is the join key.
 
 **Three gate axes** (transferable pattern for any premium feature):
 - **Role**: `billing:["read","manage"]` in `@packages/access-control`.
 - **Seats**: `ENTITLEMENTS[tier].maxMembers` enforced in `beforeAddMember` / `beforeAcceptInvitation` / `beforeCreateInvitation` (`organization-seats.ts`, `402 ORGANIZATION_SEAT_PAYMENT_REQUIRED`). Unlimited = `null`.
 - **Tier/feature**: `requireFeature` / `requirePlan` (back, `402`); `useEntitlements()` / `<FeatureGate>` / `<PlanGate>` (front). Free tier: unlimited orgs, 3 members.
 
-**Module** `apps/api/src/modules/billing/`: `BillingCatalogService` (free-only when `STRIPE_SECRET_KEY` unset), `EntitlementsService`, `BillingPortalService` (resolves the org's Stripe customer, `BILLING_NOT_FOUND` without a subscription `active`, `trialing`, `past_due` or `unpaid`, the same read as `hasSubscription`, so a past due customer can change their card while tier resolution stays on `active` and `trialing`) behind `IBillingPortalGateway` (`StripeBillingPortalGateway`), `DrizzleSubscriptionReadStore`, `StripeCatalogSource`. Routes: `GET /billing/plans`, `GET /billing/subscription`, `POST /billing/checkout`, `POST /billing/portal`. **Frontend** `apps/app/src/features/billing/`: `/pricing` · `/settings/billing` · `useEntitlements()` · `<FeatureGate>` · `<PlanGate>`.
+**Module** `modules/billing/`: `BillingCatalogService` (free-only when `STRIPE_SECRET_KEY` unset), `EntitlementsService`, `BillingPortalService` (resolves the org's Stripe customer, `BILLING_NOT_FOUND` without a subscription `active`, `trialing`, `past_due` or `unpaid`, the same read as `hasSubscription`, so a past due customer can change their card while tier resolution stays on `active` and `trialing`) behind `IBillingPortalGateway` (`StripeBillingPortalGateway`), `DrizzleSubscriptionReadStore`, `StripeCatalogSource`. Routes: `GET /billing/plans`, `GET /billing/subscription`, `POST /billing/checkout`, `POST /billing/portal`. **Frontend** `apps/app/src/features/billing/`: `/pricing` · `/settings/billing` · `useEntitlements()` · `<FeatureGate>` · `<PlanGate>`.
 
 **Quota gating (B.2, dormant)**: `ENTITLEMENTS[tier].quotas` + `assertQuota`/`requireQuota` middleware + `quota-reservation.ts` + `quota_usage` table + `useQuota`/`<QuotaGate>`. See [`docs/QUOTA-GATING.md`](./QUOTA-GATING.md). The `quotas` module ships no route (never mounted): see [`docs/SURFACE.md`](./SURFACE.md#backend-capabilities-with-no-http-surface) for why it can't appear in the route inventory below.
 
@@ -363,18 +363,18 @@ Platform operator tooling: ban/unban users, change platform role, force password
 
 Machine-to-machine access with scoped, expirable tokens. Tokens are shown once at creation and never stored in plaintext.
 
-**Format**: `clean_` prefix (configurable via `API_TOKEN_PREFIX`) + 44 base58 body characters + 6-character CRC32 checksum. The checksum rejects malformed tokens before any database call. `apps/api/src/shared/crypto/api-token.ts`: `generateToken`, `parseToken`, `hmacToken`.
+**Format**: `clean_` prefix (configurable via `API_TOKEN_PREFIX`) + 44 base58 body characters + 6-character CRC32 checksum. The checksum rejects malformed tokens before any database call. `modules/api-token/src/domain/api-token-crypto.ts`: `generateToken`, `parseToken`, `hmacToken`.
 
 **Storage**: `HMAC-SHA256(pepper, raw_token)` in a unique-indexed column (`api_token.tokenHmac`). The pepper (`API_TOKEN_PEPPER`) is a server-side secret: a database dump alone yields no usable tokens. `pepperVersion` column enables rotation without downtime via `API_TOKEN_PEPPER_PREVIOUS`: tokens found by the old pepper are transparently rehashed on next use.
 
 **Schema** `packages/drizzle/src/schema/api-token.ts`: `api_token(id, userId FK, organizationId FK nullable, name, tokenHmac unique, pepperVersion, tokenStart, scopes jsonb, lastUsedAt, expiresAt, revokedAt, revokedReason, createdAt, updatedAt)`.
 
-**Backend** `apps/api/src/modules/api-token/`:
+**Backend** `modules/api-token/`:
 - `ApiTokenService`: `create`, `list`, `revoke`. `list` takes a `TokenOwner` (`{ kind: "personal" }` or `{ kind: "orgAndPersonal" }`): a caller with an active organization sees that organization's tokens *and* their own org-less personal tokens together; with no active organization, only the personal ones. One write per token (no per-request DB write: `lastUsedAt` updated via bucket: `WHERE last_used_at < now() - interval '15 min'`).
 - `DrizzleApiTokenRepository` implements `ScopedRepository<ApiToken, RepoScope>` (wrong-owner → `Option.none()` / `NOT_FOUND`, never 403).
 - `revokeTokensOnMembershipLost` event handler: cascades revocation on `org.member.removed`.
-- Routes `apps/api/src/modules/api-token/routes.ts`: `GET/POST /settings/tokens`, `DELETE /settings/tokens/:id` (session-auth; `denyImpersonated` on writes).
-- Scanning route `apps/api/src/modules/api-token/scanning.routes.ts`: `POST /api/token-scanning/github` (ECDSA P-256 signature verification against GitHub's live public-key endpoint; revokes + emails owner on match).
+- Routes `modules/api-token/src/infrastructure/http/api-token.routes.ts`: `GET/POST /settings/tokens`, `DELETE /settings/tokens/:id` (session-auth; `denyImpersonated` on writes).
+- Scanning route `modules/api-token/src/infrastructure/http/scanning.routes.ts`: `POST /api/token-scanning/github` (ECDSA P-256 signature verification against GitHub's live public-key endpoint; revokes + emails owner on match).
 
 **Public API sub-app** `apps/api/src/public-api/`: a separate `Hono` instance mounted at `/api/v1`, outside `AppType`. `sessionMiddleware` skips `/api/v1/*` entirely; the sub-app mounts `requireApiToken` on all routes. Token-reachable routes: `GET /api/v1/me`, `GET /api/v1/organizations`, `PATCH /api/v1/me`. **Why a separate sub-app rather than a flag on existing routes**: any route that mounts both `requireAuth` and `requireApiToken` eventually drifts: a new route gets one but not the other. The sub-app makes the contract structural: what is in `/api/v1` is reachable by token, everything else is session-only. The global rate-limit policy is also bypassed at `/api/v1/*` and replaced with per-token + per-IP axes. **The integrator-facing reference for this surface (routes, token format, scopes, error codes, rate-limit headers) is [`docs/PUBLIC-API.md`](./PUBLIC-API.md)**; this entry documents why the sub-app exists, that one documents how to call it.
 

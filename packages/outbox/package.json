@@ -11,6 +11,7 @@
     "./drizzle-outbox.repository": "./src/drizzle-outbox.repository.ts",
     "./outbox-relay": "./src/outbox-relay.ts",
     "./outbox-dispatcher": "./src/outbox-dispatcher.ts",
+    "./payload-parser": "./src/payload-parser.ts",
     "./pg-listener": "./src/pg-listener.ts",
     "./jitter": "./src/jitter.ts",
     "./lease-budget": "./src/lease-budget.ts",
@@ -31,7 +32,8 @@
     "@packages/drizzle": "workspace:*",
     "@packages/events": "workspace:*",
     "@packages/sentry-scrub": "workspace:*",
-    "pg": "^8.23.1"
+    "pg": "^8.23.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@packages/test": "workspace:*",

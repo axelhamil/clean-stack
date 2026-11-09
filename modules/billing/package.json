@@ -1,0 +1,50 @@
+{
+  "name": "@modules/billing",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./billing.module": "./src/billing.module.ts",
+    "./application/config/billing-settings": "./src/application/config/billing-settings.ts",
+    "./application/ports/billing-portal.port": "./src/application/ports/billing-portal.port.ts",
+    "./application/ports/entitlements-reader.port": "./src/application/ports/entitlements-reader.port.ts",
+    "./application/ports/plan-override.port": "./src/application/ports/plan-override.port.ts",
+    "./application/ports/stripe-catalog.port": "./src/application/ports/stripe-catalog.port.ts",
+    "./application/ports/stripe-event.port": "./src/application/ports/stripe-event.port.ts",
+    "./application/ports/subscription-read.port": "./src/application/ports/subscription-read.port.ts",
+    "./application/ports/subscription-sync.port": "./src/application/ports/subscription-sync.port.ts",
+    "./application/services/billing-catalog.service": "./src/application/services/billing-catalog.service.ts",
+    "./application/services/billing-portal.service": "./src/application/services/billing-portal.service.ts",
+    "./application/services/entitlements.service": "./src/application/services/entitlements.service.ts",
+    "./application/subscription-events": "./src/application/subscription-events.ts",
+    "./domain/entitlements": "./src/domain/entitlements.ts",
+    "./infrastructure/adapters/stripe-event.gateway": "./src/infrastructure/adapters/stripe-event.gateway.ts",
+    "./infrastructure/adapters/stripe-payment-failure": "./src/infrastructure/adapters/stripe-payment-failure.ts",
+    "./infrastructure/adapters/stripe-sync-verifier": "./src/infrastructure/adapters/stripe-sync-verifier.ts",
+    "./infrastructure/http/billing.routes": "./src/infrastructure/http/billing.routes.ts"
+  },
+  "scripts": {
+    "format": "biome format . --write",
+    "lint": "biome lint .",
+    "check": "biome check .",
+    "fix": "biome check --write .",
+    "type-check": "tsc --noEmit",
+    "test": "bun test --isolate"
+  },
+  "dependencies": {
+    "@packages/access-control": "workspace:*",
+    "@packages/ddd-kit": "workspace:*",
+    "@packages/drizzle": "workspace:*",
+    "@packages/events": "workspace:*",
+    "@packages/http": "workspace:*",
+    "hono": "^4.13.14",
+    "inwire": "^4.0.1",
+    "stripe": "^23.0.1"
+  },
+  "devDependencies": {
+    "@packages/test": "workspace:*",
+    "@packages/typescript-config": "workspace:*",
+    "@types/bun": "^1.4.4",
+    "typescript": "^7.0.2"
+  }
+}

@@ -1,3 +1,6 @@
+import type { ApiScope } from "@modules/api-token/application/dto/create-token.dto";
+import type { IApiTokenRepository } from "@modules/api-token/application/ports/api-token.port";
+import { hmacToken, parseToken } from "@modules/api-token/domain/api-token-crypto";
 import type { IInstrumentation, ILogger, IUnitOfWork } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { emitEvent } from "@packages/outbox/event-emitter";
@@ -7,9 +10,6 @@ import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import type { SessionUser } from "../../auth";
 import { findUserById } from "../../auth-queries";
-import type { ApiScope } from "../../modules/api-token/application/dto/create-token.dto";
-import { hmacToken, parseToken } from "../crypto/api-token";
-import type { IApiTokenRepository } from "../ports/api-token.port";
 import { getRequestId } from "../request-context";
 
 export interface ApiTokenVariables {

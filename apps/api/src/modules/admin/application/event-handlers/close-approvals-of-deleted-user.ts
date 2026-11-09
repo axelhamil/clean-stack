@@ -1,6 +1,6 @@
 import { type EventHandler, type IDomainEvent, onEvent } from "@packages/ddd-kit";
 import { EventTypes, PayloadByEventType } from "@packages/events";
-import { payloadParser } from "../../../../shared/payload-parser";
+import { payloadParser } from "@packages/outbox/payload-parser";
 import type { ApprovalService } from "../services/approval.service";
 
 interface CloseApprovalsDeps {

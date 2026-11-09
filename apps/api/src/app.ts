@@ -1,4 +1,7 @@
+import { createApiTokenRoutes } from "@modules/api-token/infrastructure/http/api-token.routes";
+import { createApiTokenScanningRoutes } from "@modules/api-token/infrastructure/http/scanning.routes";
 import { createAuditLogRoutes } from "@modules/audit-log/infrastructure/http/audit-log.routes";
+import { createBillingRoutes } from "@modules/billing/infrastructure/http/billing.routes";
 import { createConsentRoutes } from "@modules/consents/infrastructure/http/consents.routes";
 import { createNotificationsRoutes } from "@modules/notifications/infrastructure/http/notifications.routes";
 import { createPolicyRoutes } from "@modules/policies/infrastructure/http/policies.routes";
@@ -22,9 +25,6 @@ import { createAdminOpsRoutes } from "./modules/admin/ops.routes";
 import { createAdminUserRoutes } from "./modules/admin/routes";
 import { createAdminStaffRoutes } from "./modules/admin/staff.routes";
 import { createAdminWorkspaceRoutes } from "./modules/admin/workspace.routes";
-import { createApiTokenRoutes } from "./modules/api-token/routes";
-import { createApiTokenScanningRoutes } from "./modules/api-token/scanning.routes";
-import { createBillingRoutes } from "./modules/billing/routes";
 import { healthInternalRoutes } from "./modules/health/internal.routes";
 import { healthRoutes } from "./modules/health/routes";
 import { organizationSettingsRoutes } from "./modules/organization/routes";

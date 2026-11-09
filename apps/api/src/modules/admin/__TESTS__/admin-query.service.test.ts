@@ -1,7 +1,7 @@
 import { describe, expect, it, mock } from "bun:test";
+import { entitlementsForTier } from "@modules/billing/domain/entitlements";
 import { Option, Result } from "@packages/ddd-kit";
 import { mockPort } from "@packages/test/bun";
-import { entitlementsForTier } from "../../../shared/entitlements";
 import type { IEntitlementsReader } from "../../../shared/ports/entitlements-reader.port";
 import type {
   ActivePlanOverride,

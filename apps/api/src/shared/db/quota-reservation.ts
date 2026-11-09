@@ -1,3 +1,4 @@
+import type { QuotaKey } from "@modules/billing/domain/entitlements";
 import type { AnyPgColumn, AnyPgTable } from "@packages/drizzle";
 import {
   ambientTransaction,
@@ -6,7 +7,6 @@ import {
   lockForTransaction,
   resolveExecutor,
 } from "@packages/drizzle";
-import type { QuotaKey } from "../entitlements";
 import { assertQuota } from "../middleware/billing.middleware";
 
 export async function countScopedRows(

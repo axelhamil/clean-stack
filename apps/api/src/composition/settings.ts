@@ -1,4 +1,6 @@
+import type { ApiTokenSettings } from "@modules/api-token/application/config/api-token-settings";
 import type { AuditLogSettings } from "@modules/audit-log/application/config/audit-log-settings";
+import type { BillingSettings } from "@modules/billing/application/config/billing-settings";
 import type { ConsentSettings } from "@modules/consents/application/config/consent-settings";
 import type { NotificationSettings } from "@modules/notifications/application/config/notification-settings";
 import type {
@@ -10,8 +12,6 @@ import { Option } from "@packages/ddd-kit";
 import { defineModule } from "inwire";
 import type { AdminSettings } from "../modules/admin/application/config/admin-settings";
 import type { StaffEnv } from "../modules/admin/application/services/staff-access";
-import type { ApiTokenSettings } from "../modules/api-token/application/config/api-token-settings";
-import type { BillingSettings } from "../modules/billing/application/config/billing-settings";
 import type { RgpdSettings } from "../modules/rgpd/application/config/rgpd-settings";
 import type { WebhookSettings } from "../modules/webhooks/application/config/webhook-settings";
 import type { env } from "../shared/env";

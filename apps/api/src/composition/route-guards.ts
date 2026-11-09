@@ -1,10 +1,10 @@
+import type { Feature, QuotaKey } from "@modules/billing/domain/entitlements";
 import type { StaffAccess } from "@packages/access-control";
 import { Option } from "@packages/ddd-kit";
 import type { CurrentSession, RouteGuards } from "@packages/http/route-guards";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { SessionData, SessionUser } from "../auth";
-import type { Feature, QuotaKey } from "../shared/entitlements";
 import { requireAuth } from "../shared/middleware/auth.middleware";
 import { requireFeature, requirePlan, requireQuota } from "../shared/middleware/billing.middleware";
 import { denyImpersonated } from "../shared/middleware/deny-impersonated.middleware";

@@ -7,6 +7,7 @@
  */
 
 import "./check-admin-ops.env";
+import { StripeEventGateway } from "@modules/billing/infrastructure/adapters/stripe-event.gateway";
 import { uuidv7 } from "@packages/ddd-kit";
 import {
   and,
@@ -27,7 +28,6 @@ import type Stripe from "stripe";
 import { auth } from "../src/auth";
 import { di } from "../src/container";
 import { StripeReplayService } from "../src/modules/admin/application/services/stripe-replay.service";
-import { StripeEventGateway } from "../src/modules/billing/infrastructure/adapters/stripe-event.gateway";
 import { env } from "../src/shared/env";
 import { sweepStripeEventsRoutes } from "../src/shared/internal-routes/sweep-stripe-events.route";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
