@@ -1,3 +1,4 @@
+export * from "./application/db-failure";
 export * from "./application/error-code";
 export * from "./application/instrumentation";
 export * from "./application/logger";

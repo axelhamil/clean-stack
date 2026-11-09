@@ -1,9 +1,9 @@
 import { describe, expect, it, mock } from "bun:test";
+import type { AuditLogRoutesDeps } from "@modules/audit-log/infrastructure/http/audit-log.routes";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { mockPort } from "@packages/test/bun";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import type { AuditLogRoutesDeps } from "../../audit-log/routes";
 
 const realAuthMiddleware = await import("../../../shared/middleware/auth.middleware");
 mock.module("../../../shared/middleware/auth.middleware", () => ({
@@ -28,7 +28,9 @@ mock.module("../../../shared/middleware/staff.middleware", () => ({
 }));
 
 const { mountAdminRoutes } = await import("./mount-admin-routes");
-const { createAuditLogRoutes } = await import("../../audit-log/routes");
+const { createAuditLogRoutes } = await import(
+  "@modules/audit-log/infrastructure/http/audit-log.routes"
+);
 const { routeGuards } = await import("../../../composition/route-guards");
 const { listBackRoutes } = await import("../../../shared/surface/back-routes");
 

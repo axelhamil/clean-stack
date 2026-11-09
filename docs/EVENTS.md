@@ -611,7 +611,7 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 | `packages/outbox/src/outbox-relay.ts` | Claim by lease, run the named handlers, settle, dead announcement |
 | `packages/outbox/src/drizzle-outbox.repository.ts` | Outbox repository: enqueue, claim, `pendingState`, `markDelivered`, `markFailed` |
 | `packages/outbox/src/event-handlers.ts` | Subscribes the built-in handlers to every catalog type, then the discovered `onEvent` handlers |
-| `apps/api/src/modules/audit-log/infrastructure/services/audit-event-subscriber.ts` | Built-in `audit-log` handler |
+| `modules/audit-log/src/infrastructure/services/audit-event-subscriber.ts` | Built-in `audit-log` handler |
 | `apps/api/src/modules/webhooks/infrastructure/services/webhook-fanout-subscriber.ts` | Built-in `webhook-fanout` handler (org-scoped) |
 | `apps/api/src/modules/webhooks/infrastructure/services/webhook-delivery-worker.service.ts` | HMAC POST + claim window + retry |
 | `apps/api/src/shared/aead.ts` | AEAD encrypt/decrypt for webhook secrets |

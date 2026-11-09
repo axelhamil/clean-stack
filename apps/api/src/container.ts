@@ -1,8 +1,11 @@
+import { auditLogModule } from "@modules/audit-log/audit-log.module";
 import { consentModule } from "@modules/consents/consents.module";
+import { notificationsModule } from "@modules/notifications/notifications.module";
 import { policyModule } from "@modules/policies/policies.module";
 import { profileModule } from "@modules/profile/profile.module";
 import { quotaModule } from "@modules/quotas/quotas.module";
-import type { EventHandler, IInstrumentation, IUnitOfWork } from "@packages/ddd-kit";
+import { uploadsModule } from "@modules/uploads/uploads.module";
+import type { EventHandler, IInstrumentation, ILogger, IUnitOfWork } from "@packages/ddd-kit";
 import { getRateLimitDbClient, TransactionService } from "@packages/drizzle";
 import { DrizzleEmailQueue } from "@packages/email/drizzle-email-queue";
 import type { IEmailService } from "@packages/email/email.port";
@@ -25,12 +28,9 @@ import { apiSettings } from "./composition/settings";
 import { rgpdSources } from "./composition/sources/rgpd";
 import { adminModule } from "./modules/admin/module";
 import { apiTokenModule } from "./modules/api-token/module";
-import { auditLogModule } from "./modules/audit-log/module";
 import { billingModule } from "./modules/billing/module";
 import { healthModule } from "./modules/health/module";
-import { notificationsModule } from "./modules/notifications/module";
 import { rgpdModule } from "./modules/rgpd/module";
-import { uploadsModule } from "./modules/uploads/module";
 import { webhooksModule } from "./modules/webhooks/module";
 import { authSecretKey } from "./shared/auth/auth-secrets";
 import type { OutermostUnitOfWork } from "./shared/auth/unit-of-work-adapter";
@@ -74,6 +74,7 @@ declare module "inwire" {
     IOutboxRepository: IOutboxRepository;
     ISweepRunStore: ISweepRunStore;
     IInstrumentation: IInstrumentation;
+    ILogger: ILogger;
     IPasswordBreachService: IPasswordBreachService;
     IDisposableEmailService: IDisposableEmailService;
     IRateLimiter: IRateLimiter & IRateLimitUsage;
@@ -96,6 +97,7 @@ export const di = container()
     (): IInstrumentation =>
       env.SENTRY_DSN ? new SentryInstrumentation() : new LoggingInstrumentation(logger),
   )
+  .add("ILogger", (): ILogger => logger)
   .add("ISweepRunStore", (c): ISweepRunStore => new DrizzleSweepRunStore(c.IInstrumentation))
   .add(
     "IOutboxRepository",

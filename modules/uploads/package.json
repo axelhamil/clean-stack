@@ -1,0 +1,41 @@
+{
+  "name": "@modules/uploads",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./uploads.module": "./src/uploads.module.ts",
+    "./application/config/upload-settings": "./src/application/config/upload-settings.ts",
+    "./application/ports/health.port": "./src/application/ports/health.port.ts",
+    "./application/ports/storage.port": "./src/application/ports/storage.port.ts",
+    "./application/services/upload.service": "./src/application/services/upload.service.ts",
+    "./infrastructure/services/noop-storage.service": "./src/infrastructure/services/noop-storage.service.ts",
+    "./infrastructure/storage-health-probe": "./src/infrastructure/storage-health-probe.ts",
+    "./infrastructure/http/uploads.routes": "./src/infrastructure/http/uploads.routes.ts"
+  },
+  "scripts": {
+    "format": "biome format . --write",
+    "lint": "biome lint .",
+    "check": "biome check .",
+    "fix": "biome check --write .",
+    "type-check": "tsc --noEmit",
+    "test": "bun test --isolate"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1158.0",
+    "@aws-sdk/s3-request-presigner": "^3.1158.0",
+    "@packages/ddd-kit": "workspace:*",
+    "@packages/events": "workspace:*",
+    "@packages/http": "workspace:*",
+    "@packages/outbox": "workspace:*",
+    "hono": "^4.13.14",
+    "inwire": "^4.0.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@packages/test": "workspace:*",
+    "@packages/typescript-config": "workspace:*",
+    "@types/bun": "^1.4.4",
+    "typescript": "^7.0.2"
+  }
+}

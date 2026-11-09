@@ -1,7 +1,7 @@
 // `/internal/sweep-audit-log`: gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
-import type { AuditRetention } from "@packages/drizzle";
 import { and, auditLogSchema, eq, lt } from "@packages/drizzle";
+import type { AuditRetention } from "@packages/events";
 import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";

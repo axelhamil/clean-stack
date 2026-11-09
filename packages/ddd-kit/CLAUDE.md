@@ -8,7 +8,7 @@ Domain primitives and the ports every backend package shares. Where and when to 
 src/
   primitives/    result, option, uuid (uuidv7 monotonic, UUID, randomUuidV4), canonical-json (`canonicalize`, key-order independent JSON for hashes and idempotency keys)
   domain/        entity, aggregate, value-object, watched-list, domain-event
-  application/   repository (Base + Scoped), scope (RepoScope), transaction (IUnitOfWork), unit-of-work-context (the one ambient scope: tx + collected events), error-code (AppError), instrumentation (IInstrumentation), logger (ILogger), pagination
+  application/   repository (Base + Scoped), scope (RepoScope), transaction (IUnitOfWork), unit-of-work-context (the one ambient scope: tx + collected events), error-code (AppError), db-failure (`createDbFailure(code, logger)`: logs the raw error, returns a failed `Result`), instrumentation (IInstrumentation), logger (ILogger), pagination
   events/        event-collector, event-dispatcher, in-memory-event-dispatcher, event-handler, on-event, outbox-mapping
   __TESTS__/     one file per primitive
 ```
@@ -32,6 +32,7 @@ Framework-free: it imports only Node built-ins, nothing from Drizzle, Hono, Zod 
 | `BaseRepository<T>` | A genuinely global aggregate (audit logs, system config). Rare. |
 | `ScopedRepository<T, TScope>` | An owned aggregate carrying `userId`/`organizationId`; the scope is a `RepoScope` argument, so ownership lives in the repository's `WHERE`, not in a route. |
 | `IInstrumentation`, `ILogger` | Constructor-injected into every I/O class, app or package. |
+| `createDbFailure(code, logger)` | A service or repository `catch` that must log the driver error and return `Result.fail` with its typed code; built once in the constructor from the injected `ILogger`, never per call. |
 
 ## Rules
 

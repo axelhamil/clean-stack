@@ -1,0 +1,38 @@
+{
+  "name": "@modules/audit-log",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./audit-log.module": "./src/audit-log.module.ts",
+    "./application/config/audit-log-settings": "./src/application/config/audit-log-settings.ts",
+    "./application/ports/audit-trail.port": "./src/application/ports/audit-trail.port.ts",
+    "./application/services/audit-query.service": "./src/application/services/audit-query.service.ts",
+    "./infrastructure/services/audit-event-subscriber": "./src/infrastructure/services/audit-event-subscriber.ts",
+    "./infrastructure/http/audit-log.routes": "./src/infrastructure/http/audit-log.routes.ts"
+  },
+  "scripts": {
+    "format": "biome format . --write",
+    "lint": "biome lint .",
+    "check": "biome check .",
+    "fix": "biome check --write .",
+    "type-check": "tsc --noEmit",
+    "test": "bun test --isolate"
+  },
+  "dependencies": {
+    "@packages/ddd-kit": "workspace:*",
+    "@packages/drizzle": "workspace:*",
+    "@packages/events": "workspace:*",
+    "@packages/http": "workspace:*",
+    "@packages/outbox": "workspace:*",
+    "hono": "^4.13.14",
+    "inwire": "^4.0.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@packages/test": "workspace:*",
+    "@packages/typescript-config": "workspace:*",
+    "@types/bun": "^1.4.4",
+    "typescript": "^7.0.2"
+  }
+}

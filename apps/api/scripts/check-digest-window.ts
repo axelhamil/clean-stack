@@ -15,11 +15,11 @@
 // seeded account, and takes the real `flush-notification-emails` advisory lock.
 // Local database only, `requireLocalDatabase` enforces it.
 
+import { NotificationFanoutSubscriber } from "@modules/notifications/infrastructure/services/notification-fanout-subscriber";
 import type { IInstrumentation } from "@packages/ddd-kit";
 import { db, sql, TransactionService } from "@packages/drizzle";
 import type { DeliveredEvent } from "@packages/outbox/outbox.port";
 import type { Hono } from "hono";
-import { NotificationFanoutSubscriber } from "../src/modules/notifications/infrastructure/services/notification-fanout-subscriber";
 import { flushNotificationEmailsRoutes } from "../src/shared/internal-routes/flush-notification-emails.route";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 import {

@@ -310,12 +310,6 @@ importers:
 
   apps/api:
     dependencies:
-      '@aws-sdk/client-s3':
-        specifier: ^3.1158.0
-        version: 3.1158.0
-      '@aws-sdk/s3-request-presigner':
-        specifier: ^3.1158.0
-        version: 3.1158.0
       '@better-auth/passkey':
         specifier: 1.7.14
         version: 1.7.14(@better-auth/core@1.7.14(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(@opentelemetry/api@1.9.1)(better-call@1.4.4(zod@4.6.7))(jose@6.2.12)(kysely@0.29.6)(nanostores@1.5.4))(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(better-auth@1.7.14(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.11)(drizzle-orm@0.45.4(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.6)(pg@8.23.1))(pg@8.23.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(solid-js@1.9.15)(vitest@5.0.5))(better-call@1.4.4(zod@4.6.7))(nanostores@1.5.4)
@@ -331,9 +325,15 @@ importers:
       '@better-auth/utils':
         specifier: 0.5.1
         version: 0.5.1
+      '@modules/audit-log':
+        specifier: workspace:*
+        version: link:../../modules/audit-log
       '@modules/consents':
         specifier: workspace:*
         version: link:../../modules/consents
+      '@modules/notifications':
+        specifier: workspace:*
+        version: link:../../modules/notifications
       '@modules/policies':
         specifier: workspace:*
         version: link:../../modules/policies
@@ -343,6 +343,9 @@ importers:
       '@modules/quotas':
         specifier: workspace:*
         version: link:../../modules/quotas
+      '@modules/uploads':
+        specifier: workspace:*
+        version: link:../../modules/uploads
       '@noble/ciphers':
         specifier: ^2.4.0
         version: 2.4.0
@@ -601,11 +604,94 @@ importers:
         specifier: ^4.6.7
         version: 4.6.7
 
+  modules/audit-log:
+    dependencies:
+      '@packages/ddd-kit':
+        specifier: workspace:*
+        version: link:../../packages/ddd-kit
+      '@packages/drizzle':
+        specifier: workspace:*
+        version: link:../../packages/drizzle
+      '@packages/events':
+        specifier: workspace:*
+        version: link:../../packages/events
+      '@packages/http':
+        specifier: workspace:*
+        version: link:../../packages/http
+      '@packages/outbox':
+        specifier: workspace:*
+        version: link:../../packages/outbox
+      hono:
+        specifier: ^4.13.14
+        version: 4.13.14
+      inwire:
+        specifier: ^4.0.1
+        version: 4.0.1
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@packages/test':
+        specifier: workspace:*
+        version: link:../../packages/test
+      '@packages/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/bun':
+        specifier: ^1.4.4
+        version: 1.4.4
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
   modules/consents:
     dependencies:
       '@packages/cookie-consent':
         specifier: workspace:*
         version: link:../../packages/cookie-consent
+      '@packages/ddd-kit':
+        specifier: workspace:*
+        version: link:../../packages/ddd-kit
+      '@packages/drizzle':
+        specifier: workspace:*
+        version: link:../../packages/drizzle
+      '@packages/events':
+        specifier: workspace:*
+        version: link:../../packages/events
+      '@packages/http':
+        specifier: workspace:*
+        version: link:../../packages/http
+      '@packages/outbox':
+        specifier: workspace:*
+        version: link:../../packages/outbox
+      hono:
+        specifier: ^4.13.14
+        version: 4.13.14
+      inwire:
+        specifier: ^4.0.1
+        version: 4.0.1
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@packages/test':
+        specifier: workspace:*
+        version: link:../../packages/test
+      '@packages/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/bun':
+        specifier: ^1.4.4
+        version: 1.4.4
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  modules/notifications:
+    dependencies:
+      '@packages/access-control':
+        specifier: workspace:*
+        version: link:../../packages/access-control
       '@packages/ddd-kit':
         specifier: workspace:*
         version: link:../../packages/ddd-kit
@@ -741,6 +827,49 @@ importers:
       inwire:
         specifier: ^4.0.1
         version: 4.0.1
+    devDependencies:
+      '@packages/test':
+        specifier: workspace:*
+        version: link:../../packages/test
+      '@packages/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/bun':
+        specifier: ^1.4.4
+        version: 1.4.4
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  modules/uploads:
+    dependencies:
+      '@aws-sdk/client-s3':
+        specifier: ^3.1158.0
+        version: 3.1158.0
+      '@aws-sdk/s3-request-presigner':
+        specifier: ^3.1158.0
+        version: 3.1158.0
+      '@packages/ddd-kit':
+        specifier: workspace:*
+        version: link:../../packages/ddd-kit
+      '@packages/events':
+        specifier: workspace:*
+        version: link:../../packages/events
+      '@packages/http':
+        specifier: workspace:*
+        version: link:../../packages/http
+      '@packages/outbox':
+        specifier: workspace:*
+        version: link:../../packages/outbox
+      hono:
+        specifier: ^4.13.14
+        version: 4.13.14
+      inwire:
+        specifier: ^4.0.1
+        version: 4.0.1
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
     devDependencies:
       '@packages/test':
         specifier: workspace:*
@@ -3724,6 +3853,9 @@ packages:
   '@smithy/core@3.37.0':
     resolution: {integrity: sha512-97imTcCyiPd8k0e9+ts/Sp0W65Dn9Ti357J7M09Ov4tI8Q1JDJVFSoAJtjEVKqfHEr3Pdo2jfolqKCaaiszH0g==}
     engines: {node: '>=18.0.0'}
+    deprecated: |-
+      Deprecated due to a bug in custom logger data redaction. Upgrade to the latest version. If you used a custom logger with this
+        version, review your logs and rotate any credentials or other secrets. See https://github.com/aws/aws-sdk-js-v3/issues/8393.
 
   '@smithy/credential-provider-imds@4.5.2':
     resolution: {integrity: sha512-A9uSdn72ozbRUSit0eib0TW7nXuNPlaeM0zcGkJ+nE6tFcSDbnmtwoxbTCFBukVQcszDAyvsd7+rTduPTXpygg==}

@@ -17,16 +17,7 @@ const ALLOWED_TX_PARAMETERS: Record<string, string> = {};
 
 const ALLOWED_TRANSACTION_OPENERS: Record<string, string> = {};
 
-const COMPOSED_MODULES = [
-  "admin",
-  "api-token",
-  "audit-log",
-  "billing",
-  "notifications",
-  "rgpd",
-  "uploads",
-  "webhooks",
-];
+const COMPOSED_MODULES = ["admin", "api-token", "billing", "rgpd", "webhooks"];
 
 const modules = readdirSync(join(apiSrcRoot, "modules"), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())

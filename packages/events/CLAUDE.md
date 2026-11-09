@@ -8,7 +8,7 @@ The single event catalog: every domain event type, its payload schema, retention
 src/
   event-types.ts          `EventTypes` (const object), `ALL_EVENT_TYPES`, subscription matching (`matchesSubscription`)
   payloads.ts             one Zod payload per type, `PayloadByEventType`
-  retention-map.ts        `RETENTION_MAP: Record<EventType, "operational" | "compliance" | "none">`
+  retention-map.ts        `RETENTION_MAP: Record<EventType, "operational" | "compliance" | "none">`, the audit closed lists `AUDIT_ACTOR_TYPES` and `AUDIT_RETENTIONS` (the `audit_log` enums and the audit port share them)
   visibility-map.ts       `VISIBILITY` (`satisfies Record<EventType, ...>`): `public` = webhook-subscribable, `internal` = never exposed
   event-descriptions.ts   `EVENT_DESCRIPTIONS: Record<EventType, string>`, English only
   notification-map.ts     optional `NOTIFICATION_MAP` (audience, category, allowed payload fields)

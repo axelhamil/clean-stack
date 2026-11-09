@@ -1,5 +1,9 @@
 // `/internal/flush-notification-emails`, gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
+import type {
+  DueNotification,
+  NotificationDigestError,
+} from "@modules/notifications/application/ports/notification-digest.port";
 import { type Option, Result } from "@packages/ddd-kit";
 import type { EmailError } from "@packages/email/email.port";
 import { zV } from "@packages/http/validator";
@@ -9,7 +13,6 @@ import { HTTPException } from "hono/http-exception";
 import type { PinoLogger } from "hono-pino";
 import { z } from "zod";
 import { di } from "../../container";
-import type { DueNotification, NotificationDigestError } from "../ports/notification-digest.port";
 import { internalLayers } from "./internal-layers";
 import { type SweepBeat, withSweepHeartbeat } from "./sweep-heartbeat";
 import { type SweepSpans, sweepSpans } from "./sweep-span";
