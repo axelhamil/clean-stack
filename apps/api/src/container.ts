@@ -1,3 +1,4 @@
+import { adminModule } from "@modules/admin/admin.module";
 import { apiTokenModule } from "@modules/api-token/api-token.module";
 import { auditLogModule } from "@modules/audit-log/audit-log.module";
 import { billingModule } from "@modules/billing/billing.module";
@@ -30,8 +31,8 @@ import { OutboxRelay } from "@packages/outbox/outbox-relay";
 import { container } from "inwire";
 import { Resend } from "resend";
 import { apiSettings } from "./composition/settings";
+import { adminSources } from "./composition/sources/admin";
 import { rgpdSources } from "./composition/sources/rgpd";
-import { adminModule } from "./modules/admin/module";
 import { healthModule } from "./modules/health/module";
 import { authSecretKey } from "./shared/auth/auth-secrets";
 import type { OutermostUnitOfWork } from "./shared/auth/unit-of-work-adapter";
@@ -205,6 +206,7 @@ export const di = container()
   .addModule(billingModule)
   .addModule(notificationsModule)
   .addModule(profileModule)
+  .addModule(adminSources)
   .addModule(adminModule)
   .addModule(rgpdSources)
   .addModule(rgpdModule)

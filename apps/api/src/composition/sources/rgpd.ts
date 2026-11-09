@@ -1,3 +1,11 @@
+import { announceImpersonationsEnded } from "@modules/admin/application/services/impersonation-end";
+import {
+  grantsStaffAccess,
+  isLastManager,
+  type StaffListing,
+} from "@modules/admin/application/services/staff-access";
+import { DrizzleStaffDataEraser } from "@modules/admin/infrastructure/repositories/drizzle-staff-data-eraser";
+import { endedImpersonationsOf } from "@modules/admin/infrastructure/repositories/ended-sessions";
 import type { ApiTokenService } from "@modules/api-token/application/services/api-token.service";
 import type { IApiTokenRevoker } from "@modules/rgpd/application/ports/api-token-revoker.port";
 import type { IEndedSessionsReader } from "@modules/rgpd/application/ports/ended-sessions.port";
@@ -6,14 +14,6 @@ import type { IStaffDataEraser } from "@modules/rgpd/application/ports/staff-dat
 import type { IInstrumentation } from "@packages/ddd-kit";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { defineModule } from "inwire";
-import { announceImpersonationsEnded } from "../../modules/admin/application/services/impersonation-end";
-import {
-  grantsStaffAccess,
-  isLastManager,
-  type StaffListing,
-} from "../../modules/admin/application/services/staff-access";
-import { DrizzleStaffDataEraser } from "../../modules/admin/infrastructure/repositories/drizzle-staff-data-eraser";
-import { endedImpersonationsOf } from "../../shared/db/ended-sessions";
 
 export function staffAccessRules(
   outbox: IOutboxRepository,

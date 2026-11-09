@@ -1,6 +1,6 @@
+import type { IAuthProvider } from "@modules/admin/application/ports/auth-provider.port";
 import type { IInstrumentation } from "@packages/ddd-kit";
 import { auth } from "../auth";
-import type { IAuthProvider } from "../modules/admin/application/ports/auth-provider.port";
 import { IMPERSONATION_TTL_SECONDS } from "../shared/auth/impersonation-ttl";
 import { deliverPasswordReset } from "../shared/auth/password-reset-delivery";
 

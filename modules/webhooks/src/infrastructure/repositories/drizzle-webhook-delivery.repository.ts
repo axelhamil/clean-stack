@@ -10,6 +10,7 @@ import {
   and,
   asc,
   claimedSet,
+  count,
   db,
   dbNow,
   deadShareOf,
@@ -191,6 +192,29 @@ export class DrizzleWebhookDeliveryRepository implements IWebhookDeliveryReposit
         } catch (e) {
           this.instrumentation.capture(e);
           return this.fail(e, "webhook delivery lookup failed");
+        }
+      },
+    );
+  }
+
+  async countDeadLetters(): Promise<Result<number, WebhookRepoError>> {
+    const exec = resolveExecutor();
+    return this.instrumentation.startSpan(
+      { name: "DrizzleWebhookDeliveryRepository > countDeadLetters" },
+      async () => {
+        try {
+          const query = exec
+            .select({ value: count() })
+            .from(wd)
+            .where(eq(wd.status, "dead_letter"));
+          const [total] = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+          return Result.ok(total?.value ?? 0);
+        } catch (e) {
+          this.instrumentation.capture(e);
+          return this.fail(e, "webhook dead letter count failed");
         }
       },
     );
