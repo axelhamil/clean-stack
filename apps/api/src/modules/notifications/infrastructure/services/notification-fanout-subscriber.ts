@@ -12,9 +12,9 @@ import {
 import { type NotificationChannel, notificationConfigOf } from "@packages/events";
 import type { BuiltInEventHandler } from "@packages/outbox/event-handlers";
 import type { DeliveredEvent } from "@packages/outbox/outbox.port";
-import type { StaffEnv } from "../staff-access";
-import { DEFAULT_DIGEST_HOUR_UTC, digestDueAt } from "./digest-schedule";
-import { resolveAudience } from "./resolve-audience";
+import type { StaffAudienceSettings } from "../../application/config/notification-settings";
+import { DEFAULT_DIGEST_HOUR_UTC, digestDueAt } from "../../application/services/digest-schedule";
+import { resolveAudience } from "../../application/services/resolve-audience";
 import { staffRecipients } from "./staff-recipients";
 
 function dedupKeyFor(
@@ -120,7 +120,7 @@ export class NotificationFanoutSubscriber implements BuiltInEventHandler {
     private readonly uow: IUnitOfWork,
     private readonly instrumentation: IInstrumentation,
     private readonly digestHourUtc: number = DEFAULT_DIGEST_HOUR_UTC,
-    private readonly staffEnv: StaffEnv = {
+    private readonly staffEnv: StaffAudienceSettings = {
       PLATFORM_ADMIN_IDS: [],
       PLATFORM_ADMIN_REQUIRE_MFA: false,
     },

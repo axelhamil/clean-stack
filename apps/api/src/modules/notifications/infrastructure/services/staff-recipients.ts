@@ -12,8 +12,8 @@ import {
   sql,
   staffSchema,
 } from "@packages/drizzle";
-import type { StaffEnv } from "../staff-access";
-import type { AudienceTarget } from "./resolve-audience";
+import type { StaffAudienceSettings } from "../../application/config/notification-settings";
+import type { AudienceTarget } from "../../application/services/resolve-audience";
 
 /**
  * Who can use a staff permission now, read the way `staffAccessOf` and `staffReachable` decide it,
@@ -22,7 +22,7 @@ import type { AudienceTarget } from "./resolve-audience";
  */
 export function staffRecipients(
   target: Extract<AudienceTarget, { kind: "staff" }>,
-  env: StaffEnv,
+  env: StaffAudienceSettings,
 ): SQL {
   const s = staffSchema.staffMember;
   const o = staffSchema.staffPermissionOverride;

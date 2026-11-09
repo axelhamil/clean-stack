@@ -11,16 +11,16 @@ import type {
   StaffRecord,
   StaffStoreError,
 } from "../../../../shared/ports/staff-store.port";
-import { announceImpersonationsEnded } from "../../../../shared/services/impersonation-end";
-import { announceSessionsEnded } from "../../../../shared/services/session-end";
+import type { AdminStoreError, IAdminUserStore } from "../ports/admin-user-store.port";
+import { announceImpersonationsEnded } from "./impersonation-end";
+import { announceSessionsEnded } from "./session-end";
 import {
   grantsStaffAccess,
   IMPERSONATE_PERMISSION,
   isLastManager,
   permissionsOfRecord,
   type StaffListing,
-} from "../../../../shared/staff-access";
-import type { AdminStoreError, IAdminUserStore } from "../ports/admin-user-store.port";
+} from "./staff-access";
 
 const MANAGE_STAFF_PERMISSION: StaffPermission = "staff.manage";
 

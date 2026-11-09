@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { computeAuditHash, GENESIS_HASH } from "../audit-hash";
+import { computeAuditHash, GENESIS_HASH } from "../infrastructure/services/audit-hash";
 
 describe("computeAuditHash", () => {
   const base = {

@@ -16,7 +16,7 @@ const fakeSql = Object.assign(
 mock.module("@packages/drizzle", () => ({ ...realDrizzle, sql: fakeSql }));
 
 const { ensureNotificationTrigger, NOTIFICATION_NOTIFY_CHANNEL } = await import(
-  "../notification-trigger"
+  "../infrastructure/services/notification-trigger"
 );
 
 describe("ensureNotificationTrigger", () => {

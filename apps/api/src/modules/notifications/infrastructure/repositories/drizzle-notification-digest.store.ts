@@ -19,7 +19,7 @@ import type {
   DueNotification,
   INotificationDigestStore,
   NotificationDigestError,
-} from "../ports/notification-digest.port";
+} from "../../../../shared/ports/notification-digest.port";
 
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 

@@ -18,7 +18,7 @@ import { OutboxRelay } from "@packages/outbox/outbox-relay";
 import { container } from "inwire";
 import { Resend } from "resend";
 import { apiSettings } from "./composition/settings";
-import { auditLogSources } from "./composition/sources/audit-log";
+import { rgpdSources } from "./composition/sources/rgpd";
 import { adminModule } from "./modules/admin/module";
 import { apiTokenModule } from "./modules/api-token/module";
 import { auditLogModule } from "./modules/audit-log/module";
@@ -36,11 +36,9 @@ import { authSecretKey } from "./shared/auth/auth-secrets";
 import type { OutermostUnitOfWork } from "./shared/auth/unit-of-work-adapter";
 import { env } from "./shared/env";
 import { logger } from "./shared/logger";
-import type { IAuditPort } from "./shared/ports/audit.port";
 import type { ICaptchaService } from "./shared/ports/captcha.port";
 import type { IDisposableEmailService } from "./shared/ports/disposable-email.port";
 import type { IIpGeoService } from "./shared/ports/ip-geo.port";
-import type { INotificationDigestStore } from "./shared/ports/notification-digest.port";
 import type { IPasswordBreachService } from "./shared/ports/password-breach.port";
 import type { IRateLimiter, IRateLimitUsage } from "./shared/ports/rate-limiter.port";
 import type { ISessionGeoStore } from "./shared/ports/session-geo.port";
@@ -49,11 +47,8 @@ import type { ITotpVerifier } from "./shared/ports/totp-verifier.port";
 import type { IUserAccountStore } from "./shared/ports/user-account.port";
 import { getRequestId } from "./shared/request-context";
 import { AdminActionService } from "./shared/services/admin-action.service";
-import { AuditEventSubscriber } from "./shared/services/audit-event-subscriber";
 import { backupCodeUsedNotifier } from "./shared/services/backup-code-used-notifier";
 import { DisposableEmailService } from "./shared/services/disposable-email.service";
-import { DrizzleAuditRepository } from "./shared/services/drizzle-audit.service";
-import { DrizzleNotificationDigestStore } from "./shared/services/drizzle-notification-digest.store";
 import { DrizzleSessionGeoStore } from "./shared/services/drizzle-session-geo.store";
 import { DrizzleSweepRunStore } from "./shared/services/drizzle-sweep-run.store";
 import { DrizzleTotpVerifier } from "./shared/services/drizzle-totp-verifier";
@@ -62,8 +57,6 @@ import { HeaderIpGeoService } from "./shared/services/header-ip-geo.service";
 import { HibpPasswordBreachService } from "./shared/services/hibp-password-breach.service";
 import { LoggingInstrumentation } from "./shared/services/logging-instrumentation";
 import { NoopCaptchaService } from "./shared/services/noop-captcha.service";
-import { NotificationFanoutSubscriber } from "./shared/services/notification-fanout-subscriber";
-import { NotificationStreamHub } from "./shared/services/notification-stream-hub";
 import {
   RateLimiterFlexibleAdapter,
   storeFactoryFor,
@@ -71,18 +64,15 @@ import {
 import { SecuritySignalsService } from "./shared/services/security-signals.service";
 import { SentryInstrumentation } from "./shared/services/sentry-instrumentation";
 import { SiteverifyCaptchaService } from "./shared/services/siteverify-captcha.service";
-import { WebhookFanoutSubscriber } from "./shared/services/webhook-fanout-subscriber";
 
 declare module "inwire" {
   interface AppDeps {
     ITransactionService: IUnitOfWork & OutermostUnitOfWork;
     IEmailQueue: IEmailQueue;
-    INotificationDigestStore: INotificationDigestStore;
     IEmailService: IEmailService;
     ITotpVerifier: ITotpVerifier;
     IOutboxRepository: IOutboxRepository;
     ISweepRunStore: ISweepRunStore;
-    IAuditPort: IAuditPort;
     IInstrumentation: IInstrumentation;
     IPasswordBreachService: IPasswordBreachService;
     IDisposableEmailService: IDisposableEmailService;
@@ -93,13 +83,9 @@ declare module "inwire" {
     IUserAccountStore: IUserAccountStore;
     SecuritySignalsService: SecuritySignalsService;
     AdminActionService: AdminActionService;
-    AuditEventSubscriber: AuditEventSubscriber;
-    WebhookFanoutSubscriber: WebhookFanoutSubscriber;
-    NotificationFanoutSubscriber: NotificationFanoutSubscriber;
     OutboxDispatcher: OutboxDispatcher;
     BackupCodeUsedNotifier: EventHandler;
     EmailDeliveryWorker: EmailDeliveryWorker;
-    NotificationStreamHub: NotificationStreamHub;
   }
 }
 
@@ -115,7 +101,6 @@ export const di = container()
     "IOutboxRepository",
     (c): IOutboxRepository => new DrizzleOutboxRepository(c.IInstrumentation, getRequestId),
   )
-  .add("IAuditPort", (c): IAuditPort => new DrizzleAuditRepository(c.IInstrumentation))
   .add(
     "ITransactionService",
     (c) =>
@@ -124,10 +109,6 @@ export const di = container()
       }),
   )
   .add("IEmailQueue", (c): IEmailQueue => new DrizzleEmailQueue(c.IInstrumentation, logger))
-  .add(
-    "INotificationDigestStore",
-    (c): INotificationDigestStore => new DrizzleNotificationDigestStore(c.IInstrumentation),
-  )
   .add(
     "IEmailService",
     (c): IEmailService => new QueuedEmailService(c.IEmailQueue, c.IInstrumentation),
@@ -211,29 +192,20 @@ export const di = container()
     "AdminActionService",
     (c) => new AdminActionService(c.IOutboxRepository, c.ITransactionService, c.IInstrumentation),
   )
-  .add(
-    "AuditEventSubscriber",
-    (c) =>
-      new AuditEventSubscriber(
-        c.ITransactionService,
-        c.IInstrumentation,
-        env.AUDIT_TAMPER_EVIDENCE,
-      ),
-  )
-  .add(
-    "WebhookFanoutSubscriber",
-    (c) => new WebhookFanoutSubscriber(c.ITransactionService, c.IInstrumentation),
-  )
-  .add(
-    "NotificationFanoutSubscriber",
-    (c) =>
-      new NotificationFanoutSubscriber(
-        c.ITransactionService,
-        c.IInstrumentation,
-        env.NOTIFICATION_DIGEST_HOUR_UTC,
-        c.staffSettings,
-      ),
-  )
+  .addModule(apiTokenModule)
+  .addModule(healthModule)
+  .addModule(uploadsModule)
+  .addModule(auditLogModule)
+  .addModule(webhooksModule)
+  .addModule(policyModule)
+  .addModule(consentModule)
+  .addModule(quotaModule)
+  .addModule(billingModule)
+  .addModule(notificationsModule)
+  .addModule(profileModule)
+  .addModule(adminModule)
+  .addModule(rgpdSources)
+  .addModule(rgpdModule)
   .add(
     "OutboxDispatcher",
     (c) =>
@@ -267,25 +239,7 @@ export const di = container()
         },
       ),
   )
-  .addModule(auditLogSources)
-  .addModule(apiTokenModule)
-  .addModule(healthModule)
-  .addModule(uploadsModule)
-  .addModule(auditLogModule)
-  .addModule(webhooksModule)
-  .addModule(policyModule)
-  .addModule(consentModule)
-  .addModule(quotaModule)
-  .addModule(billingModule)
-  .addModule(notificationsModule)
-  .addModule(profileModule)
-  .addModule(adminModule)
-  .addModule(rgpdModule)
   .add("BackupCodeUsedNotifier", (c) =>
     backupCodeUsedNotifier({ IEmailService: c.IEmailService, IProfileStore: c.IProfileStore }),
-  )
-  .add(
-    "NotificationStreamHub",
-    (c) => new NotificationStreamHub(logger, env.DATABASE_URL, c.IInstrumentation),
   )
   .build();

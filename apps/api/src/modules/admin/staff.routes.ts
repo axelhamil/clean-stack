@@ -2,12 +2,12 @@ import { AppErrorException, Option } from "@packages/ddd-kit";
 import type { RouteEnv, RouteGuards } from "@packages/http/route-guards";
 import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
-import type { StaffEnv } from "../../shared/staff-access";
 import { setStaffRoleBodySchema } from "./application/dto/set-staff-role.dto";
 import { setStaffOverrideBodySchema } from "./application/dto/staff-override.dto";
 import { stepUpBodySchema } from "./application/dto/step-up.dto";
 import type { ApprovalService } from "./application/services/approval.service";
 import type { StaffService } from "./application/services/staff.service";
+import type { StaffEnv } from "./application/services/staff-access";
 import type { StepUpService } from "./application/services/step-up.service";
 import { gateOr202 } from "./approval-response";
 

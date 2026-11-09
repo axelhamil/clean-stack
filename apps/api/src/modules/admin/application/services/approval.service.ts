@@ -14,7 +14,6 @@ import { type EventType, EventTypes } from "@packages/events";
 import { emitEvent } from "@packages/outbox/event-emitter";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import type { IStaffStore, StaffStoreError } from "../../../../shared/ports/staff-store.port";
-import { type StaffEnv, staffAccessOf } from "../../../../shared/staff-access";
 import {
   type ApprovalActor,
   type ApprovalHandlers,
@@ -31,6 +30,7 @@ import type {
   ApprovalStoreError,
   IApprovalStore,
 } from "../ports/approval-store.port";
+import { type StaffEnv, staffAccessOf } from "./staff-access";
 
 export type ApprovalSettings = Pick<
   AdminSettings,

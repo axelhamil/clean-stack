@@ -13,6 +13,7 @@ import {
 import { DrizzleWebhookDeliveryRepository } from "./infrastructure/repositories/drizzle-webhook-delivery.repository";
 import { DrizzleWebhookEndpointRepository } from "./infrastructure/repositories/drizzle-webhook-endpoint.repository";
 import { WebhookDeliveryWorker } from "./infrastructure/services/webhook-delivery-worker.service";
+import { WebhookFanoutSubscriber } from "./infrastructure/services/webhook-fanout-subscriber";
 
 export interface WebhooksPrerequisites {
   IInstrumentation: IInstrumentation;
@@ -47,6 +48,10 @@ export const webhooksModule = defineModule<WebhooksPrerequisites>()((b) =>
           c.IInstrumentation,
           c.webhookSettings,
         ),
+    )
+    .add(
+      "WebhookFanoutSubscriber",
+      (c) => new WebhookFanoutSubscriber(c.ITransactionService, c.IInstrumentation),
     )
     .add(
       "WebhookDeliveryWorker",

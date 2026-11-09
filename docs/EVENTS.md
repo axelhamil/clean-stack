@@ -361,7 +361,7 @@ Three surfaces consume the visibility map simultaneously:
 
 | Consumer | Where | Effect |
 |---|---|---|
-| `WebhookFanoutSubscriber` | `apps/api/src/shared/services/webhook-fanout-subscriber.ts` | Only public events are fanned out to customer webhook endpoints. Internal events skip fanout entirely. |
+| `WebhookFanoutSubscriber` | `apps/api/src/modules/webhooks/infrastructure/services/webhook-fanout-subscriber.ts` | Only public events are fanned out to customer webhook endpoints. Internal events skip fanout entirely. |
 | `EventTypePicker` + `webhookFormSchema` | `apps/app/src/features/webhooks/forms/event-type-picker.tsx` + `webhooks.schema.ts` | The subscription picker shows only `SUBSCRIBABLE_EVENT_TYPES` (public events). The Zod schema rejects any internal event type as a selector. |
 | `/developers/events` catalog | `apps/app/src/features/developers/components/event-types-table.tsx` | Only public events are listed in the public-facing event catalog page. |
 
@@ -409,7 +409,7 @@ The boilerplate emits **100 events** (35 public + 65 internal) automatically. So
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED`: `databaseHooks.user.create.after`
 - `USER_SIGNED_IN`: `databaseHooks.session.create.after`
-- `USER_SIGNED_OUT`: once per ended session, in the unit of work of the delete. Every session BetterAuth deletes goes through `databaseHooks.session.delete.before`, which claims it (`StaffService.endSession`: `DELETE ... WHERE id = ? RETURNING`) and announces it only when a row came back: the library reads the rows first and would run a `delete.after` hook even for a row a concurrent ban, revocation or sweep already deleted, so there is no `delete.after` handler. Actor on that path: `null` for any session already past its expiry (the library cleaning it up on read) and for a deprovisioning by the identity provider on `/scim/*` (bearer token, no user); otherwise the session owner for an ordinary session, and for an impersonation session the impersonating staff member on `/admin/stop-impersonating` and `/sign-out` and on any `/admin/*` or unknown path, the impersonated customer on the remaining self-service paths (`/revoke-sessions`, `/delete-user`, `/reset-password`, ...), which are refused while impersonating. A session the back office deletes directly is announced by `announceSessionsEnded` (`apps/api/src/shared/services/session-end.ts`): `AdminModerationService` (ban, session revocation, password reset) and `StaffService` (staff revocation, a write that removes `users.impersonate`) give the staff member as `actorUserId`; the impersonation sweep (`StaffService.expireImpersonations`) gives `null`. An impersonation session also gets its own `admin.impersonation.stopped`. The account wipe announces `user.deleted` instead.
+- `USER_SIGNED_OUT`: once per ended session, in the unit of work of the delete. Every session BetterAuth deletes goes through `databaseHooks.session.delete.before`, which claims it (`StaffService.endSession`: `DELETE ... WHERE id = ? RETURNING`) and announces it only when a row came back: the library reads the rows first and would run a `delete.after` hook even for a row a concurrent ban, revocation or sweep already deleted, so there is no `delete.after` handler. Actor on that path: `null` for any session already past its expiry (the library cleaning it up on read) and for a deprovisioning by the identity provider on `/scim/*` (bearer token, no user); otherwise the session owner for an ordinary session, and for an impersonation session the impersonating staff member on `/admin/stop-impersonating` and `/sign-out` and on any `/admin/*` or unknown path, the impersonated customer on the remaining self-service paths (`/revoke-sessions`, `/delete-user`, `/reset-password`, ...), which are refused while impersonating. A session the back office deletes directly is announced by `announceSessionsEnded` (`apps/api/src/modules/admin/application/services/session-end.ts`): `AdminModerationService` (ban, session revocation, password reset) and `StaffService` (staff revocation, a write that removes `users.impersonate`) give the staff member as `actorUserId`; the impersonation sweep (`StaffService.expireImpersonations`) gives `null`. An impersonation session also gets its own `admin.impersonation.stopped`. The account wipe announces `user.deleted` instead.
 - `USER_ACCOUNT_UNLINKED`: `databaseHooks.account.delete.after` (skip credential)
 
 ### Via `hooks.after` + `createAuthMiddleware` (path-based, plugin events)
@@ -611,8 +611,8 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 | `packages/outbox/src/outbox-relay.ts` | Claim by lease, run the named handlers, settle, dead announcement |
 | `packages/outbox/src/drizzle-outbox.repository.ts` | Outbox repository: enqueue, claim, `pendingState`, `markDelivered`, `markFailed` |
 | `packages/outbox/src/event-handlers.ts` | Subscribes the built-in handlers to every catalog type, then the discovered `onEvent` handlers |
-| `apps/api/src/shared/services/audit-event-subscriber.ts` | Built-in `audit-log` handler |
-| `apps/api/src/shared/services/webhook-fanout-subscriber.ts` | Built-in `webhook-fanout` handler (org-scoped) |
+| `apps/api/src/modules/audit-log/infrastructure/services/audit-event-subscriber.ts` | Built-in `audit-log` handler |
+| `apps/api/src/modules/webhooks/infrastructure/services/webhook-fanout-subscriber.ts` | Built-in `webhook-fanout` handler (org-scoped) |
 | `apps/api/src/modules/webhooks/infrastructure/services/webhook-delivery-worker.service.ts` | HMAC POST + claim window + retry |
 | `apps/api/src/shared/aead.ts` | AEAD encrypt/decrypt for webhook secrets |
 | `packages/outbox/src/jitter.ts` | Decorrelated jitter math |

@@ -6,9 +6,9 @@ import { logger } from "../../shared/logger";
 import type { IStaffStore } from "../../shared/ports/staff-store.port";
 import type { IStorageService } from "../../shared/ports/storage.port";
 import type { ITotpVerifier } from "../../shared/ports/totp-verifier.port";
-import type { StaffListing } from "../../shared/staff-access";
 import type { RgpdSettings } from "./application/config/rgpd-settings";
 import type { IRgpdRepository } from "./application/ports/rgpd.port";
+import type { IStaffAccessRules } from "./application/ports/staff-access-rules.port";
 import { RgpdService } from "./application/services/rgpd.service";
 import { DrizzleRgpdRepository } from "./infrastructure/repositories/drizzle-rgpd.repository";
 
@@ -20,7 +20,7 @@ export interface RgpdPrerequisites {
   IStorageService: IStorageService;
   IStaffStore: IStaffStore;
   ITotpVerifier: ITotpVerifier;
-  staffSettings: StaffListing;
+  IStaffAccessRules: IStaffAccessRules;
   rgpdSettings: RgpdSettings;
 }
 
@@ -41,7 +41,7 @@ export const rgpdModule = defineModule<RgpdPrerequisites>()((b) =>
           c.IOutboxRepository,
           c.IInstrumentation,
           c.IStaffStore,
-          c.staffSettings,
+          c.IStaffAccessRules,
           c.ITotpVerifier,
           c.rgpdSettings,
           logger,

@@ -6,12 +6,6 @@ import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import type { IStaffStore } from "../../../../shared/ports/staff-store.port";
 import type { IStorageService, StorageError } from "../../../../shared/ports/storage.port";
 import type { ITotpVerifier } from "../../../../shared/ports/totp-verifier.port";
-import { announceImpersonationsEnded } from "../../../../shared/services/impersonation-end";
-import {
-  grantsStaffAccess,
-  isLastManager,
-  type StaffListing,
-} from "../../../../shared/staff-access";
 import type { RgpdSettings } from "../config/rgpd-settings";
 import type {
   ExecuteWipeOutput,
@@ -20,6 +14,7 @@ import type {
   SoleOwnedOrgWithMembers,
   UserDeletionState,
 } from "../ports/rgpd.port";
+import type { IStaffAccessRules } from "../ports/staff-access-rules.port";
 
 const EXPORT_DOWNLOAD_TTL_SECONDS = 7 * 24 * 60 * 60;
 
@@ -85,7 +80,7 @@ export class RgpdService {
     private readonly outbox: IOutboxRepository,
     private readonly instrumentation: IInstrumentation,
     private readonly staff: IStaffStore,
-    private readonly staffEnv: StaffListing,
+    private readonly staffAccess: IStaffAccessRules,
     private readonly totp: ITotpVerifier,
     private readonly settings: Omit<RgpdSettings, "sweepBatchSize">,
     private readonly logger: ILogger,
@@ -287,8 +282,7 @@ export class RgpdService {
             if (wipe.isFailure) return wipe;
             if (wipe.getValue().alreadyWiped) return wipe;
 
-            await announceImpersonationsEnded(
-              this.outbox,
+            await this.staffAccess.announceImpersonationsEnded(
               wipe.getValue().endedImpersonations,
               "revoked",
               new Date(),
@@ -395,20 +389,20 @@ export class RgpdService {
   }
 
   private async refusedLastManager(userId: string): Promise<Result<void, RgpdError>> {
-    if (this.staffEnv.PLATFORM_ADMIN_IDS.includes(userId)) return Result.ok();
+    if (this.staffAccess.isListed(userId)) return Result.ok();
 
     const found = await this.staff.findActive(userId);
     if (found.isFailure) return Result.fail(found.getError());
 
     const isManager = found
       .getValue()
-      .filter((row) => row.role === "manager" && grantsStaffAccess(row, this.staffEnv))
+      .filter((row) => row.role === "manager" && this.staffAccess.grantsStaffAccess(row))
       .isSome();
     if (!isManager) return Result.ok();
 
     const managers = await this.staff.lockActiveManagers();
     if (managers.isFailure) return Result.fail(managers.getError());
-    if (!isLastManager(userId, managers.getValue(), this.staffEnv)) return Result.ok();
+    if (!this.staffAccess.isLastManager(userId, managers.getValue())) return Result.ok();
 
     return Result.fail({
       code: "ACCOUNT_DELETION_LAST_MANAGER_FORBIDDEN",
@@ -424,7 +418,7 @@ export class RgpdService {
     const revoked = await this.staff.revoke(userId);
     if (revoked.isFailure) return Result.fail(revoked.getError());
 
-    await announceImpersonationsEnded(this.outbox, revoked.getValue(), "revoked", new Date());
+    await this.staffAccess.announceImpersonationsEnded(revoked.getValue(), "revoked", new Date());
 
     await emitEvent(this.outbox, EventTypes.ADMIN_STAFF_REVOKED, "user", userId, {
       actorUserId: userId,

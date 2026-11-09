@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { Option } from "@packages/ddd-kit";
 import * as realDrizzle from "@packages/drizzle";
-import { computeAuditHash, GENESIS_HASH } from "../services/audit-hash";
+import { computeAuditHash, GENESIS_HASH } from "../infrastructure/services/audit-hash";
 
 // ── Mock @packages/drizzle ─────────────────────────────────────────────────
 const insertExecute = mock(async () => {});
@@ -33,8 +33,10 @@ mock.module("@packages/drizzle", () => ({
 }));
 
 // ── Imports after mocks ────────────────────────────────────────────────────
-const { DrizzleAuditRepository } = await import("../services/drizzle-audit.service");
-const { NoOpInstrumentation } = await import("../services/noop-instrumentation");
+const { DrizzleAuditRepository } = await import(
+  "../infrastructure/repositories/drizzle-audit.service"
+);
+const { NoOpInstrumentation } = await import("../../../shared/services/noop-instrumentation");
 
 // ── Chain helpers ──────────────────────────────────────────────────────────
 function chainRow(seq: number, prevHash: string, over: Partial<Record<string, unknown>> = {}) {

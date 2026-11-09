@@ -28,7 +28,7 @@ import { EventTypes } from "@packages/events";
 import { hashPassword } from "better-auth/crypto";
 import { di } from "../src/container";
 import { StaffService } from "../src/modules/admin/application/services/staff.service";
-import { StaffAccessService } from "../src/shared/services/staff-access.service";
+import { StaffAccessService } from "../src/modules/admin/application/services/staff-access.service";
 import { checkRecorder } from "./check-harness";
 import { requireLocalDatabase } from "./require-local-database";
 

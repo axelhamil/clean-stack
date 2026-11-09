@@ -69,7 +69,7 @@ preference per tick, for rows the fan-out had already joined against that exact
 preference row inside the dispatch transaction. One join, once, at write time.
 
 The window is anchored on wall-clock boundaries (`digestDueAt`,
-`apps/api/src/shared/services/digest-schedule.ts`): the next full hour for
+`apps/api/src/modules/notifications/application/services/digest-schedule.ts`): the next full hour for
 `hourly`, the next `NOTIFICATION_DIGEST_HOUR_UTC` (default `8`) for `daily`.
 Deliberately **not** "24 h after the last send", which drifts a little further
 every cycle and is not reproducible in a test. The boundary is strict, an event

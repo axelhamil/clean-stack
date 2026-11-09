@@ -1,8 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import { permissionsOfRole } from "@packages/access-control";
 import { Option } from "@packages/ddd-kit";
-import type { StaffRecord, StaffSource } from "../ports/staff-store.port";
-import { grantsStaffAccess, isLastManager, staffAccessOf } from "../staff-access";
+import type { StaffRecord, StaffSource } from "../../../shared/ports/staff-store.port";
+import {
+  grantsStaffAccess,
+  isLastManager,
+  staffAccessOf,
+} from "../application/services/staff-access";
 
 const NOW = new Date("2026-10-30T12:00:00Z");
 

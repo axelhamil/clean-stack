@@ -18,7 +18,7 @@ import type {
   WebhookDeliveryRecord,
 } from "../src/modules/webhooks/application/ports/webhook-delivery.port";
 import { DrizzleWebhookDeliveryRepository } from "../src/modules/webhooks/infrastructure/repositories/drizzle-webhook-delivery.repository";
-import { WebhookFanoutSubscriber } from "../src/shared/services/webhook-fanout-subscriber";
+import { WebhookFanoutSubscriber } from "../src/modules/webhooks/infrastructure/services/webhook-fanout-subscriber";
 import { checkRun, probeClaims, recordingInstrumentation, withClockAhead } from "./check-harness";
 
 const PROBE = `check-webhook-lease-${crypto.randomUUID()}`;
