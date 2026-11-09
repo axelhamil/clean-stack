@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
   ENTITLEMENTS,
   type EntitlementsView,
@@ -10,7 +10,7 @@ import {
   meetsPlan,
   quotaLimit,
   rankOf,
-} from "../entitlements";
+} from "../domain/entitlements";
 
 describe("entitlements", () => {
   it("orders tiers free < pro < business", () => {

@@ -1,4 +1,4 @@
-import type { Tier } from "./tiers";
+import type { Tier } from "@packages/access-control";
 
 export type Feature = "audit_log" | "api" | "sso";
 export type QuotaKey = "uploads" | "projects" | "apiCallsPerMonth";

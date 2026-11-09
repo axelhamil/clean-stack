@@ -17,6 +17,7 @@
     "./application/services/billing-portal.service": "./src/application/services/billing-portal.service.ts",
     "./application/services/entitlements.service": "./src/application/services/entitlements.service.ts",
     "./application/subscription-events": "./src/application/subscription-events.ts",
+    "./domain/entitlements": "./src/domain/entitlements.ts",
     "./infrastructure/adapters/stripe-event.gateway": "./src/infrastructure/adapters/stripe-event.gateway.ts",
     "./infrastructure/adapters/stripe-payment-failure": "./src/infrastructure/adapters/stripe-payment-failure.ts",
     "./infrastructure/adapters/stripe-sync-verifier": "./src/infrastructure/adapters/stripe-sync-verifier.ts",

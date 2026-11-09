@@ -1,5 +1,4 @@
 import { describe, expect, it, mock } from "bun:test";
-import { ENTITLEMENTS } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
 import { mockPort } from "@packages/test/bun";
 import { mockInstrumentation } from "@packages/test/bun/instrumentation";
@@ -14,6 +13,7 @@ import type {
   SubscriptionRow,
 } from "../application/ports/subscription-read.port";
 import { EntitlementsService } from "../application/services/entitlements.service";
+import { ENTITLEMENTS } from "../domain/entitlements";
 
 function makeStore(
   row: SubscriptionRow | null,

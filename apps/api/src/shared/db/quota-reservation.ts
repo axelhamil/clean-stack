@@ -1,4 +1,4 @@
-import type { QuotaKey } from "@packages/access-control";
+import type { QuotaKey } from "@modules/billing/domain/entitlements";
 import type { AnyPgColumn, AnyPgTable } from "@packages/drizzle";
 import {
   ambientTransaction,

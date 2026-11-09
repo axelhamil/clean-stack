@@ -13,15 +13,9 @@ import {
   subscriptionEventSource,
   subscriptionEventType,
 } from "@modules/billing/application/subscription-events";
+import { hasFeature, hasSeatAvailable } from "@modules/billing/domain/entitlements";
 import { paymentFailureOf } from "@modules/billing/infrastructure/adapters/stripe-payment-failure";
-import {
-  ac,
-  hasFeature,
-  hasSeatAvailable,
-  isPersonalOrg,
-  ORG_ROLES,
-  roles,
-} from "@packages/access-control";
+import { ac, isPersonalOrg, ORG_ROLES, roles } from "@packages/access-control";
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
 import { AppErrorException, Option } from "@packages/ddd-kit";
 import { ambientTransaction, db, lockForTransaction } from "@packages/drizzle";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { ENTITLEMENTS } from "@packages/access-control";
+import { ENTITLEMENTS } from "@modules/billing/domain/entitlements";
 import { AppErrorException } from "@packages/ddd-kit";
 import { assertFeature, assertPlan } from "../billing.middleware";
 

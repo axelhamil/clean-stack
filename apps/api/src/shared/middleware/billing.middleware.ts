@@ -5,8 +5,8 @@ import {
   hasQuotaRemaining,
   meetsPlan,
   type QuotaKey,
-  type Tier,
-} from "@packages/access-control";
+} from "@modules/billing/domain/entitlements";
+import type { Tier } from "@packages/access-control";
 import { AppErrorException } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { emitEvent } from "@packages/outbox/event-emitter";

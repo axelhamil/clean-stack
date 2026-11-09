@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { entitlementsForTier, type Tier } from "@packages/access-control";
+import { entitlementsForTier } from "@modules/billing/domain/entitlements";
+import type { Tier } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { createErrorHandler } from "../../../shared/middleware/error.middleware";

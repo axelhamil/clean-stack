@@ -113,21 +113,6 @@ export function isPersonalOrg(slug: string): boolean {
   return slug.startsWith(PERSONAL_ORG_SLUG_PREFIX);
 }
 export {
-  ENTITLEMENTS,
-  type Entitlement,
-  type EntitlementsView,
-  entitlementsForTier,
-  type Feature,
-  hasFeature,
-  hasQuotaRemaining,
-  hasSeatAvailable,
-  isTier,
-  meetsPlan,
-  type QuotaKey,
-  quotaLimit,
-  rankOf,
-} from "./entitlements";
-export {
   OVERRIDE_MAX_YEARS,
   PAID_TIERS,
   type PaidTier,

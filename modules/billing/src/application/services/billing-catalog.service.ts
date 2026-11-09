@@ -1,5 +1,6 @@
-import { ENTITLEMENTS, type Feature, isTier, type Tier } from "@packages/access-control";
+import type { Tier } from "@packages/access-control";
 import type { IInstrumentation } from "@packages/ddd-kit";
+import { ENTITLEMENTS, type Feature, isTier } from "../../domain/entitlements";
 import type { IStripeCatalogSource } from "../ports/stripe-catalog.port";
 
 export interface PlanCatalogItem {

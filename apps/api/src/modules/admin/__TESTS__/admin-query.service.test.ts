@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
-import { entitlementsForTier } from "@packages/access-control";
+import { entitlementsForTier } from "@modules/billing/domain/entitlements";
 import { Option, Result } from "@packages/ddd-kit";
 import { mockPort } from "@packages/test/bun";
 import type { IEntitlementsReader } from "../../../shared/ports/entitlements-reader.port";

@@ -1,5 +1,5 @@
-import { type EntitlementsView, entitlementsForTier, isTier } from "@packages/access-control";
 import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
+import { type EntitlementsView, entitlementsForTier, isTier } from "../../domain/entitlements";
 import type { EntitlementsReadError } from "../ports/entitlements-reader.port";
 import type { ActivePlanOverride, IPlanOverrideReader } from "../ports/plan-override.port";
 import type { ISubscriptionReadStore, SubscriptionRow } from "../ports/subscription-read.port";

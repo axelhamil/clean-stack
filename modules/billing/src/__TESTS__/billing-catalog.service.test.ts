@@ -1,5 +1,4 @@
 import { describe, expect, it, mock } from "bun:test";
-import { ENTITLEMENTS } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
 import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import type {
@@ -8,6 +7,7 @@ import type {
 } from "../application/ports/stripe-catalog.port";
 import type { BillingError } from "../application/ports/subscription-read.port";
 import { BillingCatalogService } from "../application/services/billing-catalog.service";
+import { ENTITLEMENTS } from "../domain/entitlements";
 
 const proPrice: StripePriceLite = {
   priceId: "price_pro",

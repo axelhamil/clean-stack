@@ -141,60 +141,6 @@ declare const routes: import("hono/hono-base").HonoBase<AppEnv, import("hono/typ
         };
     };
 }, "/admin/audit-log"> | import("hono/types").MergeSchemaPath<{
-    "/plans": {
-        $get: {
-            output: {
-                plans: {
-                    tier: import("@packages/access-control").Tier;
-                    name: string;
-                    priceId: string | null;
-                    unitAmount: number;
-                    currency: string;
-                    interval: string | null;
-                    marketingFeatures: string[];
-                    rank: number;
-                    features: import("@packages/access-control").Feature[];
-                    maxMembers: number | null;
-                }[];
-            };
-            outputFormat: "json";
-            status: import("hono/utils/http-status").ContentfulStatusCode;
-            input: {};
-        };
-    };
-} & {
-    "/subscription": {
-        $get: {
-            output: {
-                rank: number;
-                features: import("@packages/access-control").Feature[];
-                maxMembers: number | null;
-                quotas: {
-                    apiCallsPerMonth: number | null;
-                    projects: number | null;
-                    uploads: number | null;
-                };
-                tier: import("@packages/access-control").Tier;
-                status: string;
-                hasSubscription: boolean;
-            };
-            outputFormat: "json";
-            status: import("hono/utils/http-status").ContentfulStatusCode;
-            input: {};
-        };
-    };
-} & {
-    "/portal": {
-        $post: {
-            output: {
-                url: string;
-            };
-            outputFormat: "json";
-            status: import("hono/utils/http-status").ContentfulStatusCode;
-            input: {};
-        };
-    };
-}, "/billing"> | import("hono/types").MergeSchemaPath<{
     "/": {
         $get: {
             output: {
@@ -310,6 +256,154 @@ declare const routes: import("hono/hono-base").HonoBase<AppEnv, import("hono/typ
         };
     };
 }, "/consents"> | import("hono/types").MergeSchemaPath<{
+    "/plans": {
+        $get: {
+            output: {
+                plans: {
+                    tier: import("@packages/access-control").Tier;
+                    name: string;
+                    priceId: string | null;
+                    unitAmount: number;
+                    currency: string;
+                    interval: string | null;
+                    marketingFeatures: string[];
+                    rank: number;
+                    features: import("./shared/entitlements").Feature[];
+                    maxMembers: number | null;
+                }[];
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+            input: {};
+        };
+    };
+} & {
+    "/subscription": {
+        $get: {
+            output: {
+                rank: number;
+                features: import("./shared/entitlements").Feature[];
+                maxMembers: number | null;
+                quotas: {
+                    apiCallsPerMonth: number | null;
+                    projects: number | null;
+                    uploads: number | null;
+                };
+                tier: import("@packages/access-control").Tier;
+                status: string;
+                hasSubscription: boolean;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+            input: {};
+        };
+    };
+} & {
+    "/portal": {
+        $post: {
+            output: {
+                url: string;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+            input: {};
+        };
+    };
+}, "/billing"> | import("hono/types").MergeSchemaPath<{
+    "/": {
+        $get: {
+            output: {
+                items: {
+                    id: string;
+                    action: "staff.permission_override" | "staff.revoke" | "staff.role_change" | "user.ban_permanent";
+                    subjectId: string;
+                    params: import("hono/utils/types").JSONValue;
+                    requestedBy: string;
+                    status: "approved" | "cancelled" | "executed" | "expired" | "failed" | "pending" | "rejected";
+                    decidedBy: string | null;
+                    decisionNote: string | null;
+                    failureReason: string | null;
+                    expiresAt: string;
+                    decidedAt: string | null;
+                    createdAt: string;
+                    version: number;
+                }[];
+                nextCursor: string | null;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+            input: {
+                query: {
+                    status?: "approved" | "cancelled" | "executed" | "expired" | "failed" | "pending" | "rejected" | undefined;
+                    cursor?: string | undefined;
+                    limit?: unknown;
+                };
+            };
+        };
+    };
+} & {
+    "/:id": {
+        $get: {
+            output: {
+                id: string;
+                action: "staff.permission_override" | "staff.revoke" | "staff.role_change" | "user.ban_permanent";
+                subjectId: string;
+                params: import("hono/utils/types").JSONValue;
+                requestedBy: string;
+                status: "approved" | "cancelled" | "executed" | "expired" | "failed" | "pending" | "rejected";
+                decidedBy: string | null;
+                decisionNote: string | null;
+                failureReason: string | null;
+                expiresAt: string;
+                decidedAt: string | null;
+                createdAt: string;
+                version: number;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+        };
+    };
+} & {
+    "/:id/decide": {
+        $post: {
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+            input: {
+                json: {
+                    decision: "approve" | "reject";
+                    note: string;
+                };
+            } & {
+                param: {
+                    id: string;
+                };
+            };
+        };
+    };
+} & {
+    "/:id/cancel": {
+        $post: {
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+        };
+    };
+}, "/admin/approvals"> | import("hono/types").MergeSchemaPath<{
     "/export": {
         $post: {
             output: {
@@ -573,100 +667,6 @@ declare const routes: import("hono/hono-base").HonoBase<AppEnv, import("hono/typ
         };
     };
 }, "/admin"> | import("hono/types").MergeSchemaPath<{
-    "/": {
-        $get: {
-            output: {
-                items: {
-                    id: string;
-                    action: "staff.permission_override" | "staff.revoke" | "staff.role_change" | "user.ban_permanent";
-                    subjectId: string;
-                    params: import("hono/utils/types").JSONValue;
-                    requestedBy: string;
-                    status: "approved" | "cancelled" | "executed" | "expired" | "failed" | "pending" | "rejected";
-                    decidedBy: string | null;
-                    decisionNote: string | null;
-                    failureReason: string | null;
-                    expiresAt: string;
-                    decidedAt: string | null;
-                    createdAt: string;
-                    version: number;
-                }[];
-                nextCursor: string | null;
-            };
-            outputFormat: "json";
-            status: import("hono/utils/http-status").ContentfulStatusCode;
-            input: {
-                query: {
-                    status?: "approved" | "cancelled" | "executed" | "expired" | "failed" | "pending" | "rejected" | undefined;
-                    cursor?: string | undefined;
-                    limit?: unknown;
-                };
-            };
-        };
-    };
-} & {
-    "/:id": {
-        $get: {
-            output: {
-                id: string;
-                action: "staff.permission_override" | "staff.revoke" | "staff.role_change" | "user.ban_permanent";
-                subjectId: string;
-                params: import("hono/utils/types").JSONValue;
-                requestedBy: string;
-                status: "approved" | "cancelled" | "executed" | "expired" | "failed" | "pending" | "rejected";
-                decidedBy: string | null;
-                decisionNote: string | null;
-                failureReason: string | null;
-                expiresAt: string;
-                decidedAt: string | null;
-                createdAt: string;
-                version: number;
-            };
-            outputFormat: "json";
-            status: import("hono/utils/http-status").ContentfulStatusCode;
-            input: {
-                param: {
-                    id: string;
-                };
-            };
-        };
-    };
-} & {
-    "/:id/decide": {
-        $post: {
-            output: {
-                ok: true;
-            };
-            outputFormat: "json";
-            status: import("hono/utils/http-status").ContentfulStatusCode;
-            input: {
-                json: {
-                    decision: "approve" | "reject";
-                    note: string;
-                };
-            } & {
-                param: {
-                    id: string;
-                };
-            };
-        };
-    };
-} & {
-    "/:id/cancel": {
-        $post: {
-            output: {
-                ok: true;
-            };
-            outputFormat: "json";
-            status: import("hono/utils/http-status").ContentfulStatusCode;
-            input: {
-                param: {
-                    id: string;
-                };
-            };
-        };
-    };
-}, "/admin/approvals"> | import("hono/types").MergeSchemaPath<{
     "/sso-enforcement": {
         $post: {
             output: {
@@ -782,7 +782,7 @@ declare const routes: import("hono/hono-base").HonoBase<AppEnv, import("hono/typ
                 items: {
                     id: string;
                     type: string;
-                    status: import("@modules/billing/application/ports/stripe-event.port").StripeEventStatus;
+                    status: import("./client").StripeEventStatus;
                     receivedAt: string;
                     lastError: string | null;
                     replayedAt: string | null;
@@ -960,190 +960,6 @@ declare const routes: import("hono/hono-base").HonoBase<AppEnv, import("hono/typ
         };
     };
 }, "/admin/orgs"> | import("hono/types").MergeSchemaPath<{
-    "/": {
-        $get: {
-            output: {
-                items: {
-                    id: string;
-                    email: string;
-                    name: string;
-                    banned: boolean;
-                    twoFactorEnabled: boolean;
-                    banReason: string | null;
-                    banExpires: string | null;
-                    createdAt: string;
-                }[];
-                nextCursor: string | null;
-            };
-            outputFormat: "json";
-            status: import("hono/utils/http-status").ContentfulStatusCode;
-            input: {
-                query: {
-                    search?: string | undefined;
-                    banned?: "false" | "true" | undefined;
-                    organizationId?: string | undefined;
-                    cursor?: string | undefined;
-                    limit?: unknown;
-                };
-            };
-        };
-    };
-} & {
-    "/:id": {
-        $get: {
-            output: {
-                id: string;
-                email: string;
-                name: string;
-                banned: boolean;
-                twoFactorEnabled: boolean;
-                banReason: string | null;
-                banExpires: string | null;
-                createdAt: string;
-                sessions: {
-                    id: string;
-                    createdAt: string;
-                    expiresAt: string;
-                    ipAddress: string | null;
-                    userAgent: string | null;
-                    impersonatedBy: string | null;
-                }[];
-                memberships: {
-                    organizationId: string;
-                    organizationName: string;
-                    role: string;
-                }[];
-            };
-            outputFormat: "json";
-            status: import("hono/utils/http-status").ContentfulStatusCode;
-            input: {
-                param: {
-                    id: string;
-                };
-            };
-        };
-    };
-} & {
-    "/:id/ban": {
-        $post: {
-            output: {
-                approvalId: string;
-            };
-            outputFormat: "json";
-            status: 202;
-            input: {
-                json: {
-                    reason: string;
-                    expiresIn?: number | undefined;
-                };
-            } & {
-                param: {
-                    id: string;
-                };
-            };
-        } | {
-            output: {
-                ok: true;
-            };
-            outputFormat: "json";
-            status: import("hono/utils/http-status").ContentfulStatusCode;
-            input: {
-                json: {
-                    reason: string;
-                    expiresIn?: number | undefined;
-                };
-            } & {
-                param: {
-                    id: string;
-                };
-            };
-        };
-    };
-} & {
-    "/:id/unban": {
-        $post: {
-            output: {
-                ok: true;
-            };
-            outputFormat: "json";
-            status: import("hono/utils/http-status").ContentfulStatusCode;
-            input: {
-                param: {
-                    id: string;
-                };
-            };
-        };
-    };
-} & {
-    "/:id/reset-password": {
-        $post: {
-            output: {
-                ok: true;
-            };
-            outputFormat: "json";
-            status: import("hono/utils/http-status").ContentfulStatusCode;
-            input: {
-                param: {
-                    id: string;
-                };
-            };
-        };
-    };
-} & {
-    "/:id/sessions": {
-        $delete: {
-            output: {
-                ok: true;
-            };
-            outputFormat: "json";
-            status: import("hono/utils/http-status").ContentfulStatusCode;
-            input: {
-                param: {
-                    id: string;
-                };
-            };
-        };
-    };
-} & {
-    "/:id/notes": {
-        $get: {
-            output: {
-                items: {
-                    id: string;
-                    authorName: string | null;
-                    body: string;
-                    createdAt: string;
-                }[];
-            };
-            outputFormat: "json";
-            status: import("hono/utils/http-status").ContentfulStatusCode;
-            input: {
-                param: {
-                    id: string;
-                };
-            };
-        };
-    };
-} & {
-    "/:id/notes": {
-        $post: {
-            output: {
-                ok: true;
-            };
-            outputFormat: "json";
-            status: import("hono/utils/http-status").ContentfulStatusCode;
-            input: {
-                json: {
-                    body: string;
-                };
-            } & {
-                param: {
-                    id: string;
-                };
-            };
-        };
-    };
-}, "/admin/users"> | import("hono/types").MergeSchemaPath<{
     "/me": {
         $get: {
             output: {
@@ -1345,6 +1161,190 @@ declare const routes: import("hono/hono-base").HonoBase<AppEnv, import("hono/typ
         };
     };
 }, "/admin"> | import("hono/types").MergeSchemaPath<{
+    "/": {
+        $get: {
+            output: {
+                items: {
+                    id: string;
+                    email: string;
+                    name: string;
+                    banned: boolean;
+                    twoFactorEnabled: boolean;
+                    banReason: string | null;
+                    banExpires: string | null;
+                    createdAt: string;
+                }[];
+                nextCursor: string | null;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+            input: {
+                query: {
+                    search?: string | undefined;
+                    banned?: "false" | "true" | undefined;
+                    organizationId?: string | undefined;
+                    cursor?: string | undefined;
+                    limit?: unknown;
+                };
+            };
+        };
+    };
+} & {
+    "/:id": {
+        $get: {
+            output: {
+                id: string;
+                email: string;
+                name: string;
+                banned: boolean;
+                twoFactorEnabled: boolean;
+                banReason: string | null;
+                banExpires: string | null;
+                createdAt: string;
+                sessions: {
+                    id: string;
+                    createdAt: string;
+                    expiresAt: string;
+                    ipAddress: string | null;
+                    userAgent: string | null;
+                    impersonatedBy: string | null;
+                }[];
+                memberships: {
+                    organizationId: string;
+                    organizationName: string;
+                    role: string;
+                }[];
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+        };
+    };
+} & {
+    "/:id/ban": {
+        $post: {
+            output: {
+                approvalId: string;
+            };
+            outputFormat: "json";
+            status: 202;
+            input: {
+                json: {
+                    reason: string;
+                    expiresIn?: number | undefined;
+                };
+            } & {
+                param: {
+                    id: string;
+                };
+            };
+        } | {
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+            input: {
+                json: {
+                    reason: string;
+                    expiresIn?: number | undefined;
+                };
+            } & {
+                param: {
+                    id: string;
+                };
+            };
+        };
+    };
+} & {
+    "/:id/unban": {
+        $post: {
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+        };
+    };
+} & {
+    "/:id/reset-password": {
+        $post: {
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+        };
+    };
+} & {
+    "/:id/sessions": {
+        $delete: {
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+        };
+    };
+} & {
+    "/:id/notes": {
+        $get: {
+            output: {
+                items: {
+                    id: string;
+                    authorName: string | null;
+                    body: string;
+                    createdAt: string;
+                }[];
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+            input: {
+                param: {
+                    id: string;
+                };
+            };
+        };
+    };
+} & {
+    "/:id/notes": {
+        $post: {
+            output: {
+                ok: true;
+            };
+            outputFormat: "json";
+            status: import("hono/utils/http-status").ContentfulStatusCode;
+            input: {
+                json: {
+                    body: string;
+                };
+            } & {
+                param: {
+                    id: string;
+                };
+            };
+        };
+    };
+}, "/admin/users"> | import("hono/types").MergeSchemaPath<{
     "/": {
         $get: {
             output: {

@@ -1,4 +1,5 @@
-import type { Feature, QuotaKey, StaffAccess } from "@packages/access-control";
+import type { Feature, QuotaKey } from "@modules/billing/domain/entitlements";
+import type { StaffAccess } from "@packages/access-control";
 import { Option } from "@packages/ddd-kit";
 import type { CurrentSession, RouteGuards } from "@packages/http/route-guards";
 import type { Context } from "hono";

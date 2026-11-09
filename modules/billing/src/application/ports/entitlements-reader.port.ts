@@ -1,5 +1,5 @@
-import type { EntitlementsView } from "@packages/access-control";
 import type { AppError, Result } from "@packages/ddd-kit";
+import type { EntitlementsView } from "../../domain/entitlements";
 import type { PlanOverrideStoreError } from "./plan-override.port";
 
 export type EntitlementsReadError = AppError<"BILLING_PROVIDER_FAILURE"> | PlanOverrideStoreError;
