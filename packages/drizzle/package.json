@@ -5,8 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./schema/auth": "./src/schema/auth.ts",
-    "./schema/multi-tenant": "./src/schema/multi-tenant.ts",
+    "./schema/*": "./src/schema/*.ts",
     "./sweep-count": "./src/sweep-count.ts",
     "./sweep-purge": "./src/sweep-purge.ts",
     "./sweep-span": "./src/sweep-span.ts"

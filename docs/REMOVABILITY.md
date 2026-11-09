@@ -25,7 +25,7 @@ When removing module `<x>`, walk these 6 axes in order. The order minimises inte
 | 2 | **Events catalog** | `packages/events/src/event-types.ts`, `payloads.ts`, `retention-map.ts`: drop event-types owned by `<x>` only (events emitted by other modules / BetterAuth bridge stay) |
 | 3 | **Shared ports the module owned** | `shared/ports/<port>.ts` types added for `<x>` only (e.g. template keys in `email.port.ts`), `shared/services/<impl>.ts` matching entries |
 | 4 | **Env vars** | `shared/env.ts` Zod schema, `.env.example`: every `<X>_*` env knob the module read |
-| 5 | **Schema + auth.ts + migration** | `packages/drizzle/src/schema/*.ts`: table owned by `<x>` *or* columns the module added to a shared table; `apps/api/src/auth.ts` `additionalFields` if BetterAuth-owned table touched; run `pnpm db:generate` and **inspect** the migration before committing |
+| 5 | **Schema + auth.ts + migration** | `modules/<x>/schemas/*.ts`: the tables `<x>` owns leave with the module; a column it added to a kit table stays in `packages/drizzle/src/schema/*.ts` and is removed there; `apps/api/src/auth.ts` `additionalFields` if BetterAuth-owned table touched; run `pnpm db:generate` and **inspect** the migration before committing |
 | 6 | **Front feature + composition + API client + router + docs** | `apps/app/src/features/<x>/`, plus host page composition (`<X>Card` removals), plus `shared/api/{queries,mutations}/<x>-*`, plus its `route(...)`/`index(...)` entry in `apps/app/routes.ts`, plus any `docs/*.md` sections that document the now-removed surface |
 
 **Decision rules baked in**:
