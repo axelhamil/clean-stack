@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Result } from "@packages/ddd-kit";
+import type { ISweepRunStore, SweepRun, SweepRunStoreError } from "@packages/http/sweep-run.port";
 import { mockPort } from "@packages/test/bun";
 import { Hono } from "hono";
 import { env } from "../../../shared/env";
@@ -11,11 +12,6 @@ import {
   sign,
 } from "../../../shared/internal-routes/internal-signature";
 import { createErrorHandler } from "../../../shared/middleware/error.middleware";
-import type {
-  ISweepRunStore,
-  SweepRun,
-  SweepRunStoreError,
-} from "../../../shared/ports/sweep-run.port";
 import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
 import type { RgpdError } from "../application/ports/rgpd.port";
 import type {

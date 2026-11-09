@@ -27,6 +27,8 @@ import {
   outboxSchema,
   TransactionService,
 } from "@packages/drizzle";
+import { purgeBatchWithTimeout, requireFilter } from "@packages/drizzle/sweep-purge";
+import { sweepSpans } from "@packages/drizzle/sweep-span";
 import { EventTypes } from "@packages/events";
 import {
   DrizzleOutboxRepository,
@@ -36,8 +38,6 @@ import { emitEvent } from "@packages/outbox/event-emitter";
 import type { OutboxRecord } from "@packages/outbox/outbox.port";
 import { Client } from "pg";
 import { buildPurgeFilter } from "../src/shared/internal-routes/sweep-outbox.route";
-import { purgeBatchWithTimeout, requireFilter } from "../src/shared/internal-routes/sweep-purge";
-import { sweepSpans } from "../src/shared/internal-routes/sweep-span";
 import { checkRun, recordingInstrumentation } from "./check-harness";
 
 const PROBE = `check.outbox-lease.${crypto.randomUUID()}`;

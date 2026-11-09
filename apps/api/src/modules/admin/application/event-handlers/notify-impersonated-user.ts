@@ -1,8 +1,8 @@
 import { type EventHandler, type IDomainEvent, onEvent, Result } from "@packages/ddd-kit";
 import type { IEmailService } from "@packages/email/email.port";
 import { EventTypes, PayloadByEventType } from "@packages/events";
+import { handlerIdempotency } from "@packages/outbox/handler-idempotency";
 import { payloadParser } from "@packages/outbox/payload-parser";
-import { handlerIdempotency } from "../../../../shared/handler-idempotency";
 import { localeForUser } from "../../../../shared/locale-for-user";
 import type { IProfileStore } from "../../../../shared/ports/profile.port";
 import type { AdminQueryService } from "../services/admin-query.service";

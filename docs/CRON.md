@@ -226,7 +226,7 @@ dryRun, batchCount, deletedPerPass, stopReasons, truncated, skipped }`.
 
 `batchSize` bounds rows, not time. Each batch carries its own
 `statement_timeout`: 5 s for a purge, 10 s for a dry-run count (the shared
-`countEligibleWithTimeout` helper in `apps/api/src/shared/internal-routes/sweep-count.ts`,
+`countEligibleWithTimeout` helper in `packages/drizzle/src/sweep-count.ts`,
 since an unbounded `COUNT(*)` on a large table would otherwise hold a pooled
 connection for the whole idle timeout): which is what makes checking the
 budget between batches sufficient.

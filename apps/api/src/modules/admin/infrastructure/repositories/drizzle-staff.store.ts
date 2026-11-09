@@ -19,19 +19,15 @@ import {
   resolveExecutor,
   staffSchema,
 } from "@packages/drizzle";
+import { countEligibleWithTimeout } from "@packages/drizzle/sweep-count";
+import { lockedBatch, requireFilter, withSweepGuards } from "@packages/drizzle/sweep-purge";
+import { sweepSpans } from "@packages/drizzle/sweep-span";
 import {
   ENDED_SESSION_COLUMNS,
   endedImpersonationsOf,
   endedSessionsOf,
 } from "../../../../shared/db/ended-sessions";
 import { createDbFailure } from "../../../../shared/db-failure";
-import { countEligibleWithTimeout } from "../../../../shared/internal-routes/sweep-count";
-import {
-  lockedBatch,
-  requireFilter,
-  withSweepGuards,
-} from "../../../../shared/internal-routes/sweep-purge";
-import { sweepSpans } from "../../../../shared/internal-routes/sweep-span";
 import type {
   EndedImpersonation,
   EndedSessions,

@@ -1,6 +1,6 @@
 # http rules
 
-The HTTP kit a module's routes are written against: the zod request validator, time-id cursor pagination and the route-guard contract. Auto-loaded under `packages/http/`. Consumer: `apps/api` (and every `@modules/<name>` once modules move). Server conventions (RPC chaining, error envelope): `apps/api/CLAUDE.md`.
+The HTTP kit a module's routes are written against: the zod request validator, time-id cursor pagination, the route-guard contract and the retention sweep loop (its queries live in `@packages/drizzle`). Auto-loaded under `packages/http/`. Consumer: `apps/api` (and every `@modules/<name>` once modules move). Server conventions (RPC chaining, error envelope): `apps/api/CLAUDE.md`.
 
 ## Layout
 
@@ -10,6 +10,10 @@ src/
   error-handler.ts             `createErrorHandler({ instrumentation, logger, isProduction })`: the one `onError` envelope, the host binds its telemetry, logger and environment
   time-id-cursor.ts            keyset cursor on `(time, id)`: `timeIdCursorSchema` (decode), `encodeTimeIdCursor`, `afterTimeIdCursor` (`WHERE`), `exactInstant`
   route-guards.ts              `RouteGuards` contract, `RouteGuard`, `RouteEnv`
+  sweep-runner.ts              `runRetentionSweep`, `runBatchedSweep`, `sweepBodySchema`, `releaseLease`: the batched, time-boxed, single-flight sweep loop
+  sweep-heartbeat.ts           `withSweepHeartbeat`, `beatOfSweep`: one `SweepRun` row per run
+  sweep-result.ts              `classifySweepResult`: skipped, batch error, truncated or ok
+  sweep-run.port.ts            `ISweepRunStore`, `SweepRun`, `SweepOutcome`
   testing/route-guards.ts      `openRouteGuards(requester)`: every gate open, for a module's route tests
 ```
 

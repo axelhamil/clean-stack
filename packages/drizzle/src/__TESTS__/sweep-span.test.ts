@@ -1,11 +1,11 @@
-import { describe, expect, it, spyOn } from "bun:test";
-import { NoOpInstrumentation } from "../../services/noop-instrumentation";
+import { describe, expect, it } from "bun:test";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { sweepSpans } from "../sweep-span";
 
 describe("sweepSpans", () => {
   it("opens a named span and returns the callback's value", async () => {
-    const instrumentation = new NoOpInstrumentation();
-    const spy = spyOn(instrumentation, "startSpan");
+    const instrumentation = mockInstrumentation();
+    const spy = instrumentation.startSpan;
     const spans = sweepSpans(instrumentation);
 
     const result = await spans.span({ name: "sweep > sweep-x", op: "function" }, async () => 42);
@@ -18,8 +18,8 @@ describe("sweepSpans", () => {
   });
 
   it("tags db spans with the sql and the postgres attribute", async () => {
-    const instrumentation = new NoOpInstrumentation();
-    const spy = spyOn(instrumentation, "startSpan");
+    const instrumentation = mockInstrumentation();
+    const spy = instrumentation.startSpan;
     const spans = sweepSpans(instrumentation);
 
     await spans.db(
@@ -38,7 +38,7 @@ describe("sweepSpans", () => {
   });
 
   it("does not evaluate the sql thunk once the budget is exhausted", async () => {
-    const instrumentation = new NoOpInstrumentation();
+    const instrumentation = mockInstrumentation();
     const spans = sweepSpans(instrumentation, 1);
     let calls = 0;
     const sqlOf = () => {
@@ -53,8 +53,8 @@ describe("sweepSpans", () => {
   });
 
   it("stops opening db spans past the budget but still runs the query", async () => {
-    const instrumentation = new NoOpInstrumentation();
-    const spy = spyOn(instrumentation, "startSpan");
+    const instrumentation = mockInstrumentation();
+    const spy = instrumentation.startSpan;
     const spans = sweepSpans(instrumentation, 2);
 
     const results: number[] = [];
@@ -71,7 +71,7 @@ describe("sweepSpans", () => {
   });
 
   it("keeps opening the lease span even past the exhausted db budget", async () => {
-    const instrumentation = new NoOpInstrumentation();
+    const instrumentation = mockInstrumentation();
     const spans = sweepSpans(instrumentation, 1);
 
     // Exhaust the budgeted db spans first.
@@ -84,7 +84,8 @@ describe("sweepSpans", () => {
       async () => 0,
     );
 
-    const spy = spyOn(instrumentation, "startSpan");
+    const spy = instrumentation.startSpan;
+    spy.mockClear();
     await spans.lease(
       () => 'delete from "sweep_lock"',
       async () => undefined,
@@ -102,8 +103,8 @@ describe("sweepSpans", () => {
   });
 
   it("keeps a separate budget per instance", async () => {
-    const instrumentation = new NoOpInstrumentation();
-    const spy = spyOn(instrumentation, "startSpan");
+    const instrumentation = mockInstrumentation();
+    const spy = instrumentation.startSpan;
 
     // Built before either is used: a bug that backs `remaining` with module-level
     // state (reset per construction) would have both instances share one counter
@@ -144,8 +145,8 @@ describe("sweepSpans", () => {
   });
 
   it("passes captures through with their metadata", () => {
-    const instrumentation = new NoOpInstrumentation();
-    const spy = spyOn(instrumentation, "capture");
+    const instrumentation = mockInstrumentation();
+    const spy = instrumentation.capture;
     const err = new Error("boom");
 
     sweepSpans(instrumentation).capture(err, { label: "sweep-x", batchCount: 3 });

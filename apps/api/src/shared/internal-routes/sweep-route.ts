@@ -1,19 +1,19 @@
 import type { AnyPgColumn, AnyPgTable, SQL } from "@packages/drizzle";
-import type { PinoLogger } from "hono-pino";
-import { di } from "../../container";
-import { env } from "../env";
-import { countEligibleWithTimeout } from "./sweep-count";
-import { beatOfSweep, withSweepHeartbeat } from "./sweep-heartbeat";
-import { sweepLockFor } from "./sweep-lock";
-import { purgeBatchWithTimeout } from "./sweep-purge";
+import { countEligibleWithTimeout } from "@packages/drizzle/sweep-count";
+import { purgeBatchWithTimeout } from "@packages/drizzle/sweep-purge";
+import { type SweepSpans, sweepSpans } from "@packages/drizzle/sweep-span";
+import { beatOfSweep, withSweepHeartbeat } from "@packages/http/sweep-heartbeat";
 import {
   type RetentionPass,
   runRetentionSweep,
   type SweepBatchErrorDecision,
   type SweepBody,
   type SweepResponse,
-} from "./sweep-runner";
-import { type SweepSpans, sweepSpans } from "./sweep-span";
+} from "@packages/http/sweep-runner";
+import type { PinoLogger } from "hono-pino";
+import { di } from "../../container";
+import { env } from "../env";
+import { sweepLockFor } from "./sweep-lock";
 
 type TablePassOptions = {
   label: string;

@@ -4,7 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./sweep-count": "./src/sweep-count.ts",
+    "./sweep-purge": "./src/sweep-purge.ts",
+    "./sweep-span": "./src/sweep-span.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",
@@ -16,7 +19,8 @@
     "lint": "biome lint .",
     "check": "biome check .",
     "fix": "biome check --write .",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "bun test --isolate"
   },
   "dependencies": {
     "@packages/cookie-consent": "workspace:*",
@@ -28,7 +32,9 @@
     "pg": "^8.23.1"
   },
   "devDependencies": {
+    "@packages/test": "workspace:*",
     "@packages/typescript-config": "workspace:*",
+    "@types/bun": "^1.4.4",
     "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1",
     "drizzle-kit": "^0.31.11",

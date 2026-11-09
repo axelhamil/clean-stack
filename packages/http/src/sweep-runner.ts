@@ -1,6 +1,6 @@
-import type { PinoLogger } from "hono-pino";
+import type { ILogger } from "@packages/ddd-kit";
+import type { SweepSpans } from "@packages/drizzle/sweep-span";
 import { z } from "zod";
-import type { SweepSpans } from "./sweep-span";
 
 export const MAX_BATCHES = 1000;
 export const INTER_BATCH_SLEEP_MS = 50;
@@ -30,7 +30,7 @@ export type RunBatchedSweepOptions = {
   countEligible: () => Promise<number>;
   batchSize: number;
   dryRun: boolean;
-  logger: PinoLogger;
+  logger: ILogger;
   label: string;
   onBatchError?: (err: unknown) => SweepBatchErrorDecision;
   deadlineAt?: number;
@@ -61,7 +61,7 @@ export type SweepLock = {
 export type RunRetentionSweepOptions = {
   body: SweepBody;
   passes: RetentionPass[];
-  logger: PinoLogger;
+  logger: ILogger;
   label: string;
   deadlineMs?: number;
   now?: () => number;
@@ -91,7 +91,7 @@ export type SweepResponse = {
 export async function releaseLease(
   lock: SweepLock,
   label: string,
-  logger: Pick<PinoLogger, "error">,
+  logger: Pick<ILogger, "error">,
   spans: SweepSpans,
 ): Promise<void> {
   try {

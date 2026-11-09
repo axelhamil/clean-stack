@@ -12,6 +12,8 @@
 // sweep-lock.ts (see docs/FEATURES.md and docs/REMOVABILITY.md).
 
 import { db, eq, resolveExecutor, sql, sweepSchema } from "@packages/drizzle";
+import { purgeBatchWithTimeout } from "@packages/drizzle/sweep-purge";
+import { sweepSpans } from "@packages/drizzle/sweep-span";
 import type { Hono } from "hono";
 import { di } from "../src/container";
 import { env } from "../src/shared/env";
@@ -25,8 +27,6 @@ import {
 } from "../src/shared/internal-routes/sweep-lock";
 import { sweepNotificationsRoutes } from "../src/shared/internal-routes/sweep-notifications.route";
 import { sweepOutboxRoutes } from "../src/shared/internal-routes/sweep-outbox.route";
-import { purgeBatchWithTimeout } from "../src/shared/internal-routes/sweep-purge";
-import { sweepSpans } from "../src/shared/internal-routes/sweep-span";
 import { sweepWebhookDeliveryRoutes } from "../src/shared/internal-routes/sweep-webhook-delivery.route";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 import { checkRecorder, internalApp, signedInternalRequest } from "./check-harness";

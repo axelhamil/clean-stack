@@ -1,12 +1,12 @@
 // `/internal/*`: gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
 import { AppErrorException, type IInstrumentation } from "@packages/ddd-kit";
+import { sweepSpans } from "@packages/drizzle/sweep-span";
 import type { RouteGuard } from "@packages/http/route-guards";
+import { type SweepBeat, withSweepHeartbeat } from "@packages/http/sweep-heartbeat";
+import type { ISweepRunStore } from "@packages/http/sweep-run.port";
 import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
-import { type SweepBeat, withSweepHeartbeat } from "../../shared/internal-routes/sweep-heartbeat";
-import { sweepSpans } from "../../shared/internal-routes/sweep-span";
-import type { ISweepRunStore } from "../../shared/ports/sweep-run.port";
 import type { RgpdSettings } from "./application/config/rgpd-settings";
 import { sweepBodySchema } from "./application/dto/process-pending-deletions.dto";
 import type {

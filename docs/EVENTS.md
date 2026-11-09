@@ -158,7 +158,7 @@ export const ordersModule = defineModule()((b) =>
 );
 ```
 
-`OutboxDispatcher.start()` discovers it automatically at boot via `Object.entries(di)` + `EVENT_HANDLER_SYMBOL` marker. **No registration array, no manifest.** The handler name is a persisted key (kebab-case, unique per event type, `<module>-<reaction>`): it is how a redelivery knows which handlers already ran, so renaming it reruns the handler on every pending event. A handler that talks to the outside world passes a key derived from it and the event id (`handlerIdempotency(name, event)` in `shared/`) so a redelivery never sends twice.
+`OutboxDispatcher.start()` discovers it automatically at boot via `Object.entries(di)` + `EVENT_HANDLER_SYMBOL` marker. **No registration array, no manifest.** The handler name is a persisted key (kebab-case, unique per event type, `<module>-<reaction>`): it is how a redelivery knows which handlers already ran, so renaming it reruns the handler on every pending event. A handler that talks to the outside world passes a key derived from it and the event id (`handlerIdempotency(name, event)` in `@packages/outbox/handler-idempotency`) so a redelivery never sends twice.
 
 A handler that throws, returns a failed `Result` (`onEvent` throws it for you, so the application layer still never throws), or runs past `OUTBOX_HANDLER_BUDGET_SECONDS` is a failed delivery: the event is retried with only that handler (see [Delivery](#delivery-lease-retry-and-dead-replay)), and the relay logs and reports the failure itself. Never swallow an error or capture it in the handler; a swallowed error is a delivery the relay believes succeeded, a captured one is reported twice.
 

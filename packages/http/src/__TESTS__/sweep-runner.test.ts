@@ -1,7 +1,7 @@
-import { describe, expect, it, spyOn } from "bun:test";
-import { NoOpInstrumentation } from "../../services/noop-instrumentation";
+import { describe, expect, it } from "bun:test";
+import { sweepSpans } from "@packages/drizzle/sweep-span";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { MAX_BATCHES, releaseLease, runRetentionSweep } from "../sweep-runner";
-import { sweepSpans } from "../sweep-span";
 
 const logger = { info: () => {}, warn: () => {}, error: () => {} } as never;
 
@@ -10,7 +10,7 @@ const logger = { info: () => {}, warn: () => {}, error: () => {} } as never;
 // lease behavior pass this always-acquires no-op instead.
 const noopLock = { acquire: async () => true, release: async () => {} };
 
-const noopSpans = () => sweepSpans(new NoOpInstrumentation());
+const noopSpans = () => sweepSpans(mockInstrumentation());
 
 describe("runRetentionSweep", () => {
   it("runs passes sequentially and reports each one", async () => {
@@ -245,8 +245,8 @@ describe("runRetentionSweep, lease", () => {
   });
 
   it("marks the run span skipped when the lease is held", async () => {
-    const instrumentation = new NoOpInstrumentation();
-    const spy = spyOn(instrumentation, "setSpanAttributes");
+    const instrumentation = mockInstrumentation();
+    const spy = instrumentation.setSpanAttributes;
 
     await runRetentionSweep({
       body: {},
@@ -300,8 +300,8 @@ describe("runRetentionSweep, lease", () => {
 
 describe("runRetentionSweep instrumentation", () => {
   it("wraps the run and each pass in a named span", async () => {
-    const instrumentation = new NoOpInstrumentation();
-    const spy = spyOn(instrumentation, "startSpan");
+    const instrumentation = mockInstrumentation();
+    const spy = instrumentation.startSpan;
 
     await runRetentionSweep({
       body: { dryRun: true },
@@ -332,8 +332,8 @@ describe("runRetentionSweep instrumentation", () => {
   });
 
   it("records the pass outcome as span attributes", async () => {
-    const instrumentation = new NoOpInstrumentation();
-    const spy = spyOn(instrumentation, "setSpanAttributes");
+    const instrumentation = mockInstrumentation();
+    const spy = instrumentation.setSpanAttributes;
 
     await runRetentionSweep({
       body: {},
@@ -357,8 +357,8 @@ describe("runRetentionSweep instrumentation", () => {
   });
 
   it("records the run outcome as span attributes when it completes", async () => {
-    const instrumentation = new NoOpInstrumentation();
-    const spy = spyOn(instrumentation, "setSpanAttributes");
+    const instrumentation = mockInstrumentation();
+    const spy = instrumentation.setSpanAttributes;
 
     await runRetentionSweep({
       body: {},
@@ -388,8 +388,8 @@ describe("runRetentionSweep instrumentation", () => {
   });
 
   it("captures a swallowed batch error", async () => {
-    const instrumentation = new NoOpInstrumentation();
-    const spy = spyOn(instrumentation, "capture");
+    const instrumentation = mockInstrumentation();
+    const spy = instrumentation.capture;
     const boom = new Error("batch exploded");
 
     await runRetentionSweep({
@@ -415,8 +415,8 @@ describe("runRetentionSweep instrumentation", () => {
   });
 
   it("does not capture a rethrown batch error, onError already reports it", async () => {
-    const instrumentation = new NoOpInstrumentation();
-    const spy = spyOn(instrumentation, "capture");
+    const instrumentation = mockInstrumentation();
+    const spy = instrumentation.capture;
 
     await expect(
       runRetentionSweep({
@@ -442,8 +442,8 @@ describe("runRetentionSweep instrumentation", () => {
   });
 
   it("captures a failed lease release", async () => {
-    const instrumentation = new NoOpInstrumentation();
-    const spy = spyOn(instrumentation, "capture");
+    const instrumentation = mockInstrumentation();
+    const spy = instrumentation.capture;
     const releaseFailure = new Error("release failed");
 
     await runRetentionSweep({
@@ -468,8 +468,8 @@ describe("releaseLease", () => {
   // A bare `await lock.release()` in a `finally` turned a committed run into a 500
   // on a release failure, and masked the original error when the run had thrown.
   it("resolves when the release throws, and logs and captures the failure", async () => {
-    const instrumentation = new NoOpInstrumentation();
-    const capture = spyOn(instrumentation, "capture");
+    const instrumentation = mockInstrumentation();
+    const capture = instrumentation.capture;
     const errors: unknown[] = [];
     const releaseFailure = new Error("release failed");
 

@@ -55,7 +55,8 @@ Each module **owner of an external dependency** ships its own `XxxHealthProbe` c
 ```ts
 // modules/billing/src/infrastructure/stripe-health-probe.ts
 import type { OnInit } from "inwire";
-import type { HealthCheckFn, IHealthCheckRegistry } from "../../../shared/ports/health.port";
+import type { HealthCheckFn } from "@packages/ddd-kit";
+import type { IHealthCheckRegistry } from "../../../shared/ports/health.port";
 import type { IBillingProvider } from "../../../shared/ports/billing.port";
 
 export class StripeHealthProbe implements OnInit {

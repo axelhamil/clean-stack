@@ -1,7 +1,8 @@
+import type { HealthStatus } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { di } from "../../container";
 import { env } from "../../shared/env";
-import type { AggregatedReport, HealthStatus } from "../../shared/ports/health.port";
+import type { AggregatedReport } from "../../shared/ports/health.port";
 import { lifecycleState } from "../../shared/shutdown";
 
 const PASS: HealthStatus = "pass";

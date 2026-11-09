@@ -5,7 +5,9 @@ import type {
   NotificationDigestError,
 } from "@modules/notifications/application/ports/notification-digest.port";
 import { type Option, Result } from "@packages/ddd-kit";
+import { type SweepSpans, sweepSpans } from "@packages/drizzle/sweep-span";
 import type { EmailError } from "@packages/email/email.port";
+import { type SweepBeat, withSweepHeartbeat } from "@packages/http/sweep-heartbeat";
 import { zV } from "@packages/http/validator";
 import { toLocale } from "@packages/i18n";
 import { Hono } from "hono";
@@ -14,8 +16,6 @@ import type { PinoLogger } from "hono-pino";
 import { z } from "zod";
 import { di } from "../../container";
 import { internalLayers } from "./internal-layers";
-import { type SweepBeat, withSweepHeartbeat } from "./sweep-heartbeat";
-import { type SweepSpans, sweepSpans } from "./sweep-span";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
 
