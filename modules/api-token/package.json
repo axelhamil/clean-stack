@@ -14,7 +14,8 @@
     "./infrastructure/repositories/drizzle-api-token.repository": "./src/infrastructure/repositories/drizzle-api-token.repository.ts",
     "./infrastructure/services/github-key-verifier": "./src/infrastructure/services/github-key-verifier.ts",
     "./infrastructure/http/api-token.routes": "./src/infrastructure/http/api-token.routes.ts",
-    "./infrastructure/http/scanning.routes": "./src/infrastructure/http/scanning.routes.ts"
+    "./infrastructure/http/scanning.routes": "./src/infrastructure/http/scanning.routes.ts",
+    "./schemas/*": "./schemas/*.ts"
   },
   "scripts": {
     "format": "biome format . --write",
@@ -32,6 +33,7 @@
     "@packages/http": "workspace:*",
     "@packages/i18n": "workspace:*",
     "@packages/outbox": "workspace:*",
+    "drizzle-orm": "^0.45.4",
     "hono": "^4.13.14",
     "inwire": "^4.0.1",
     "zod": "^4.6.7"

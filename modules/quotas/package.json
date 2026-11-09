@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     "./quotas.module": "./src/quotas.module.ts",
-    "./application/ports/quota-usage.port": "./src/application/ports/quota-usage.port.ts"
+    "./application/ports/quota-usage.port": "./src/application/ports/quota-usage.port.ts",
+    "./schemas/*": "./schemas/*.ts"
   },
   "scripts": {
     "format": "biome format . --write",
@@ -18,6 +19,7 @@
   "dependencies": {
     "@packages/ddd-kit": "workspace:*",
     "@packages/drizzle": "workspace:*",
+    "drizzle-orm": "^0.45.4",
     "inwire": "^4.0.1"
   },
   "devDependencies": {

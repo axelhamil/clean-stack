@@ -1,7 +1,7 @@
+import { user } from "@packages/drizzle/schema/auth";
+import { organization } from "@packages/drizzle/schema/multi-tenant";
 import type { API_TOKEN_REVOKED_REASONS } from "@packages/events";
 import { index, jsonb, pgTable, smallint, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
-import { user } from "./auth";
-import { organization } from "./multi-tenant";
 
 export type ApiTokenRevokedReason = (typeof API_TOKEN_REVOKED_REASONS)[number];
 

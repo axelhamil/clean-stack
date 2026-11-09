@@ -34,12 +34,12 @@ requireLocalDatabase("check-wipe-rollback");
 
 import { generateToken, hmacToken } from "@modules/api-token/domain/api-token-crypto";
 import { DrizzleApiTokenRepository } from "@modules/api-token/infrastructure/repositories/drizzle-api-token.repository";
+import * as apiTokenSchema from "@modules/api-token/schemas/api-token";
 import { RgpdService } from "@modules/rgpd/application/services/rgpd.service";
 import { DrizzleRgpdRepository } from "@modules/rgpd/infrastructure/repositories/drizzle-rgpd.repository";
 import { NoOpStorageService } from "@modules/uploads/infrastructure/services/noop-storage.service";
 import type { IInstrumentation } from "@packages/ddd-kit";
 import {
-  apiTokenSchema,
   authSchema,
   db,
   eq,

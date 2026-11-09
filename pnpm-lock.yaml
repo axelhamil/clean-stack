@@ -633,6 +633,9 @@ importers:
       '@packages/outbox':
         specifier: workspace:*
         version: link:../../packages/outbox
+      drizzle-orm:
+        specifier: ^0.45.4
+        version: 0.45.4(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.6)(pg@8.23.1)
       hono:
         specifier: ^4.13.14
         version: 4.13.14
@@ -756,6 +759,9 @@ importers:
       '@packages/outbox':
         specifier: workspace:*
         version: link:../../packages/outbox
+      drizzle-orm:
+        specifier: ^0.45.4
+        version: 0.45.4(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.6)(pg@8.23.1)
       hono:
         specifier: ^4.13.14
         version: 4.13.14
@@ -842,6 +848,9 @@ importers:
       '@packages/policies':
         specifier: workspace:*
         version: link:../../packages/policies
+      drizzle-orm:
+        specifier: ^0.45.4
+        version: 0.45.4(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.6)(pg@8.23.1)
       hono:
         specifier: ^4.13.14
         version: 4.13.14
@@ -916,6 +925,9 @@ importers:
       '@packages/drizzle':
         specifier: workspace:*
         version: link:../../packages/drizzle
+      drizzle-orm:
+        specifier: ^0.45.4
+        version: 0.45.4(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(bun-types@1.4.4)(kysely@0.29.6)(pg@8.23.1)
       inwire:
         specifier: ^4.0.1
         version: 4.0.1
@@ -1131,18 +1143,12 @@ importers:
 
   packages/drizzle:
     dependencies:
-      '@packages/cookie-consent':
-        specifier: workspace:*
-        version: link:../cookie-consent
       '@packages/ddd-kit':
         specifier: workspace:*
         version: link:../ddd-kit
       '@packages/events':
         specifier: workspace:*
         version: link:../events
-      '@packages/policies':
-        specifier: workspace:*
-        version: link:../policies
       dotenv:
         specifier: ^18.0.9
         version: 18.0.9
