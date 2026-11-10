@@ -61,7 +61,7 @@ describe("NotificationFanoutSubscriber", () => {
     expect(calls()).toBe(1);
   });
 
-  test("inserts nothing and fails the delivery when the staff audience cannot be read", async () => {
+  test("inserts nothing and fails the delivery when the staff audience cannot be read, captured once by the reader", async () => {
     const staff = mockPort<IStaffRecipientsReader>();
     staff.recipientsOf.mockResolvedValue(
       Result.fail({
@@ -69,9 +69,10 @@ describe("NotificationFanoutSubscriber", () => {
         message: "database operation failed: recipientsOf",
       }),
     );
+    const instrumentation = mockInstrumentation();
     const handler = new NotificationFanoutSubscriber(
       mockUnitOfWork().unitOfWork,
-      mockInstrumentation(),
+      instrumentation,
       staff,
     );
 
@@ -81,5 +82,6 @@ describe("NotificationFanoutSubscriber", () => {
 
     await expect(delivery).rejects.toBeInstanceOf(AppErrorException);
     expect(calls()).toBe(0);
+    expect(instrumentation.capture).not.toHaveBeenCalled();
   });
 });

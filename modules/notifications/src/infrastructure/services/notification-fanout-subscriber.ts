@@ -158,11 +158,7 @@ export class NotificationFanoutSubscriber implements BuiltInEventHandler {
             const staff = await this.staffRecipients.recipientsOf(target, this.staffEnv);
             if (staff.isFailure) throw new AppErrorException(staff.getError());
 
-            const ids = sql.join(
-              staff.getValue().map((id) => sql`${id}`),
-              sql`, `,
-            );
-            return sql`(SELECT unnest(ARRAY[${ids}]::text[]) AS user_id)`;
+            return sql`(SELECT unnest(${sql.param(staff.getValue())}::text[]) AS user_id)`;
           };
 
           const rules = deliveryRules(config.category, organizationId, config.forced === true);
@@ -212,7 +208,7 @@ export class NotificationFanoutSubscriber implements BuiltInEventHandler {
             );
           });
         } catch (err) {
-          this.instrumentation.capture(err);
+          if (!(err instanceof AppErrorException)) this.instrumentation.capture(err);
           throw err;
         }
       },

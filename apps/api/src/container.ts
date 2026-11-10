@@ -3,7 +3,6 @@ import { apiTokenModule } from "@modules/api-token/api-token.module";
 import { auditLogModule } from "@modules/audit-log/audit-log.module";
 import { billingModule } from "@modules/billing/billing.module";
 import { consentModule } from "@modules/consents/consents.module";
-import type { IStaffRecipientsReader } from "@modules/notifications/application/ports/staff-recipients.port";
 import { notificationsModule } from "@modules/notifications/notifications.module";
 import { policyModule } from "@modules/policies/policies.module";
 import { profileModule } from "@modules/profile/profile.module";
@@ -33,9 +32,9 @@ import { container } from "inwire";
 import { Resend } from "resend";
 import { apiSettings } from "./composition/settings";
 import { adminSources } from "./composition/sources/admin";
+import { notificationsSources } from "./composition/sources/notifications";
 import { rgpdSources } from "./composition/sources/rgpd";
 import { healthModule } from "./modules/health/module";
-import { StaffRecipientsQuery } from "./queries/staff-recipients.query";
 import { authSecretKey } from "./shared/auth/auth-secrets";
 import type { OutermostUnitOfWork } from "./shared/auth/unit-of-work-adapter";
 import { env } from "./shared/env";
@@ -206,10 +205,7 @@ export const di = container()
   .addModule(consentModule)
   .addModule(quotaModule)
   .addModule(billingModule)
-  .add(
-    "IStaffRecipientsReader",
-    (c): IStaffRecipientsReader => new StaffRecipientsQuery(c.IInstrumentation),
-  )
+  .addModule(notificationsSources)
   .addModule(notificationsModule)
   .addModule(profileModule)
   .addModule(adminSources)
