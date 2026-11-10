@@ -605,7 +605,7 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 | `packages/events/src/visibility-map.ts` | Allowlist: `"public"` = customer contract, `"internal"` = operational signal. Drives fanout, picker, and public catalog simultaneously. |
 | `packages/events/src/{descriptions,json-schema}.ts` | Human-readable descriptions + `jsonSchemaForEvent` (Zod 4 `z.toJSONSchema`): consumed by public catalog + `EventTypePicker` |
 | `packages/ddd-kit/src/events/{event-collector,on-event,outbox-mapping}.ts` | ALS collector + handler factory + CloudEvents mapping |
-| `packages/drizzle/src/schema/{outbox,audit-log,webhooks}.ts` | The 4 tables |
+| `packages/drizzle/src/schema/outbox.ts`, `modules/audit-log/schemas/audit-log.ts`, `modules/webhooks/schemas/webhooks.ts` | The 4 tables |
 | `packages/drizzle/src/services/transaction-manager.service.ts` | `TransactionService.run()`: ALS flush + nested runs joining the outermost transaction + rollback when the callback resolves to a failed `Result` |
 | `packages/outbox/src/outbox-dispatcher.ts` | LISTEN/NOTIFY worker, wake schedule, start and stop |
 | `packages/outbox/src/outbox-relay.ts` | Claim by lease, run the named handlers, settle, dead announcement |
