@@ -9,7 +9,7 @@ drizzle.config.ts              drizzle-kit config (schema "./src/schema/*" plus 
 migrations/                    generated SQL, committed
 src/
   config.ts                    `db`, `DbClient`, `Transaction`, `closeDb()` (ends the pool, called by the api shutdown)
-  schema/<topic>.ts            one file per kit topic (auth, multi-tenant, outbox, sweep, ...); a business table lives in its module's `schemas/`, re-exported as `<topic>Schema` from `index.ts`; each is also a sub-path export (`@packages/drizzle/schema/<topic>`) for module schemas
+  schema/<topic>.ts            one file per kit topic (auth, multi-tenant, outbox, sweep, ...), re-exported as `<topic>Schema` from `index.ts` and also a sub-path export (`@packages/drizzle/schema/<topic>`) for module schemas; a business table lives in its module's `schemas/`
   db-failure.ts                `dbOperationFailure(code)`: the error a store returns when a query throws
   advisory-lock.ts             `lockForTransaction`, `tryLockForTransaction` (transaction scoped advisory lock)
   sweep-purge.ts               `purgeBatchWithTimeout`, `withSweepGuards`, `requireFilter`: the batched retention delete under its `SET LOCAL` guards
