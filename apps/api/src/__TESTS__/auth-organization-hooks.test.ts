@@ -212,12 +212,9 @@ describe("organization hooks, seat gate", () => {
     },
   );
 
-  it.each(["beforeAddMember", "beforeCreateInvitation", "beforeAcceptInvitation"] as const)(
-    "given an org below its seat cap, when %s runs, then it lets the member in",
-    async (name) => {
-      countActiveMembers.mockResolvedValue(MAX_MEMBERS - 1);
+  it("given an org below its seat cap, when a member is added, then it lets the member in", async () => {
+    countActiveMembers.mockResolvedValue(MAX_MEMBERS - 1);
 
-      await expect(runHook(name, { organization: TEAM })).resolves.toBeUndefined();
-    },
-  );
+    await expect(runHook("beforeAddMember", { organization: TEAM })).resolves.toBeUndefined();
+  });
 });

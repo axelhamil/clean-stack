@@ -548,7 +548,7 @@ Emitted via `emitEvent(outbox, ...)` in `requireQuota` when a request hits a quo
 
 - `BILLING_QUOTA_EXCEEDED` (`billing.quota.exceeded`): emitted on quota ceiling hit. Payload: `{ organizationId, resource: string, limit: number, attempted: number, tier: string, actorUserId: string }`, retention `operational`.
 
-### Via `auth.ts` `hooks.after` (Phase C.7: `@better-auth/sso` / `@better-auth/scim`)
+### Via `auth/hooks/after.ts` (Phase C.7: `@better-auth/sso` / `@better-auth/scim`)
 
 The SSO events are emitted via `emitEvent(outbox, ...)` in `apps/api/src/auth/hooks/after.ts`, path-keyed off `SSO_PATHS`/`SCIM_PATHS` (`apps/api/src/shared/auth/sso-paths.ts`). The SCIM connection events come from `ScimConnectionService` (`apps/api/src/shared/services/scim-connection.service.ts`), the only caller of the plugin's managed-connection server APIs. SCIM user endpoints authenticate with a bearer token, not a session: the actor is the owner who created the connection (`scimConnectionCreator`), not `ctx.context.session`. `scimProviderId`/`providerId` in the SCIM payloads carry the managed connection id; the key names are kept for payload stability.
 

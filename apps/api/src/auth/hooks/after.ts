@@ -10,12 +10,12 @@ import {
 } from "../../shared/auth/sso-paths";
 import { logger } from "../../shared/logger";
 import { emit } from "../emit";
-import { emitScimUserEvents } from "../plugins/scim";
 import {
   findLatestLinkedAccount,
   findLatestPasskey,
   findSsoProviderByProviderId,
 } from "../queries";
+import { emitScimUserEvents } from "../scim-events";
 import { ssoProviderDeleteSnapshots } from "../snapshots";
 import { requestClientIp } from "../visitor";
 

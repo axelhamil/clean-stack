@@ -34,7 +34,7 @@ export function ProviderCard() {
 
   // `sso.register`'s error carries the API's business code inside `.message`
   // rather than a separate `.code` field (`assertSsoEntitlementFor` in
-  // apps/api/src/auth/plugins/sso.ts), so `{ code: err.message }` feeds that string into
+  // apps/api/src/auth/entitlements.ts), so `{ code: err.message }` feeds that string into
   // `formatApiError`'s `errors.byCode` lookup. Passing `err.message` as the
   // fallback too means an unrecognized code still surfaces the server's own text.
   const onRegisterError = (err: Error) =>

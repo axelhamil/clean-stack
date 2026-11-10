@@ -34,7 +34,7 @@ apps/api/src/
     index.ts                    `authOptions`, the `plugins` array in its load-bearing order, `export const auth`, `SessionUser` / `SessionData`
     plugins/<name>.ts           One file per plugin with hooks or helpers of its own (`stripe`, `organization`, `sso`, `scim`, `clear-expired-ban`, `security-signals`)
     hooks/{before,after,database}.ts   The top-level `hooks.before` / `hooks.after` / `databaseHooks`
-    emit.ts, email.ts, visitor.ts, snapshots.ts, personal-org.ts, email-verification.ts   Helpers shared by the files above
+    emit.ts, email.ts, visitor.ts, snapshots.ts, personal-org.ts, entitlements.ts, seats.ts, scim-events.ts   Helpers shared by the files above; a plugin file never imports another plugin file and a hook never imports a plugin file
     queries.ts                  Typed Drizzle data access for the bridge, plain functions (no port, DI or aggregate: auth is not domain), reading `resolveExecutor()`. Keeps `auth/` config + event wiring only, never inline `db.*`.
   app.ts                        `Hono` construction, chained `.route()` mounts, middleware, `export const routes` / `export type AppType`. No server boot.
   index.ts                      Server entry: explicit `Bun.serve()` handle (kept on `globalThis` so `bun --hot` reloads it instead of rebinding the port), DI preload, worker starts, ordered shutdown steps. Imports `app` from `app.ts`, re-exports `AppType`.

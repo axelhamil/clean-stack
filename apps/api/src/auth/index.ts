@@ -21,8 +21,13 @@ import { TOTP_OPTIONS } from "../shared/auth/totp-options";
 import { asUnitOfWork } from "../shared/auth/unit-of-work-adapter";
 import { env, FRONT_ORIGINS } from "../shared/env";
 import { MIN_PASSWORD_LENGTH } from "../shared/password-policy";
-import { dispatchEmail, localeForEmail, localeOf, tokenIdempotencyKey } from "./email";
-import { acceptStalePoliciesAtFirstVerification } from "./email-verification";
+import {
+  acceptStalePoliciesAtFirstVerification,
+  dispatchEmail,
+  localeForEmail,
+  localeOf,
+  tokenIdempotencyKey,
+} from "./email";
 import { emit } from "./emit";
 import { afterHook } from "./hooks/after";
 import { createBeforeHook, type SessionReader } from "./hooks/before";

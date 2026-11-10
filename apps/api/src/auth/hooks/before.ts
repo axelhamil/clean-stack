@@ -9,7 +9,7 @@ import { logger } from "../../shared/logger";
 import { isBlockedDuringImpersonation } from "../../shared/middleware/impersonation-blocklist";
 import { validatePassword } from "../../shared/password-policy";
 import { emitBestEffort } from "../emit";
-import { assertSsoEntitlementFor } from "../plugins/sso";
+import { assertSsoEntitlementFor } from "../entitlements";
 import {
   enforcedProviderForDomain,
   findMemberOf,
