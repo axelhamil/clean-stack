@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { findUserOrganizations } from "../../auth-queries";
+import { findUserOrganizations } from "../../auth/queries";
 import type { ApiTokenVariables } from "../../shared/middleware/api-token.middleware";
 import { requireScope } from "../require-scope";
 

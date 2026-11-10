@@ -37,7 +37,7 @@ export const authClient = createAuthClient({
     }),
     _stripeClientPlugin,
     // `domainVerification: { enabled: true }` must mirror the server's `sso()` config
-    // in apps/api/src/auth.ts: it gates whether the client's inferred types include
+    // in apps/api/src/auth/plugins/sso.ts: it gates whether the client's inferred types include
     // requestDomainVerification/verifyDomain at all.
     ssoClient({ domainVerification: { enabled: true } }),
   ],

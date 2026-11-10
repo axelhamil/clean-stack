@@ -28,8 +28,8 @@ mock.module("../container", () => ({
 
 const clearExpiredBan = mock(async () => false);
 
-const realAuthQueries = await import("../auth-queries");
-mock.module("../auth-queries", () => ({
+const realAuthQueries = await import("../auth/queries");
+mock.module("../auth/queries", () => ({
   ...realAuthQueries,
   clearExpiredBan,
   enforcedProviderForDomain: async () => Option.none(),

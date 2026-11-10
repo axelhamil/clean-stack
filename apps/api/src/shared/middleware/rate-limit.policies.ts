@@ -231,7 +231,7 @@ export const GITHUB_SCANNING_POLICY: PolicyConfig = {
 // SCIM (RFC 7644) directory sync, bearer-token protocol surface with no session,
 // so it previously ran at the loose 300/min GLOBAL_POLICY (tuned for smoothing a
 // signed-in user's page navigation, not for bounding a machine client). Also the
-// surface the post-PR-review SCIM hardening closed (`auth.ts`: `hooks.before` reads
+// surface the post-PR-review SCIM hardening closed (`auth/hooks/before.ts`: `hooks.before` reads
 // the bearer header before the plugin's own token verification to gate seat cap and
 // snapshot the deprovisioning actor), a tight, fail-closed ceiling here is defense
 // in depth on top of that fix, not a substitute for it. Keyed by IP.

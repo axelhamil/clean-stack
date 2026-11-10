@@ -23,8 +23,8 @@ mock.module("../container", () => ({
 const deleteOrgIfEmpty = mock(async () => false);
 const countActiveMembers = mock(async () => 0);
 
-const realAuthQueries = await import("../auth-queries");
-mock.module("../auth-queries", () => ({
+const realAuthQueries = await import("../auth/queries");
+mock.module("../auth/queries", () => ({
   ...realAuthQueries,
   deleteOrgIfEmpty,
   countActiveMembers,

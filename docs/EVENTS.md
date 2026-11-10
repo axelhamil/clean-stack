@@ -404,7 +404,7 @@ Le canal in-app décide de la clause `WHERE` (la ligne n'est pas insérée du to
 
 ## BetterAuth bridge: what fires what
 
-The boilerplate emits **100 events** (35 public + 65 internal) automatically. Sources: 25 from `apps/api/src/auth.ts` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **8 from `modules/webhooks/`** (3 CRUD + 5 internal: test, secret_rotated, disabled, exhausted, replayed), 1 from `modules/policies/`, **3 from `modules/consents/`**, 7 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth.ts` + 2 from `SecuritySignalsService`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **6 from `modules/admin/`** (Phase C.3: 4 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4: created, revoked, used), **3 from `modules/notifications/`** (Phase D.3: preference.updated, org_preference.updated, read), **14 from `sso`/`scim`** (Phase C.7: 7 `sso.*` provider/domain/enforcement/login events + 7 `scim.*` connection/user lifecycle events), **1 from `modules/profile/`** (Phase E.1a: `user.locale.changed`), **1 from the outbox relay** (`outbox.event_dead`). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber`: they flow to `audit_log` and in-process handlers only.
+The boilerplate emits **100 events** (35 public + 65 internal) automatically. Sources: 25 from `apps/api/src/auth/` covering BetterAuth lifecycles, 5 from `modules/rgpd/`, 3 from `modules/uploads/`, **8 from `modules/webhooks/`** (3 CRUD + 5 internal: test, secret_rotated, disabled, exhausted, replayed), 1 from `modules/policies/`, **3 from `modules/consents/`**, 7 from security (3 middleware/endpoint + 2 abuse-prevention hooks in `auth/hooks/before.ts` + 2 from `SecuritySignalsService`), **4 from `modules/billing/`**, **1 from quota middleware**, **1 from audit-log operator** (`security.operator.audit_accessed`), **1 from email delivery worker** (`email.delivery.exhausted`), **6 from `modules/admin/`** (Phase C.3: 4 actions + 2 impersonation lifecycle), **3 from `modules/api-token/`** (Phase C.4: created, revoked, used), **3 from `modules/notifications/`** (Phase D.3: preference.updated, org_preference.updated, read), **14 from `sso`/`scim`** (Phase C.7: 7 `sso.*` provider/domain/enforcement/login events + 7 `scim.*` connection/user lifecycle events), **1 from `modules/profile/`** (Phase E.1a: `user.locale.changed`), **1 from the outbox relay** (`outbox.event_dead`). Source of truth: `packages/events/src/event-types.ts` + `packages/events/src/visibility-map.ts`. **Internal events** skip `WebhookFanoutSubscriber`: they flow to `audit_log` and in-process handlers only.
 
 ### Via `databaseHooks` (TX-bound, captures all flows)
 - `USER_CREATED`: `databaseHooks.user.create.after`
@@ -506,7 +506,7 @@ Internal, compliance retention, forced notifications to whoever holds `approvals
 The rows backfilled by migration `0028` announce nothing: no request and no actor exist at that point, the migration file is the record.
 
 ### Via `PolicyAcceptanceService` (Phase A.2)
-- `USER_POLICY_ACCEPTED` (`user.policy.accepted`): payload `{ userId, policyType, policyVersion, ipAddress? }`, retention `compliance`. Self-actor: `userId` resolves as the actor via `AuditEventSubscriber.extractActor`. Emitted from `PolicyAcceptanceService.accept`, which is called from **two sites**: (1) the BetterAuth `/verify-email` after-hook in `auth.ts` (sign-up path, idempotent via `getStaleTypes`) and (2) the `POST /me/policies/accept` route (explicit re-acceptance by already-authenticated users).
+- `USER_POLICY_ACCEPTED` (`user.policy.accepted`): payload `{ userId, policyType, policyVersion, ipAddress? }`, retention `compliance`. Self-actor: `userId` resolves as the actor via `AuditEventSubscriber.extractActor`. Emitted from `PolicyAcceptanceService.accept`, which is called from **two sites**: (1) the BetterAuth `/verify-email` after-hook in `auth/hooks/after.ts` (sign-up path, idempotent via `getStaleTypes`) and (2) the `POST /me/policies/accept` route (explicit re-acceptance by already-authenticated users).
 
 ### Via `ConsentService` (Phase A.4)
 
@@ -522,7 +522,7 @@ Ces 3 events ne sont pas des state-changes métier : ils signalent des rejets de
 - `SECURITY_CSP_VIOLATION` (`security.csp.violation`) : émis par l'endpoint public `POST /csp-report`. Payload : `{ documentUri, violatedDirective, blockedUri, actorUserId? }`, retention `operational`.
 - `SECURITY_CSRF_REJECTED` (`security.csrf.rejected`) : émis par le CSRF middleware sur Origin invalide. Payload : `{ ipAddress, path, origin?, actorUserId? }`, retention `operational`.
 
-### Via abuse-prevention hooks (Phase C.1 s5a, `auth.ts` `hooks.before`)
+### Via abuse-prevention hooks (Phase C.1 s5a, `auth/hooks/before.ts`)
 
 Émis via `emitEvent(outbox, ...)` dans le `hooks.before` BetterAuth, juste avant le rejet (`throw APIError`). **Piège BetterAuth** : dans un `hooks.before`, `ctx.context.request` et `ctx.context.session` sont **`undefined`** (le before-hook global tourne avant le session-middleware) : l'IP se lit sur `ctx.headers`, et l'actor authentifié (`/change-password`) via `auth.api.getSession({ headers: ctx.headers })`. Câbler sur `ctx.context.*` fait throw le calcul d'IP avant l'emit → event perdu silencieusement (les tests unitaires ne montent pas les hooks, seule une passe end-to-end le révèle).
 
@@ -531,9 +531,9 @@ Ces 3 events ne sont pas des state-changes métier : ils signalent des rejets de
 - `SECURITY_GEO_DENIED` (`security.geo.denied`) : émis sur refus par la deny-list pays ou ASN au sign-in et au sign-up. Payload : `{ actorUserId: string | null, ip: string | null, path, country: string | null, asn: string | null, reason: "country" | "asn" }` : `actorUserId` nul avant vérification des identifiants. Retention `operational`.
 - `SECURITY_PASSWORD_BREACHED` (`security.password.breached`) : émis sur un mot de passe compromis HIBP au sign-up / reset / change-password (le rejet 422 vient déjà de la NIST policy). Payload : `{ actorUserId: string | null, email: string | null, ip: string | null, path }` : `actorUserId`/`email` portés par la session réelle sur `/change-password`, `null` sur sign-up/reset (pas de session). Retention `operational`.
 
-### Via subscription events (`auth.ts` `@better-auth/stripe` callbacks: Phase B.1)
+### Via subscription events (`auth/plugins/stripe.ts` `@better-auth/stripe` callbacks: Phase B.1)
 
-Emitted via `emitEvent(outbox, ...)` inside the `@better-auth/stripe` plugin callbacks wired in `apps/api/src/auth.ts` (`onSubscriptionComplete`, `onSubscriptionCreated`, `onSubscriptionUpdate`, `onSubscriptionDeleted`, and the `onEvent` invoice.payment_failed handler). These are Stripe-originated lifecycle events, not triggered by a user HTTP request, so `actorUserId` is nullable (the Stripe webhook arrives on behalf of the org with no authenticated session). Subscription state SSOT is the plugin `subscription` table; these events are the compliance + operational audit trail on top of it.
+Emitted via `emitEvent(outbox, ...)` inside the `@better-auth/stripe` plugin callbacks wired in `apps/api/src/auth/plugins/stripe.ts` (`onSubscriptionComplete`, `onSubscriptionCreated`, `onSubscriptionUpdate`, `onSubscriptionDeleted`, and the `onEvent` invoice.payment_failed handler). These are Stripe-originated lifecycle events, not triggered by a user HTTP request, so `actorUserId` is nullable (the Stripe webhook arrives on behalf of the org with no authenticated session). Subscription state SSOT is the plugin `subscription` table; these events are the compliance + operational audit trail on top of it.
 
 - `BILLING_SUBSCRIPTION_CREATED` (`billing.subscription.created`): emitted when a checkout completes and on the `customer.subscription.created` webhook of a subscription started outside a checkout (dashboard). Payload: `{ organizationId, subscriptionId, tier, status, actorUserId: null, currentPeriodEnd }`, retention `compliance`.
 - `BILLING_SUBSCRIPTION_UPDATED` (`billing.subscription.updated`): emitted on `customer.subscription.updated` when the new status is not terminal. Same payload shape as `created`, retention `compliance`.
@@ -550,7 +550,7 @@ Emitted via `emitEvent(outbox, ...)` in `requireQuota` when a request hits a quo
 
 ### Via `auth.ts` `hooks.after` (Phase C.7: `@better-auth/sso` / `@better-auth/scim`)
 
-The SSO events are emitted via `emitEvent(outbox, ...)` in `apps/api/src/auth.ts`'s `hooks.after`, path-keyed off `SSO_PATHS`/`SCIM_PATHS` (`apps/api/src/shared/auth/sso-paths.ts`). The SCIM connection events come from `ScimConnectionService` (`apps/api/src/shared/services/scim-connection.service.ts`), the only caller of the plugin's managed-connection server APIs. SCIM user endpoints authenticate with a bearer token, not a session: the actor is the owner who created the connection (`scimConnectionCreator`), not `ctx.context.session`. `scimProviderId`/`providerId` in the SCIM payloads carry the managed connection id; the key names are kept for payload stability.
+The SSO events are emitted via `emitEvent(outbox, ...)` in `apps/api/src/auth/hooks/after.ts`, path-keyed off `SSO_PATHS`/`SCIM_PATHS` (`apps/api/src/shared/auth/sso-paths.ts`). The SCIM connection events come from `ScimConnectionService` (`apps/api/src/shared/services/scim-connection.service.ts`), the only caller of the plugin's managed-connection server APIs. SCIM user endpoints authenticate with a bearer token, not a session: the actor is the owner who created the connection (`scimConnectionCreator`), not `ctx.context.session`. `scimProviderId`/`providerId` in the SCIM payloads carry the managed connection id; the key names are kept for payload stability.
 
 - `SSO_PROVIDER_REGISTERED` (`sso.provider.registered`): `path === SSO_PATHS.register`. Payload: `{ actorUserId, organizationId, providerId, protocol: "oidc" | "saml", domain }`, retention `internal`.
 - `SSO_PROVIDER_UPDATED` (`sso.provider.updated`): `path === SSO_PATHS.updateProvider`. Payload includes `changedFields: string[]`.
@@ -617,5 +617,5 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 | `modules/webhooks/src/infrastructure/crypto/aead.ts` | AEAD encrypt/decrypt for webhook secrets |
 | `packages/outbox/src/jitter.ts` | Decorrelated jitter math |
 | `packages/outbox/src/event-emitter.ts` | `emitEvent()` shared helper (used by RGPD, uploads, BetterAuth bridge) |
-| `apps/api/src/auth.ts` | BetterAuth bridge (23 events: 15 user + 8 org) |
+| `apps/api/src/auth/` | BetterAuth bridge (23 events: 15 user + 8 org) |
 | `apps/api/src/modules/{audit-log,webhooks}/` | Built-in modules (admin routes + worker) |

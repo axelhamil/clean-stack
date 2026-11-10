@@ -54,7 +54,7 @@ export const registerSamlProviderMutationOptions = mutationOptions({
   }) => {
     const providerId = providerIdFromDomain(values.domain);
     // The server forces SHA-256 + signed assertions on every SAML registration
-    // (D8 hardening in apps/api/src/auth.ts): the client never sends
+    // (D8 hardening in apps/api/src/auth/hooks/before.ts): the client never sends
     // `signatureAlgorithm`, there is no weaker option to offer.
     //
     // A SAML registration names two entities. The top-level `issuer` is this

@@ -5,8 +5,8 @@ let nextRole: string | null = null;
 
 // The role lookup is the only data access this subject performs; everything else the
 // real module exports stays real (see apps/api/CLAUDE.md, spread the real module).
-const realAuthQueries = await import("../../auth-queries");
-mock.module("../../auth-queries", () => ({
+const realAuthQueries = await import("../../auth/queries");
+mock.module("../../auth/queries", () => ({
   ...realAuthQueries,
   findActiveMemberRole: async () => nextRole,
 }));

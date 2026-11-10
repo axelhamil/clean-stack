@@ -8,7 +8,7 @@ import { type ILogger, Option, Result } from "@packages/ddd-kit";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { Hono } from "hono";
-import * as realAuthQueries from "../../auth-queries";
+import * as realAuthQueries from "../../auth/queries";
 import { createErrorHandler } from "../../shared/middleware/error.middleware";
 import { API_TOKEN_IP_POLICY } from "../../shared/middleware/rate-limit.policies";
 import type {
@@ -21,7 +21,7 @@ import { createPublicApiV1 } from "../index";
 
 // ── Module mocks (only auth surface, no container/env/rate-limit.ip) ─────
 // auth is mocked because it builds the BetterAuth singleton at module load
-// time; auth-queries spreads the real module and only replaces the calls the
+// time; auth/queries spreads the real module and only replaces the calls the
 // middleware and routes can reach. container and env are NOT mocked (apps/api/.env is loaded by
 // the Bun test runner, avoiding global state pollution across the test suite).
 
@@ -49,7 +49,7 @@ const testUser = {
   lastExportRequestedAt: null,
 };
 
-mock.module("../../auth-queries", () => ({
+mock.module("../../auth/queries", () => ({
   ...realAuthQueries,
   findUserById: async (id: string) => (id === "u1" ? testUser : undefined),
   findUserOrganizations: async () => [],

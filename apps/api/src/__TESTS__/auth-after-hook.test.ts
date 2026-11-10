@@ -59,8 +59,8 @@ const findMemberOf = mock(
 const findActiveMemberOrgId = mock(async (): Promise<string | undefined> => "org-1");
 const insertPersonalOrgWithOwner = mock(async () => undefined);
 
-const realAuthQueries = await import("../auth-queries");
-mock.module("../auth-queries", () => ({
+const realAuthQueries = await import("../auth/queries");
+mock.module("../auth/queries", () => ({
   ...realAuthQueries,
   findLatestPasskey,
   findLatestLinkedAccount,

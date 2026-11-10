@@ -1,5 +1,5 @@
 /**
- * Data-access helpers for the BetterAuth bridge (auth.ts).
+ * Data-access helpers for the BetterAuth bridge (auth/).
  *
  * Plain functions, no DI, no repository class, no port interface, auth is
  * infra config, not domain. See CLAUDE.md §DDD scope.
@@ -18,7 +18,7 @@ import {
   sql,
   ssoSchema,
 } from "@packages/drizzle";
-import type { EnforcementLookup } from "./shared/auth/sso-enforcement";
+import type { EnforcementLookup } from "../shared/auth/sso-enforcement";
 
 // ── #1: ensurePersonalOrgFor queries ──────────────────────────────────────
 

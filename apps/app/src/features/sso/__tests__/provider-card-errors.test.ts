@@ -14,7 +14,7 @@ async function frenchErrorsT() {
  * resolves through the catalog end to end, against a real i18next instance
  * booted with the French resources (not the hand-rolled fake `t`
  * `messages.test.ts` uses), for the exact two error shapes
- * `assertSsoEntitlementFor` (apps/api/src/auth.ts) sends: an `APIError` whose
+ * `assertSsoEntitlementFor` (apps/api/src/auth/plugins/sso.ts) sends: an `APIError` whose
  * `.message` carries the business code, no separate `.code`.
  */
 describe("provider-card SSO registration error routing (real French t)", () => {

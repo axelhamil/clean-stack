@@ -22,7 +22,7 @@ import {
 import { EventTypes } from "@packages/events";
 import { Hono } from "hono";
 import { app } from "../src/app";
-import { deleteOrgIfEmpty } from "../src/auth-queries";
+import { deleteOrgIfEmpty } from "../src/auth/queries";
 import { di } from "../src/container";
 import { env } from "../src/shared/env";
 import { requireFeature, requirePlan } from "../src/shared/middleware/billing.middleware";

@@ -14,7 +14,7 @@ const issueToken = mock(async () =>
 
 mock.module("../../../container", () => ({
   di: {
-    // requireAuth loads auth.ts, which resolves the plan catalog once at import.
+    // requireAuth loads auth/, which resolves the plan catalog once at import.
     BillingCatalogService: { getCatalog: async () => [] },
     PolicyAcceptanceService: { hasAcceptedCurrent: async () => Result.ok(true) },
     EntitlementsService: {
@@ -31,8 +31,8 @@ mock.module("../../../shared/services/scim-connection.service", () => ({
   },
 }));
 
-const realAuthQueries = await import("../../../auth-queries");
-mock.module("../../../auth-queries", () => ({
+const realAuthQueries = await import("../../../auth/queries");
+mock.module("../../../auth/queries", () => ({
   ...realAuthQueries,
   findActiveMemberRole: async () => "owner",
 }));

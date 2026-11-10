@@ -1,11 +1,11 @@
 ---
 name: auth-server
-description: Use when working on BetterAuth server-side, the request pipeline, session middleware, rate limiting, CSRF, cookies, or auth email URLs. Trigger on "BetterAuth", "auth.ts", "sessionMiddleware", "requireCsrf", "rate-limit", "cookie", "sign-in", "session". Not for front auth-client or org permissions.
+description: Use when working on BetterAuth server-side, the request pipeline, session middleware, rate limiting, CSRF, cookies, or auth email URLs. Trigger on "BetterAuth", "auth/", "sessionMiddleware", "requireCsrf", "rate-limit", "cookie", "sign-in", "session". Not for front auth-client or org permissions.
 ---
 
 # Auth (BetterAuth integration, server)
 
-**Module-level singleton** (`src/auth.ts`), not wrapped in port/adapter, not in DI (wrapping recopies `auth.api.*` and loses `auth.$Infer.*`). Every consumer imports `auth` directly. **No inline `db.*` in `auth.ts`**, SQL lives in `auth-queries.ts` as typed Drizzle functions reading `resolveExecutor()`. Auth is infra, not domain: no repository, no port, no DI.
+**Module-level singleton** (`src/auth/index.ts`, one file per plugin and hook under `src/auth/`), not wrapped in port/adapter, not in DI (wrapping recopies `auth.api.*` and loses `auth.$Infer.*`). Every consumer imports `auth` directly. **No inline `db.*` in `auth/`**, SQL lives in `auth/queries.ts` as typed Drizzle functions reading `resolveExecutor()`. Auth is infra, not domain: no repository, no port, no DI.
 
 ## Server pipeline (in order, `index.ts`)
 
