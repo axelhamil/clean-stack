@@ -1,5 +1,6 @@
 import { createOTP } from "@better-auth/utils/otp";
-import { authSchema, db, eq, inArray, or, outboxSchema, sql, staffSchema } from "@packages/drizzle";
+import * as staffSchema from "@modules/admin/schemas/staff";
+import { authSchema, db, eq, inArray, or, outboxSchema, sql } from "@packages/drizzle";
 import { hashPassword } from "better-auth/crypto";
 import { app } from "../src/app";
 import { auth } from "../src/auth";

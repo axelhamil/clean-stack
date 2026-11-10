@@ -6,6 +6,7 @@
  * deletes an organization. Creates and removes its own rows.
  */
 
+import * as staffSchema from "@modules/admin/schemas/staff";
 import * as billingSchema from "@modules/billing/schemas/billing";
 import { uuidv7 } from "@packages/ddd-kit";
 import {
@@ -17,7 +18,6 @@ import {
   multiTenantSchema,
   or,
   outboxSchema,
-  staffSchema,
 } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { Hono } from "hono";

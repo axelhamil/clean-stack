@@ -6,6 +6,7 @@ import type {
 } from "./application/config/notification-settings";
 import type { INotificationStore } from "./application/ports/notification.port";
 import type { INotificationDigestStore } from "./application/ports/notification-digest.port";
+import type { IStaffRecipientsReader } from "./application/ports/staff-recipients.port";
 import { DrizzleNotificationStore } from "./infrastructure/repositories/drizzle-notification.store";
 import { DrizzleNotificationDigestStore } from "./infrastructure/repositories/drizzle-notification-digest.store";
 import { NotificationFanoutSubscriber } from "./infrastructure/services/notification-fanout-subscriber";
@@ -15,6 +16,7 @@ export interface NotificationsPrerequisites {
   IInstrumentation: IInstrumentation;
   ILogger: ILogger;
   ITransactionService: IUnitOfWork;
+  IStaffRecipientsReader: IStaffRecipientsReader;
   staffSettings: StaffAudienceSettings;
   notificationSettings: NotificationSettings;
 }
@@ -35,6 +37,7 @@ export const notificationsModule = defineModule<NotificationsPrerequisites>()((b
         new NotificationFanoutSubscriber(
           c.ITransactionService,
           c.IInstrumentation,
+          c.IStaffRecipientsReader,
           c.notificationSettings.digestHourUtc,
           c.staffSettings,
         ),

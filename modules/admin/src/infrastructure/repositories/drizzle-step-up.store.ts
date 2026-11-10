@@ -5,7 +5,8 @@ import {
   Option,
   Result,
 } from "@packages/ddd-kit";
-import { authSchema, eq, resolveExecutor, staffSchema } from "@packages/drizzle";
+import { authSchema, eq, resolveExecutor } from "@packages/drizzle";
+import * as staffSchema from "../../../schemas/staff";
 import type { IStepUpStore, StepUpStoreError } from "../../application/ports/step-up-store.port";
 
 const dbAttrs = { "db.system.name": "postgresql" } as const;

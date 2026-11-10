@@ -6,8 +6,9 @@
  * probe users.
  */
 
+import * as staffSchema from "@modules/admin/schemas/staff";
 import { Result } from "@packages/ddd-kit";
-import { authSchema, db, eq, staffSchema } from "@packages/drizzle";
+import { authSchema, db, eq } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { di } from "../src/container";
 import {

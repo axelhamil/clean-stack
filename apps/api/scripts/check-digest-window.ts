@@ -20,6 +20,7 @@ import type { IInstrumentation } from "@packages/ddd-kit";
 import { db, sql, TransactionService } from "@packages/drizzle";
 import type { DeliveredEvent } from "@packages/outbox/outbox.port";
 import type { Hono } from "hono";
+import { StaffRecipientsQuery } from "../src/queries/staff-recipients.query";
 import { flushNotificationEmailsRoutes } from "../src/shared/internal-routes/flush-notification-emails.route";
 import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 import {
@@ -48,6 +49,7 @@ const instrumentation: IInstrumentation = new NoOpInstrumentation();
 const subscriber = new NotificationFanoutSubscriber(
   new TransactionService(instrumentation, async () => {}),
   instrumentation,
+  new StaffRecipientsQuery(instrumentation),
   DIGEST_HOUR_UTC,
 );
 

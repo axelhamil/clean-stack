@@ -9,12 +9,12 @@ import {
   inArray,
   isNull,
   lte,
-  notificationSchema,
   resolveExecutor,
   sql,
   tryLockForTransaction,
 } from "@packages/drizzle";
 import { NOTIFICATION_MAP } from "@packages/events";
+import * as notificationSchema from "../../../schemas/notification";
 import type {
   DueNotification,
   INotificationDigestStore,

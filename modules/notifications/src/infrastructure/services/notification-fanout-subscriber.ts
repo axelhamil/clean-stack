@@ -1,10 +1,9 @@
-import type { IInstrumentation, IUnitOfWork } from "@packages/ddd-kit";
+import { AppErrorException, type IInstrumentation, type IUnitOfWork } from "@packages/ddd-kit";
 import {
   and,
   eq,
   inArray,
   multiTenantSchema,
-  notificationSchema,
   resolveExecutor,
   type SQL,
   sql,
@@ -12,10 +11,11 @@ import {
 import { type NotificationChannel, notificationConfigOf } from "@packages/events";
 import type { BuiltInEventHandler } from "@packages/outbox/event-handlers";
 import type { DeliveredEvent } from "@packages/outbox/outbox.port";
+import * as notificationSchema from "../../../schemas/notification";
 import type { StaffAudienceSettings } from "../../application/config/notification-settings";
+import type { IStaffRecipientsReader } from "../../application/ports/staff-recipients.port";
 import { DEFAULT_DIGEST_HOUR_UTC, digestDueAt } from "../../application/services/digest-schedule";
 import { resolveAudience } from "../../application/services/resolve-audience";
-import { staffRecipients } from "./staff-recipients";
 
 function dedupKeyFor(
   event: DeliveredEvent,
@@ -119,6 +119,7 @@ export class NotificationFanoutSubscriber implements BuiltInEventHandler {
   constructor(
     private readonly uow: IUnitOfWork,
     private readonly instrumentation: IInstrumentation,
+    private readonly staffRecipients: IStaffRecipientsReader,
     private readonly digestHourUtc: number = DEFAULT_DIGEST_HOUR_UTC,
     private readonly staffEnv: StaffAudienceSettings = {
       PLATFORM_ADMIN_IDS: [],
@@ -144,23 +145,29 @@ export class NotificationFanoutSubscriber implements BuiltInEventHandler {
           const m = multiTenantSchema.member;
           const organizationId = event.organizationId ?? null;
 
-          const recipients =
-            target.kind === "staff"
-              ? staffRecipients(target, this.staffEnv)
-              : target.kind === "user"
-                ? sql`(SELECT ${target.userId}::text AS user_id)`
-                : sql`(SELECT ${m.userId} AS user_id FROM ${m} WHERE ${
-                    target.roles === "all"
-                      ? eq(m.organizationId, target.organizationId)
-                      : and(
-                          eq(m.organizationId, target.organizationId),
-                          inArray(m.role, target.roles),
-                        )
-                  })`;
+          const recipientsOf = async (): Promise<SQL> => {
+            if (target.kind === "user") return sql`(SELECT ${target.userId}::text AS user_id)`;
+            if (target.kind === "org") {
+              return sql`(SELECT ${m.userId} AS user_id FROM ${m} WHERE ${
+                target.roles === "all"
+                  ? eq(m.organizationId, target.organizationId)
+                  : and(eq(m.organizationId, target.organizationId), inArray(m.role, target.roles))
+              })`;
+            }
+
+            const staff = await this.staffRecipients.recipientsOf(target, this.staffEnv);
+            if (staff.isFailure) throw new AppErrorException(staff.getError());
+
+            const ids = sql.join(
+              staff.getValue().map((id) => sql`${id}`),
+              sql`, `,
+            );
+            return sql`(SELECT unnest(ARRAY[${ids}]::text[]) AS user_id)`;
+          };
 
           const rules = deliveryRules(config.category, organizationId, config.forced === true);
 
-          const insertSql = sql`
+          const insertSql = (recipients: SQL) => sql`
             INSERT INTO ${n} (
               ${sql.identifier(n.id.name)},
               ${sql.identifier(n.userId.name)},
@@ -194,7 +201,7 @@ export class NotificationFanoutSubscriber implements BuiltInEventHandler {
           `;
 
           await this.uow.run(async () => {
-            const query = resolveExecutor().execute(insertSql);
+            const query = resolveExecutor().execute(insertSql(await recipientsOf()));
             await this.instrumentation.startSpan(
               {
                 name: query.getQuery().sql,

@@ -1,3 +1,5 @@
+import { session, user } from "@packages/drizzle/schema/auth";
+import { organization } from "@packages/drizzle/schema/multi-tenant";
 import { sql } from "drizzle-orm";
 import {
   bigint,
@@ -10,8 +12,6 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { session, user } from "./auth";
-import { organization } from "./multi-tenant";
 
 export const staffMember = pgTable(
   "staff_member",

@@ -1,3 +1,5 @@
+import { user } from "@packages/drizzle/schema/auth";
+import { organization } from "@packages/drizzle/schema/multi-tenant";
 import {
   NOTIFICATION_CHANNELS,
   NOTIFICATION_FREQUENCIES,
@@ -5,8 +7,6 @@ import {
 } from "@packages/events";
 import { sql } from "drizzle-orm";
 import { boolean, index, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
-import { user } from "./auth";
-import { organization } from "./multi-tenant";
 
 export const notification = pgTable(
   "notification",

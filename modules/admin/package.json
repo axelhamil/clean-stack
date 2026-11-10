@@ -44,7 +44,8 @@
     "./infrastructure/http/staff.routes": "./src/infrastructure/http/staff.routes.ts",
     "./infrastructure/http/workspace.routes": "./src/infrastructure/http/workspace.routes.ts",
     "./infrastructure/http/admin-internal.routes": "./src/infrastructure/http/admin-internal.routes.ts",
-    "./testing/mount-admin-routes": "./src/testing/mount-admin-routes.ts"
+    "./testing/mount-admin-routes": "./src/testing/mount-admin-routes.ts",
+    "./schemas/*": "./schemas/*.ts"
   },
   "scripts": {
     "format": "biome format . --write",
@@ -63,6 +64,7 @@
     "@packages/http": "workspace:*",
     "@packages/i18n": "workspace:*",
     "@packages/outbox": "workspace:*",
+    "drizzle-orm": "^0.45.4",
     "hono": "^4.13.14",
     "hono-pino": "^0.10.3",
     "inwire": "^4.0.1",
