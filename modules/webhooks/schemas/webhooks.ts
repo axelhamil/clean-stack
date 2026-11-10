@@ -1,3 +1,5 @@
+import { organization } from "@packages/drizzle/schema/multi-tenant";
+import { outboxEvent } from "@packages/drizzle/schema/outbox";
 import { relations, sql } from "drizzle-orm";
 import {
   boolean,
@@ -9,8 +11,6 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { organization } from "./multi-tenant";
-import { outboxEvent } from "./outbox";
 
 export const WEBHOOK_DELIVERY_STATUSES = ["pending", "success", "failed", "dead_letter"] as const;
 

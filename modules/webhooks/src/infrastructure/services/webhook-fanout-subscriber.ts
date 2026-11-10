@@ -1,8 +1,9 @@
 import { type IInstrumentation, type IUnitOfWork, uuidv7 } from "@packages/ddd-kit";
-import { and, dbNow, eq, resolveExecutor, webhooksSchema } from "@packages/drizzle";
+import { and, dbNow, eq, resolveExecutor } from "@packages/drizzle";
 import { isKnownEventType, isPublicEvent, matchesSubscription } from "@packages/events";
 import type { BuiltInEventHandler } from "@packages/outbox/event-handlers";
 import type { DeliveredEvent } from "@packages/outbox/outbox.port";
+import * as webhooksSchema from "../../../schemas/webhooks";
 
 const ep = webhooksSchema.webhookEndpoint;
 const wd = webhooksSchema.webhookDelivery;

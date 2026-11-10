@@ -15,10 +15,18 @@ import {
 } from "@modules/billing/application/subscription-events";
 import { hasFeature, hasSeatAvailable } from "@modules/billing/domain/entitlements";
 import { paymentFailureOf } from "@modules/billing/infrastructure/adapters/stripe-payment-failure";
+import * as billingSchema from "@modules/billing/schemas/billing";
 import { ac, isPersonalOrg, ORG_ROLES, roles } from "@packages/access-control";
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
 import { AppErrorException, Option } from "@packages/ddd-kit";
-import { ambientTransaction, db, lockForTransaction } from "@packages/drizzle";
+import {
+  ambientTransaction,
+  authSchema,
+  db,
+  lockForTransaction,
+  multiTenantSchema,
+  ssoSchema,
+} from "@packages/drizzle";
 import type { EmailTemplates, TemplateVariables } from "@packages/email/email.port";
 import { type EventType, EventTypes } from "@packages/events";
 import { DEFAULT_LOCALE, type Locale, toLocale } from "@packages/i18n";
@@ -683,9 +691,16 @@ const authOptions = {
   // The adapter gets `db` wrapped so every transaction it opens is an outermost unit
   // of work: the hooks it runs inside read it through `resolveExecutor()` and their
   // events are flushed before it commits.
+  // BetterAuth's Drizzle adapter resolves every model its plugins write (the Stripe
+  // plugin's `subscription` included) from this object, so a table a plugin owns
+  // has to be listed here, not only exported from its module.
   database: drizzleAdapter(
     asUnitOfWork(db, () => di.ITransactionService),
-    { provider: "pg", transaction: true },
+    {
+      provider: "pg",
+      transaction: true,
+      schema: { ...authSchema, ...multiTenantSchema, ...ssoSchema, ...billingSchema },
+    },
   ),
 
   user: {

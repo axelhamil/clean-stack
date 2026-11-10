@@ -5,7 +5,8 @@ import {
   Option,
   Result,
 } from "@packages/ddd-kit";
-import { and, eq, resolveExecutor, sql, webhooksSchema } from "@packages/drizzle";
+import { and, eq, resolveExecutor, sql } from "@packages/drizzle";
+import * as webhooksSchema from "../../../schemas/webhooks";
 import type {
   CreateEndpointArgs,
   IWebhookEndpointRepository,

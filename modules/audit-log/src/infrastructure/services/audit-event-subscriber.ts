@@ -1,16 +1,11 @@
 import type { IInstrumentation, IUnitOfWork } from "@packages/ddd-kit";
-import {
-  auditLogSchema,
-  desc,
-  isNotNull,
-  lockForTransaction,
-  resolveExecutor,
-} from "@packages/drizzle";
+import { desc, isNotNull, lockForTransaction, resolveExecutor } from "@packages/drizzle";
 import type { AuditActorType } from "@packages/events";
 import { retentionFor } from "@packages/events";
 import { readActorId } from "@packages/outbox/event-actor";
 import type { BuiltInEventHandler } from "@packages/outbox/event-handlers";
 import type { DeliveredEvent } from "@packages/outbox/outbox.port";
+import * as auditLogSchema from "../../../schemas/audit-log";
 import { computeAuditHash, GENESIS_HASH } from "./audit-hash";
 
 const al = auditLogSchema.auditLog;

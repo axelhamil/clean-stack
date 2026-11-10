@@ -1,7 +1,6 @@
 import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import {
   and,
-  billingSchema,
   dbClockNow,
   dbNow,
   dbOperationFailure,
@@ -13,6 +12,7 @@ import {
   resolveExecutor,
   secondsFromClock,
 } from "@packages/drizzle";
+import * as billingSchema from "../../../schemas/billing";
 import type {
   IStripeEventStore,
   StripeEventDelivery,

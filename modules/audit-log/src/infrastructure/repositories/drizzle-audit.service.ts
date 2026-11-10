@@ -9,7 +9,6 @@ import {
 import {
   and,
   asc,
-  auditLogSchema,
   desc,
   eq,
   gte,
@@ -25,6 +24,7 @@ import {
   exactInstant,
   timeIdCursorSchema,
 } from "@packages/http/time-id-cursor";
+import * as auditLogSchema from "../../../schemas/audit-log";
 import type {
   AuditEntry,
   AuditError,

@@ -21,7 +21,8 @@
     "./infrastructure/adapters/stripe-event.gateway": "./src/infrastructure/adapters/stripe-event.gateway.ts",
     "./infrastructure/adapters/stripe-payment-failure": "./src/infrastructure/adapters/stripe-payment-failure.ts",
     "./infrastructure/adapters/stripe-sync-verifier": "./src/infrastructure/adapters/stripe-sync-verifier.ts",
-    "./infrastructure/http/billing.routes": "./src/infrastructure/http/billing.routes.ts"
+    "./infrastructure/http/billing.routes": "./src/infrastructure/http/billing.routes.ts",
+    "./schemas/*": "./schemas/*.ts"
   },
   "scripts": {
     "format": "biome format . --write",
@@ -37,6 +38,7 @@
     "@packages/drizzle": "workspace:*",
     "@packages/events": "workspace:*",
     "@packages/http": "workspace:*",
+    "drizzle-orm": "^0.45.4",
     "hono": "^4.13.14",
     "inwire": "^4.0.1",
     "stripe": "^23.0.1"

@@ -13,7 +13,8 @@
     "./infrastructure/repositories/drizzle-webhook-delivery.repository": "./src/infrastructure/repositories/drizzle-webhook-delivery.repository.ts",
     "./infrastructure/services/webhook-delivery-worker.service": "./src/infrastructure/services/webhook-delivery-worker.service.ts",
     "./infrastructure/services/webhook-fanout-subscriber": "./src/infrastructure/services/webhook-fanout-subscriber.ts",
-    "./infrastructure/http/webhooks.routes": "./src/infrastructure/http/webhooks.routes.ts"
+    "./infrastructure/http/webhooks.routes": "./src/infrastructure/http/webhooks.routes.ts",
+    "./schemas/*": "./schemas/*.ts"
   },
   "scripts": {
     "format": "biome format . --write",
@@ -31,6 +32,7 @@
     "@packages/events": "workspace:*",
     "@packages/http": "workspace:*",
     "@packages/outbox": "workspace:*",
+    "drizzle-orm": "^0.45.4",
     "hono": "^4.13.14",
     "inwire": "^4.0.1",
     "zod": "^4.6.7"
@@ -39,7 +41,6 @@
     "@packages/test": "workspace:*",
     "@packages/typescript-config": "workspace:*",
     "@types/bun": "^1.4.4",
-    "drizzle-orm": "^0.45.4",
     "typescript": "^7.0.2"
   }
 }

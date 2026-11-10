@@ -1,6 +1,7 @@
 // `/internal/sweep-stripe-events`: gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
-import { billingSchema, lt } from "@packages/drizzle";
+import * as billingSchema from "@modules/billing/schemas/billing";
+import { lt } from "@packages/drizzle";
 import { requireFilter } from "@packages/drizzle/sweep-purge";
 import { sweepBodySchema } from "@packages/http/sweep-runner";
 import { zV } from "@packages/http/validator";

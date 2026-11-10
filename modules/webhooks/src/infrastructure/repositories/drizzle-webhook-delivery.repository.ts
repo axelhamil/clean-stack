@@ -27,8 +27,8 @@ import {
   releasedSet,
   resolveExecutor,
   secondsFromNow,
-  webhooksSchema,
 } from "@packages/drizzle";
+import * as webhooksSchema from "../../../schemas/webhooks";
 import type {
   DeliveryClaimRequest,
   DeliveryFailure,

@@ -7,12 +7,12 @@
 
 import { staffAccessOf } from "@modules/admin/application/services/staff-access";
 import { createAdminInternalRoutes } from "@modules/admin/infrastructure/http/admin-internal.routes";
+import * as auditLogSchema from "@modules/audit-log/schemas/audit-log";
 import { staffRecipients } from "@modules/notifications/infrastructure/services/staff-recipients";
 import { APPROVAL_ACTIONS, authorizeStaff } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
 import {
   and,
-  auditLogSchema,
   authSchema,
   db,
   eq,

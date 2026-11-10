@@ -1,3 +1,5 @@
+import { user } from "@packages/drizzle/schema/auth";
+import { organization } from "@packages/drizzle/schema/multi-tenant";
 import { sql } from "drizzle-orm";
 import {
   boolean,
@@ -8,8 +10,6 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { user } from "./auth";
-import { organization } from "./multi-tenant";
 
 export const STRIPE_EVENT_STATUSES = ["received", "failed"] as const;
 

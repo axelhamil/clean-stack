@@ -1,6 +1,7 @@
 // `/internal/sweep-webhook-delivery`: gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
-import { and, inArray, lt, webhooksSchema } from "@packages/drizzle";
+import * as webhooksSchema from "@modules/webhooks/schemas/webhooks";
+import { and, inArray, lt } from "@packages/drizzle";
 import { requireFilter } from "@packages/drizzle/sweep-purge";
 import { sweepBodySchema } from "@packages/http/sweep-runner";
 import { zV } from "@packages/http/validator";
