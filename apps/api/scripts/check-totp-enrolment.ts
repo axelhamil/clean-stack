@@ -14,7 +14,8 @@ import { requireLocalDatabase } from "./require-local-database";
 requireLocalDatabase("check-totp-enrolment");
 
 import { createOTP } from "@better-auth/utils/otp";
-import { authSchema, db, eq, staffSchema } from "@packages/drizzle";
+import * as staffSchema from "@modules/admin/schemas/staff";
+import { authSchema, db, eq } from "@packages/drizzle";
 import { authSecretKey } from "../src/shared/auth/auth-secrets";
 import { TOTP_OPTIONS } from "../src/shared/auth/totp-options";
 import { env } from "../src/shared/env";

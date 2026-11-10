@@ -1,7 +1,8 @@
 // `/internal/sweep-notifications`: gated by signed HMAC + optional private-network (env-driven). Never exposed to public traffic.
 
+import * as notificationSchema from "@modules/notifications/schemas/notification";
 import type { SQL } from "@packages/drizzle";
-import { and, isNotNull, lt, notificationSchema } from "@packages/drizzle";
+import { and, isNotNull, lt } from "@packages/drizzle";
 import { requireFilter } from "@packages/drizzle/sweep-purge";
 import { sweepBodySchema } from "@packages/http/sweep-runner";
 import { zV } from "@packages/http/validator";

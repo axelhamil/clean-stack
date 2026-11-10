@@ -8,8 +8,8 @@ import {
   eq,
   inArray,
   resolveExecutor,
-  staffSchema,
 } from "@packages/drizzle";
+import * as staffSchema from "../../../schemas/staff";
 import type {
   DeletedSavedView,
   ISavedViewStore,

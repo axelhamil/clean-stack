@@ -13,19 +13,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { StaffService } from "@modules/admin/application/services/staff.service";
 import { StaffAccessService } from "@modules/admin/application/services/staff-access.service";
+import * as staffSchema from "@modules/admin/schemas/staff";
 import { permissionsOfRole } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
-import {
-  and,
-  authSchema,
-  db,
-  eq,
-  inArray,
-  or,
-  outboxSchema,
-  sql,
-  staffSchema,
-} from "@packages/drizzle";
+import { and, authSchema, db, eq, inArray, or, outboxSchema, sql } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { hashPassword } from "better-auth/crypto";
 import { di } from "../src/container";

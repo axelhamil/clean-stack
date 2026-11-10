@@ -7,8 +7,9 @@
 
 import { staffAccessOf } from "@modules/admin/application/services/staff-access";
 import { createAdminInternalRoutes } from "@modules/admin/infrastructure/http/admin-internal.routes";
+import * as staffSchema from "@modules/admin/schemas/staff";
 import * as auditLogSchema from "@modules/audit-log/schemas/audit-log";
-import { staffRecipients } from "@modules/notifications/infrastructure/services/staff-recipients";
+import * as notificationSchema from "@modules/notifications/schemas/notification";
 import { APPROVAL_ACTIONS, authorizeStaff } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
 import {
@@ -18,15 +19,14 @@ import {
   eq,
   inArray,
   multiTenantSchema,
-  notificationSchema,
   resolveExecutor,
   sql,
-  staffSchema,
 } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { timeIdCursorSchema } from "@packages/http/time-id-cursor";
 import { Hono } from "hono";
 import { di } from "../src/container";
+import { staffRecipients } from "../src/queries/staff-recipients.query";
 import { internalLayers } from "../src/shared/internal-routes/internal-layers";
 import { runSweepRequest } from "../src/shared/internal-routes/sweep-route";
 import {

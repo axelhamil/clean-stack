@@ -1,5 +1,6 @@
 import { type AppError, type IInstrumentation, Result } from "@packages/ddd-kit";
-import { dbOperationFailure, eq, resolveExecutor, staffSchema } from "@packages/drizzle";
+import { dbOperationFailure, eq, resolveExecutor } from "@packages/drizzle";
+import * as staffSchema from "../../../schemas/staff";
 
 const { staffNote, savedView } = staffSchema;
 const failure = dbOperationFailure("ADMIN_STAFF_PROVIDER_FAILURE");

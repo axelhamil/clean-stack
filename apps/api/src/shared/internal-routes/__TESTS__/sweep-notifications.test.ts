@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { db, notificationSchema } from "@packages/drizzle";
+import * as notificationSchema from "@modules/notifications/schemas/notification";
+import { db } from "@packages/drizzle";
 import { buildPurgeFilter } from "../sweep-notifications.route";
 
 // Rendered through the real query builder (nothing is replaced in this file), so the

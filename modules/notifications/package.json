@@ -8,10 +8,11 @@
     "./application/config/notification-settings": "./src/application/config/notification-settings.ts",
     "./application/ports/notification.port": "./src/application/ports/notification.port.ts",
     "./application/ports/notification-digest.port": "./src/application/ports/notification-digest.port.ts",
+    "./application/ports/staff-recipients.port": "./src/application/ports/staff-recipients.port.ts",
     "./infrastructure/services/notification-fanout-subscriber": "./src/infrastructure/services/notification-fanout-subscriber.ts",
     "./infrastructure/services/notification-stream-hub": "./src/infrastructure/services/notification-stream-hub.ts",
-    "./infrastructure/services/staff-recipients": "./src/infrastructure/services/staff-recipients.ts",
-    "./infrastructure/http/notifications.routes": "./src/infrastructure/http/notifications.routes.ts"
+    "./infrastructure/http/notifications.routes": "./src/infrastructure/http/notifications.routes.ts",
+    "./schemas/*": "./schemas/*.ts"
   },
   "scripts": {
     "format": "biome format . --write",
@@ -28,6 +29,7 @@
     "@packages/events": "workspace:*",
     "@packages/http": "workspace:*",
     "@packages/outbox": "workspace:*",
+    "drizzle-orm": "^0.45.4",
     "hono": "^4.13.14",
     "inwire": "^4.0.1",
     "zod": "^4.6.7"

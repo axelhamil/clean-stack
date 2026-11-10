@@ -32,6 +32,7 @@ import { container } from "inwire";
 import { Resend } from "resend";
 import { apiSettings } from "./composition/settings";
 import { adminSources } from "./composition/sources/admin";
+import { notificationsSources } from "./composition/sources/notifications";
 import { rgpdSources } from "./composition/sources/rgpd";
 import { healthModule } from "./modules/health/module";
 import { authSecretKey } from "./shared/auth/auth-secrets";
@@ -204,6 +205,7 @@ export const di = container()
   .addModule(consentModule)
   .addModule(quotaModule)
   .addModule(billingModule)
+  .addModule(notificationsSources)
   .addModule(notificationsModule)
   .addModule(profileModule)
   .addModule(adminSources)

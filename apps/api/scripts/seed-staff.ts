@@ -1,4 +1,5 @@
-import { authSchema, db, eq, staffSchema } from "@packages/drizzle";
+import * as staffSchema from "@modules/admin/schemas/staff";
+import { authSchema, db, eq } from "@packages/drizzle";
 import { hashPassword } from "better-auth/crypto";
 import { di } from "../src/container";
 import { seedTwoFactor } from "./check-harness";

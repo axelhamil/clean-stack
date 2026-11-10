@@ -33,6 +33,7 @@ import { requireLocalDatabase } from "./require-local-database";
 requireLocalDatabase("check-wipe-rollback");
 
 import { DrizzleStaffStore } from "@modules/admin/infrastructure/repositories/drizzle-staff.store";
+import * as staffSchema from "@modules/admin/schemas/staff";
 import { generateToken, hmacToken } from "@modules/api-token/domain/api-token-crypto";
 import { DrizzleApiTokenRepository } from "@modules/api-token/infrastructure/repositories/drizzle-api-token.repository";
 import * as apiTokenSchema from "@modules/api-token/schemas/api-token";
@@ -48,7 +49,6 @@ import {
   multiTenantSchema,
   outboxSchema,
   sql,
-  staffSchema,
   TransactionService,
 } from "@packages/drizzle";
 import { DrizzleEmailQueue } from "@packages/email/drizzle-email-queue";

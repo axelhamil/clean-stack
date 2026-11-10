@@ -8,9 +8,9 @@ import {
   inArray,
   isNull,
   lt,
-  notificationSchema,
   resolveExecutor,
 } from "@packages/drizzle";
+import * as notificationSchema from "../../../schemas/notification";
 import type {
   INotificationStore,
   NotificationError,

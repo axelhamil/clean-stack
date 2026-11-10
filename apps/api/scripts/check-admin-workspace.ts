@@ -6,6 +6,7 @@
  * heartbeat. Creates and removes its own rows.
  */
 
+import * as staffSchema from "@modules/admin/schemas/staff";
 import { createRgpdInternalRoutes } from "@modules/rgpd/infrastructure/http/rgpd-internal.routes";
 import { uuidv7 } from "@packages/ddd-kit";
 import {
@@ -16,7 +17,6 @@ import {
   inArray,
   outboxSchema,
   sql,
-  staffSchema,
   sweepSchema,
 } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";

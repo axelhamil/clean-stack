@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { AppErrorException, Result } from "@packages/ddd-kit";
 import * as realDrizzle from "@packages/drizzle";
 import type { DeliveredEvent } from "@packages/outbox/outbox.port";
+import { mockPort } from "@packages/test/bun";
 import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
+import type { IStaffRecipientsReader } from "../application/ports/staff-recipients.port";
 
 const executor = {
   execute: mock(() => ({
@@ -28,7 +31,11 @@ const event = (eventType: string, payload: unknown, organizationId?: string): De
 });
 
 const subscriber = () =>
-  new NotificationFanoutSubscriber(mockUnitOfWork().unitOfWork, mockInstrumentation());
+  new NotificationFanoutSubscriber(
+    mockUnitOfWork().unitOfWork,
+    mockInstrumentation(),
+    mockPort<IStaffRecipientsReader>(),
+  );
 const calls = () => executor.execute.mock.calls.length;
 
 beforeEach(() => {
@@ -52,5 +59,29 @@ describe("NotificationFanoutSubscriber", () => {
     await subscriber().handle(event("user.password_changed", { userId: "u1" }));
 
     expect(calls()).toBe(1);
+  });
+
+  test("inserts nothing and fails the delivery when the staff audience cannot be read, captured once by the reader", async () => {
+    const staff = mockPort<IStaffRecipientsReader>();
+    staff.recipientsOf.mockResolvedValue(
+      Result.fail({
+        code: "NOTIFICATION_STAFF_RECIPIENTS_PROVIDER_FAILURE",
+        message: "database operation failed: recipientsOf",
+      }),
+    );
+    const instrumentation = mockInstrumentation();
+    const handler = new NotificationFanoutSubscriber(
+      mockUnitOfWork().unitOfWork,
+      instrumentation,
+      staff,
+    );
+
+    const delivery = handler.handle(
+      event("admin.approval.requested", { approvalId: "a1", action: "ban", userId: "u2" }),
+    );
+
+    await expect(delivery).rejects.toBeInstanceOf(AppErrorException);
+    expect(calls()).toBe(0);
+    expect(instrumentation.capture).not.toHaveBeenCalled();
   });
 });

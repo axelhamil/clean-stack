@@ -8,8 +8,8 @@ import {
   isNull,
   multiTenantSchema,
   resolveExecutor,
-  staffSchema,
 } from "@packages/drizzle";
+import * as staffSchema from "../../../schemas/staff";
 import type {
   IStaffNoteStore,
   NewStaffNote,

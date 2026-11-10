@@ -24,11 +24,11 @@ import {
   lte,
   or,
   resolveExecutor,
-  staffSchema,
 } from "@packages/drizzle";
 import { countEligibleWithTimeout } from "@packages/drizzle/sweep-count";
 import { lockedBatch, requireFilter, withSweepGuards } from "@packages/drizzle/sweep-purge";
 import { sweepSpans } from "@packages/drizzle/sweep-span";
+import * as staffSchema from "../../../schemas/staff";
 import type {
   EndedImpersonation,
   EndedSessions,
