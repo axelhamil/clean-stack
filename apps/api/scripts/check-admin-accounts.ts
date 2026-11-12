@@ -12,6 +12,7 @@ import { uuidv7 } from "@packages/ddd-kit";
 import {
   authSchema,
   db,
+  emailSchema,
   eq,
   inArray,
   like,
@@ -41,6 +42,7 @@ const { organization, member } = multiTenantSchema;
 const { planOverride, subscription } = billingSchema;
 const { staffNote } = staffSchema;
 const oe = outboxSchema.outboxEvent;
+const em = emailSchema.emailMessage;
 
 const probes = adminProbes(PREFIX);
 const checks = checkRecorder();
@@ -64,6 +66,7 @@ async function cleanup(): Promise<void> {
     await db.delete(subscription).where(inArray(subscription.referenceId, orgIds));
     await db.delete(organization).where(inArray(organization.id, orgIds));
   }
+  await db.delete(em).where(like(em.toAddress, `${PREFIX}%`));
   await db.delete(authSchema.user).where(like(authSchema.user.id, `${PREFIX}%`));
   await probes.cleanup();
 }
