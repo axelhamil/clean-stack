@@ -4,7 +4,10 @@ import { createErrorHandler } from "../../middleware/error.middleware";
 import { NoOpInstrumentation } from "../../services/noop-instrumentation";
 import { SIGNATURE_HEADER } from "../internal-signature";
 import { sweepAuditLogRoutes } from "../sweep-audit-log.route";
+import { sweepConsentsRoutes } from "../sweep-consents.route";
+import { sweepNotificationsRoutes } from "../sweep-notifications.route";
 import { sweepOutboxRoutes } from "../sweep-outbox.route";
+import { sweepStripeEventsRoutes } from "../sweep-stripe-events.route";
 import { sweepWebhookDeliveryRoutes } from "../sweep-webhook-delivery.route";
 
 function makeApp(routes: Hono) {
@@ -29,6 +32,21 @@ const cases: Array<{ name: string; path: string; routes: Hono }> = [
     name: "sweep-webhook-delivery",
     path: "/internal/sweep-webhook-delivery",
     routes: sweepWebhookDeliveryRoutes as unknown as Hono,
+  },
+  {
+    name: "sweep-consents",
+    path: "/internal/sweep-consents",
+    routes: sweepConsentsRoutes as unknown as Hono,
+  },
+  {
+    name: "sweep-stripe-events",
+    path: "/internal/sweep-stripe-events",
+    routes: sweepStripeEventsRoutes as unknown as Hono,
+  },
+  {
+    name: "sweep-notifications",
+    path: "/internal/sweep-notifications",
+    routes: sweepNotificationsRoutes as unknown as Hono,
   },
 ];
 
