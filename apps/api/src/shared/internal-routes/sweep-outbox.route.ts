@@ -3,15 +3,8 @@
 import type { SQL } from "@packages/drizzle";
 import { and, isNotNull, lt, outboxSchema } from "@packages/drizzle";
 import { requireFilter } from "@packages/drizzle/sweep-purge";
-import { sweepBodySchema } from "@packages/http/sweep-runner";
-import { zV } from "@packages/http/validator";
-import { Hono } from "hono";
-import type { PinoLogger } from "hono-pino";
 import { env } from "../env";
-import { internalLayers } from "./internal-layers";
-import { runSweepRequest, tableRetentionPass } from "./sweep-route";
-
-type HonoEnv = { Variables: { logger: PinoLogger } };
+import { tableSweepRoute } from "./sweep-route";
 
 const event = outboxSchema.outboxEvent;
 const LABEL = "sweep-outbox";
@@ -25,37 +18,20 @@ const isForeignKeyViolation = (err: unknown): boolean =>
   (err.message.includes("violates foreign key constraint") ||
     ("code" in err && (err as { code: string }).code === "23503"));
 
-export const sweepOutboxRoutes = new Hono<HonoEnv>()
-  .use("*", ...internalLayers)
-  .post("/sweep-outbox", zV("json", sweepBodySchema), async (c) => {
-    const logger = c.var.logger;
+export const sweepOutboxRoutes = tableSweepRoute({
+  label: LABEL,
+  retentionDays: env.OUTBOX_RETENTION_DAYS,
+  table: event,
+  idColumn: event.id,
+  orderBy: event.dispatchedAt,
+  filterFor: buildPurgeFilter,
+  onBatchError: (err, logger) => {
+    if (!isForeignKeyViolation(err)) return "throw";
 
-    const response = await runSweepRequest({
-      label: LABEL,
-      body: c.req.valid("json"),
-      logger,
-      passes: (spans) => [
-        tableRetentionPass(
-          {
-            label: "default",
-            retentionDays: env.OUTBOX_RETENTION_DAYS,
-            table: event,
-            idColumn: event.id,
-            orderBy: event.dispatchedAt,
-            filterFor: buildPurgeFilter,
-            onBatchError: (err) => {
-              if (!isForeignKeyViolation(err)) return "throw";
-
-              logger.error(
-                { err },
-                "sweep-outbox FK violation, stopping the entire sweep (run sweep-webhook-delivery first)",
-              );
-              return "break";
-            },
-          },
-          spans,
-        ),
-      ],
-    });
-    return c.json(response);
-  });
+    logger.error(
+      { err },
+      "sweep-outbox FK violation, stopping the entire sweep (run sweep-webhook-delivery first)",
+    );
+    return "break";
+  },
+});

@@ -3,45 +3,23 @@
 import * as webhooksSchema from "@modules/webhooks/schemas/webhooks";
 import { and, inArray, lt } from "@packages/drizzle";
 import { requireFilter } from "@packages/drizzle/sweep-purge";
-import { sweepBodySchema } from "@packages/http/sweep-runner";
-import { zV } from "@packages/http/validator";
-import { Hono } from "hono";
-import type { PinoLogger } from "hono-pino";
 import { env } from "../env";
-import { internalLayers } from "./internal-layers";
-import { runSweepRequest, tableRetentionPass } from "./sweep-route";
-
-type HonoEnv = { Variables: { logger: PinoLogger } };
+import { tableSweepRoute } from "./sweep-route";
 
 const RETENTION_STATUSES = ["success", "dead_letter"] as const;
 const LABEL = "sweep-webhook-delivery";
 
 const wd = webhooksSchema.webhookDelivery;
 
-export const sweepWebhookDeliveryRoutes = new Hono<HonoEnv>()
-  .use("*", ...internalLayers)
-  .post("/sweep-webhook-delivery", zV("json", sweepBodySchema), async (c) => {
-    const response = await runSweepRequest({
-      label: LABEL,
-      body: c.req.valid("json"),
-      logger: c.var.logger,
-      passes: (spans) => [
-        tableRetentionPass(
-          {
-            label: "default",
-            retentionDays: env.WEBHOOK_DELIVERY_RETENTION_DAYS,
-            table: wd,
-            idColumn: wd.id,
-            orderBy: wd.createdAt,
-            filterFor: (cutoff) =>
-              requireFilter(
-                and(inArray(wd.status, [...RETENTION_STATUSES]), lt(wd.createdAt, cutoff)),
-                LABEL,
-              ),
-          },
-          spans,
-        ),
-      ],
-    });
-    return c.json(response);
-  });
+export const sweepWebhookDeliveryRoutes = tableSweepRoute({
+  label: LABEL,
+  retentionDays: env.WEBHOOK_DELIVERY_RETENTION_DAYS,
+  table: wd,
+  idColumn: wd.id,
+  orderBy: wd.createdAt,
+  filterFor: (cutoff) =>
+    requireFilter(
+      and(inArray(wd.status, [...RETENTION_STATUSES]), lt(wd.createdAt, cutoff)),
+      LABEL,
+    ),
+});

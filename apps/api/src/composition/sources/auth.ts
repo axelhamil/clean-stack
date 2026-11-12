@@ -5,6 +5,7 @@ import type { BillingCatalogService } from "@modules/billing/application/service
 import type { StripeSyncVerifier } from "@modules/billing/infrastructure/adapters/stripe-sync-verifier";
 import type { ConsentService } from "@modules/consents/application/services/consent.service";
 import type { PolicyAcceptanceService } from "@modules/policies/application/services/policy-acceptance.service";
+import type { IProfileStore } from "@modules/profile/application/ports/profile.port";
 import type { ILogger, IUnitOfWork } from "@packages/ddd-kit";
 import type { IEmailService } from "@packages/email/email.port";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
@@ -22,7 +23,6 @@ import type {
 import type { OutermostUnitOfWork } from "../../auth/unit-of-work-adapter";
 import type { IDisposableEmailService } from "../../shared/ports/disposable-email.port";
 import type { IPasswordBreachService } from "../../shared/ports/password-breach.port";
-import type { IProfileStore } from "../../shared/ports/profile.port";
 import type { IRateLimiter } from "../../shared/ports/rate-limiter.port";
 import type { ITotpVerifier } from "../../shared/ports/totp-verifier.port";
 import type { SecuritySignalsService } from "../../shared/services/security-signals.service";

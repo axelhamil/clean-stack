@@ -544,7 +544,7 @@ Emitted via `emitEvent(outbox, ...)` inside the `@better-auth/stripe` plugin cal
 
 ### Via `requireQuota` middleware (Phase B.2)
 
-Emitted via `emitEvent(outbox, ...)` in `requireQuota` when a request hits a quota ceiling. The middleware runs before the business handler; if the quota is already at or above the limit, it returns `429 BILLING_QUOTA_EXCEEDED` and emits the event. **`reserveQuota` (the authoritative in-TX check) does NOT emit this event**: it only calls `assertQuota` which throws. A caller enforcing via `reserveQuota` inside `uow.run()` without the middleware must emit the event themselves if they want the telemetry (or mount `requireQuota` on the route).
+Emitted via `emitEvent(outbox, ...)` in `requireQuota` when a request hits a quota ceiling. The middleware runs before the business handler; if the quota is already at or above the limit, it returns `429 BILLING_QUOTA_EXCEEDED` and emits the event. **`reserveQuota` (the authoritative in-TX check) does NOT emit this event**: it throws the same `BILLING_QUOTA_EXCEEDED` error as `assertQuota`, both built from `hasQuotaRemaining` and `quotaExceededError` of `@modules/quotas`. A caller enforcing via `reserveQuota` inside `uow.run()` without the middleware must emit the event themselves if they want the telemetry (or mount `requireQuota` on the route).
 
 - `BILLING_QUOTA_EXCEEDED` (`billing.quota.exceeded`): emitted on quota ceiling hit. Payload: `{ organizationId, resource: string, limit: number, attempted: number, tier: string, actorUserId: string }`, retention `operational`.
 

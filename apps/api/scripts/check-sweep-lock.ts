@@ -30,6 +30,7 @@ import {
 } from "../src/shared/internal-routes/sweep-lock";
 import { sweepNotificationsRoutes } from "../src/shared/internal-routes/sweep-notifications.route";
 import { sweepOutboxRoutes } from "../src/shared/internal-routes/sweep-outbox.route";
+import { sweepStripeEventsRoutes } from "../src/shared/internal-routes/sweep-stripe-events.route";
 import { sweepWebhookDeliveryRoutes } from "../src/shared/internal-routes/sweep-webhook-delivery.route";
 import { signedInternalRequest } from "./check-seed";
 
@@ -158,7 +159,7 @@ check("sweepLockFor's release deletes the row", wiringRowsAfterRelease.length ==
   );
 }
 
-// ── the six routes: each must pass its own label to sweepLockFor, not a shared or
+// ── the seven routes: each must pass its own label to sweepLockFor, not a shared or
 // wrong one, proven by holding that exact label's lease and expecting THIS route,
 // and only this route, to log the skip for it. Deleting a route's `lock:` wiring, or
 // wiring it to the wrong label, makes this fail. Asserted off the log line rather than
@@ -197,6 +198,11 @@ const routeCases: Array<{ name: string; path: string; routes: Hono }> = [
     name: "sweep-notifications",
     path: "/internal/sweep-notifications",
     routes: sweepNotificationsRoutes as unknown as Hono,
+  },
+  {
+    name: "sweep-stripe-events",
+    path: "/internal/sweep-stripe-events",
+    routes: sweepStripeEventsRoutes as unknown as Hono,
   },
 ];
 

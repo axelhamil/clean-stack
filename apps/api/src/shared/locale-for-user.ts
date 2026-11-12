@@ -1,7 +1,6 @@
-import type { ProfileError } from "@modules/profile/application/ports/profile.port";
+import type { IProfileStore, ProfileError } from "@modules/profile/application/ports/profile.port";
 import type { Option, Result } from "@packages/ddd-kit";
 import { DEFAULT_LOCALE, type Locale } from "@packages/i18n";
-import type { IProfileStore } from "./ports/profile.port";
 
 function collapse(found: Result<Option<Locale>, ProfileError>): Locale {
   if (found.isFailure) return DEFAULT_LOCALE;

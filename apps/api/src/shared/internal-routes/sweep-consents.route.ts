@@ -4,40 +4,18 @@
 import * as consentSchema from "@modules/consents/schemas/consent";
 import { and, isNull, lt } from "@packages/drizzle";
 import { requireFilter } from "@packages/drizzle/sweep-purge";
-import { sweepBodySchema } from "@packages/http/sweep-runner";
-import { zV } from "@packages/http/validator";
-import { Hono } from "hono";
-import type { PinoLogger } from "hono-pino";
 import { env } from "../env";
-import { internalLayers } from "./internal-layers";
-import { runSweepRequest, tableRetentionPass } from "./sweep-route";
-
-type HonoEnv = { Variables: { logger: PinoLogger } };
+import { tableSweepRoute } from "./sweep-route";
 
 const record = consentSchema.consentRecord;
 const LABEL = "sweep-consents";
 
-export const sweepConsentsRoutes = new Hono<HonoEnv>()
-  .use("*", ...internalLayers)
-  .post("/sweep-consents", zV("json", sweepBodySchema), async (c) => {
-    const response = await runSweepRequest({
-      label: LABEL,
-      body: c.req.valid("json"),
-      logger: c.var.logger,
-      passes: (spans) => [
-        tableRetentionPass(
-          {
-            label: "default",
-            retentionDays: env.CONSENT_RETENTION_DAYS,
-            table: record,
-            idColumn: record.id,
-            orderBy: record.expiresAt,
-            filterFor: (cutoff) =>
-              requireFilter(and(isNull(record.userId), lt(record.expiresAt, cutoff)), LABEL),
-          },
-          spans,
-        ),
-      ],
-    });
-    return c.json(response);
-  });
+export const sweepConsentsRoutes = tableSweepRoute({
+  label: LABEL,
+  retentionDays: env.CONSENT_RETENTION_DAYS,
+  table: record,
+  idColumn: record.id,
+  orderBy: record.expiresAt,
+  filterFor: (cutoff) =>
+    requireFilter(and(isNull(record.userId), lt(record.expiresAt, cutoff)), LABEL),
+});

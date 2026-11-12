@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import { AppErrorException, UnitOfWorkContext } from "@packages/ddd-kit";
-import { countScopedRows, reserveQuota } from "../db/quota-reservation";
+import { countScopedRows, reserveQuota } from "../infrastructure/quota-reservation";
 
 function fakeTx() {
   return { execute: mock(async () => undefined) };

@@ -2,9 +2,9 @@ import type { ILocaleReader } from "@modules/admin/application/ports/locale-read
 import type { StripeReplayRule } from "@modules/admin/application/ports/stripe-event.port";
 import type { StaffLookupOnce } from "@modules/admin/application/services/staff-access.service";
 import { isReplayableStripeEvent } from "@modules/billing/application/ports/stripe-event.port";
+import type { IProfileStore } from "@modules/profile/application/ports/profile.port";
 import { defineModule } from "inwire";
 import { localeForUser } from "../../shared/locale-for-user";
-import type { IProfileStore } from "../../shared/ports/profile.port";
 import { staffLookupOnce } from "../../shared/request-context";
 
 export interface AdminSourcesPrerequisites {

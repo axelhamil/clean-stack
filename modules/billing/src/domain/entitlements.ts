@@ -64,7 +64,3 @@ export function hasSeatAvailable(activeMembers: number, maxMembers: number | nul
 export function quotaLimit(view: EntitlementsView, key: QuotaKey): number | null {
   return view.quotas[key];
 }
-
-export function hasQuotaRemaining(used: number, limit: number | null): boolean {
-  return limit === null || used < limit;
-}

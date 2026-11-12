@@ -2,10 +2,10 @@ import {
   type EntitlementsView,
   type Feature,
   hasFeature,
-  hasQuotaRemaining,
   meetsPlan,
   type QuotaKey,
 } from "@modules/billing/domain/entitlements";
+import { hasQuotaRemaining, quotaExceededError } from "@modules/quotas/domain/quota-remaining";
 import type { Tier } from "@packages/access-control";
 import { AppErrorException } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
@@ -19,10 +19,6 @@ function paymentRequired(message: string): never {
   throw new AppErrorException({ code: "BILLING_PAYMENT_REQUIRED", message });
 }
 
-function quotaExceeded(message: string): never {
-  throw new AppErrorException({ code: "BILLING_QUOTA_EXCEEDED", message });
-}
-
 export function assertFeature(view: EntitlementsView, flag: Feature): void {
   if (!hasFeature(view, flag)) paymentRequired(`Plan does not include feature: ${flag}`);
 }
@@ -32,9 +28,7 @@ export function assertPlan(view: EntitlementsView, minTier: Tier): void {
 }
 
 export function assertQuota(used: number, limit: number | null): void {
-  if (!hasQuotaRemaining(used, limit)) {
-    quotaExceeded(`Quota exceeded (${used}/${limit}).`);
-  }
+  if (!hasQuotaRemaining(used, limit)) throw quotaExceededError(used, limit);
 }
 
 export const requireFeature = (flag: Feature) =>
@@ -82,7 +76,7 @@ export const requireQuota = (key: QuotaKey, readUsage: (c: Context) => Promise<n
         // telemetry must never break enforcement, the event is operational, not compliance
         logger.warn({ err }, "billing: quota exceeded event emit failed, still enforcing 429");
       }
-      quotaExceeded(`Quota exceeded for ${key} (${used}/${limit}).`);
+      throw quotaExceededError(used, limit, key);
     }
     await next();
   });

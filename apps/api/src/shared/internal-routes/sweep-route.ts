@@ -9,10 +9,14 @@ import {
   type SweepBatchErrorDecision,
   type SweepBody,
   type SweepResponse,
+  sweepBodySchema,
 } from "@packages/http/sweep-runner";
+import { zV } from "@packages/http/validator";
+import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
 import { di } from "../../container";
 import { env } from "../env";
+import { internalLayers } from "./internal-layers";
 import { sweepLockFor } from "./sweep-lock";
 
 type TablePassOptions = {
@@ -85,4 +89,37 @@ export function runSweepRequest(opts: {
         lock: sweepLockFor(opts.label, spans),
       }),
   );
+}
+
+export type TableSweepRouteOptions = Omit<TablePassOptions, "label" | "onBatchError"> & {
+  label: string;
+  onBatchError?: (err: unknown, logger: PinoLogger) => SweepBatchErrorDecision;
+};
+
+export function tableSweepRoute(opts: TableSweepRouteOptions) {
+  const { label, onBatchError, ...pass } = opts;
+
+  return new Hono<{ Variables: { logger: PinoLogger } }>()
+    .use("*", ...internalLayers)
+    .post(`/${label}`, zV("json", sweepBodySchema), async (c) => {
+      const logger = c.var.logger;
+
+      const response = await runSweepRequest({
+        label,
+        body: c.req.valid("json"),
+        logger,
+        passes: (spans) => [
+          tableRetentionPass(
+            {
+              ...pass,
+              label: "default",
+              onBatchError: onBatchError && ((err) => onBatchError(err, logger)),
+            },
+            spans,
+          ),
+        ],
+      });
+
+      return c.json(response);
+    });
 }
