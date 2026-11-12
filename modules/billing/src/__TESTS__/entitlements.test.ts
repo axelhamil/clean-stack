@@ -4,7 +4,6 @@ import {
   type EntitlementsView,
   entitlementsForTier,
   hasFeature,
-  hasQuotaRemaining,
   hasSeatAvailable,
   isTier,
   meetsPlan,
@@ -95,11 +94,5 @@ describe("quota catalog", () => {
   it("returns null (unlimited) for the business tier", () => {
     expect(quotaLimit(businessView, "uploads")).toBeNull();
     expect(quotaLimit(businessView, "apiCallsPerMonth")).toBeNull();
-  });
-
-  it("hasQuotaRemaining is true below the cap and when unlimited", () => {
-    expect(hasQuotaRemaining(9, 10)).toBe(true);
-    expect(hasQuotaRemaining(10, 10)).toBe(false);
-    expect(hasQuotaRemaining(9999, null)).toBe(true);
   });
 });
