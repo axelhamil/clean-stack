@@ -1,7 +1,6 @@
+import { PASSWORD_LENGTH } from "@packages/access-control";
 import { Option } from "@packages/ddd-kit";
 import type { IPasswordBreachService } from "../shared/ports/password-breach.port";
-
-export const MIN_PASSWORD_LENGTH = 15;
 
 export interface PasswordViolation {
   message: string;
@@ -42,7 +41,7 @@ export async function validatePassword(
   ctx: { email?: string; name?: string; appName: string },
   breachService: IPasswordBreachService,
 ): Promise<Option<PasswordViolation>> {
-  if (password.length < MIN_PASSWORD_LENGTH) return Option.none();
+  if (password.length < PASSWORD_LENGTH.min) return Option.none();
 
   const violation = findPasswordViolation(password, ctx);
   if (violation.isSome()) return violation;

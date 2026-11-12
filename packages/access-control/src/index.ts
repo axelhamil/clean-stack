@@ -37,6 +37,7 @@ const _member = _ac.newRole({
 });
 
 export { isBanLive } from "./ban";
+export { PASSWORD_LENGTH } from "./password";
 export {
   APPROVAL_ACTION_PERMISSION,
   APPROVAL_ACTIONS,
