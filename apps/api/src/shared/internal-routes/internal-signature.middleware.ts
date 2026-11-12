@@ -1,6 +1,3 @@
-import { createMiddleware } from "hono/factory";
-import { HTTPException } from "hono/http-exception";
-import { env } from "../env";
 import {
   canonicalize,
   MAX_AGE_SECONDS,
@@ -8,7 +5,10 @@ import {
   SIGNATURE_HEADER,
   sign,
   verify,
-} from "./internal-signature";
+} from "@packages/http/internal-signature";
+import { createMiddleware } from "hono/factory";
+import { HTTPException } from "hono/http-exception";
+import { env } from "../env";
 
 export const requireInternalSignature = createMiddleware(async (c, next) => {
   const key = env.INTERNAL_SIGNING_KEY;

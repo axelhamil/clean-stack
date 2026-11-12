@@ -1,6 +1,11 @@
 // Client-side counterpart of `requireInternalSignature`, the canonical message
 // MUST stay byte-identical with the verifier. See docs/CRON.md.
-import { buildSignatureHeader, canonicalize, SIGNATURE_HEADER, sign } from "./internal-signature";
+import {
+  buildSignatureHeader,
+  canonicalize,
+  SIGNATURE_HEADER,
+  sign,
+} from "@packages/http/internal-signature";
 
 /**
  * Deliberately above the server's own idle timeout: with both sides on their

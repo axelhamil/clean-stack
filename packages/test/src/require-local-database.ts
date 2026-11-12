@@ -7,12 +7,18 @@
  * to production.
  */
 
-const LOCAL_DATABASE_URL_PATTERN =
-  /^(?:postgres(?:ql)?:\/\/)[^/]*@?(localhost|127\.0\.0\.1)(?::\d+)?\//;
+const POSTGRES_PROTOCOLS = new Set(["postgres:", "postgresql:"]);
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"]);
+
+function isLocalDatabaseUrl(databaseUrl: string): boolean {
+  const url = URL.parse(databaseUrl);
+  if (!url) return false;
+
+  return POSTGRES_PROTOCOLS.has(url.protocol) && LOCAL_HOSTS.has(url.hostname);
+}
 
 export function requireLocalDatabase(scriptName: string): void {
-  const databaseUrl = process.env.DATABASE_URL ?? "";
-  const isLocalDatabase = LOCAL_DATABASE_URL_PATTERN.test(databaseUrl);
+  const isLocalDatabase = isLocalDatabaseUrl(process.env.DATABASE_URL ?? "");
   if (!isLocalDatabase) {
     console.error(
       `${scriptName} refuses to run: DATABASE_URL does not point at localhost/127.0.0.1. ` +
@@ -20,18 +26,4 @@ export function requireLocalDatabase(scriptName: string): void {
     );
     process.exit(1);
   }
-}
-
-const SEEDABLE_HOSTS = new Set(["localhost", "127.0.0.1", "postgres"]);
-
-function hostOf(databaseUrl: string | undefined): string | undefined {
-  return URL.parse(databaseUrl ?? "")?.hostname;
-}
-
-export function requireSeedableDatabase(databaseUrl: string | undefined): void {
-  if (SEEDABLE_HOSTS.has(hostOf(databaseUrl) ?? "")) return;
-
-  throw new Error(
-    "Refusing to seed staff: these accounts include a manager with a public TOTP secret, so DATABASE_URL must point at localhost, 127.0.0.1 or postgres.",
-  );
 }

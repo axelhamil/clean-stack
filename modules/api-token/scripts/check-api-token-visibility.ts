@@ -9,19 +9,19 @@
 // an executable check against a real database and wire it to a script") and
 // `check-fanout-preferences.ts` for the reference shape.
 //
-// Run: `pnpm --filter api check:api-token-visibility` (needs `pnpm --filter api db:seed`).
+// Run: `pnpm --filter @modules/api-token check:api-token-visibility` (needs `pnpm --filter api db:seed`).
 // Re-run after any change to `visibleTokensFilter` or `TokenOwner`.
 //
 // WARNING: writes real user, organization and api_token rows (all prefixed
 // and cleaned up). Local database only, `requireLocalDatabase` enforces it.
 
-import type { TokenOwner } from "@modules/api-token/application/ports/api-token.port";
-import { DrizzleApiTokenRepository } from "@modules/api-token/infrastructure/repositories/drizzle-api-token.repository";
-import * as apiTokenSchema from "@modules/api-token/schemas/api-token";
+import { NoOpInstrumentation } from "@packages/ddd-kit";
 import { authSchema, db, multiTenantSchema, sql } from "@packages/drizzle";
-import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
-import { checkRecorder, findSeededUserId } from "./check-harness";
-import { requireLocalDatabase } from "./require-local-database";
+import { checkRecorder, findSeededUserId } from "@packages/test/check-harness";
+import { requireLocalDatabase } from "@packages/test/require-local-database";
+import * as apiTokenSchema from "../schemas/api-token";
+import type { TokenOwner } from "../src/application/ports/api-token.port";
+import { DrizzleApiTokenRepository } from "../src/infrastructure/repositories/drizzle-api-token.repository";
 
 requireLocalDatabase("check-api-token-visibility");
 

@@ -2,7 +2,7 @@ import { describe, expect, it, mock, spyOn } from "bun:test";
 import { CryptoHasher } from "bun";
 
 const { HibpPasswordBreachService } = await import("../hibp-password-breach.service");
-const { NoOpInstrumentation } = await import("../noop-instrumentation");
+const { NoOpInstrumentation } = await import("@packages/ddd-kit");
 
 const PASSWORD = "supersecretpassword";
 // SHA-1("supersecretpassword") uppercase, computed at module load to verify URL construction

@@ -11,8 +11,8 @@
  */
 
 import { setTimeout as sleep } from "node:timers/promises";
-import { checkRecorder } from "./check-harness";
-import { requireLocalDatabase } from "./require-local-database";
+import { checkRecorder } from "@packages/test/check-harness";
+import { requireLocalDatabase } from "@packages/test/require-local-database";
 
 requireLocalDatabase("check-scim-seats");
 

@@ -10,8 +10,8 @@
  * concurrent calls against the real plugin tables can show it.
  */
 
-import { checkRecorder } from "./check-harness";
-import { requireLocalDatabase } from "./require-local-database";
+import { checkRecorder } from "@packages/test/check-harness";
+import { requireLocalDatabase } from "@packages/test/require-local-database";
 
 requireLocalDatabase("check-scim-connection");
 

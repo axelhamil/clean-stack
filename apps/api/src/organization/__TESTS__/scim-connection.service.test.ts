@@ -27,7 +27,7 @@ mock.module("@packages/drizzle", () => ({
 }));
 
 const { ScimConnectionService } = await import("../scim-connection.service");
-const { NoOpInstrumentation } = await import("../../shared/services/noop-instrumentation");
+const { NoOpInstrumentation } = await import("@packages/ddd-kit");
 
 describe("ScimConnectionService.issueToken", () => {
   it("still returns the token when its event cannot be recorded, and reports the failure", async () => {

@@ -1,12 +1,12 @@
 import { NotificationFanoutSubscriber } from "@modules/notifications/infrastructure/services/notification-fanout-subscriber";
 import * as notificationSchema from "@modules/notifications/schemas/notification";
 import type { IInstrumentation } from "@packages/ddd-kit";
+import { NoOpInstrumentation } from "@packages/ddd-kit";
 import { db, eq, multiTenantSchema, sql, TransactionService } from "@packages/drizzle";
 import type { DeliveredEvent } from "@packages/outbox/outbox.port";
+import { checkRecorder, findSeededUserId } from "@packages/test/check-harness";
+import { requireLocalDatabase } from "@packages/test/require-local-database";
 import { StaffRecipientsQuery } from "../src/queries/staff-recipients.query";
-import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
-import { checkRecorder, findSeededUserId } from "./check-harness";
-import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-fanout-preferences");
 

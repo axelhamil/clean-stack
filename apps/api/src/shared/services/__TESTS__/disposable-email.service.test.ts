@@ -10,7 +10,7 @@ mock.module("node:dns/promises", () => ({ ...realDns, resolveMx: mockResolveMx }
 
 // Import after mocking to capture mocked module
 const { DisposableEmailService } = await import("../disposable-email.service");
-const { NoOpInstrumentation } = await import("../noop-instrumentation");
+const { NoOpInstrumentation } = await import("@packages/ddd-kit");
 
 describe("DisposableEmailService", () => {
   beforeEach(() => {

@@ -18,10 +18,10 @@ import { permissionsOfRole } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
 import { and, authSchema, db, eq, inArray, or, outboxSchema, sql } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
+import { checkRecorder } from "@packages/test/check-harness";
+import { requireLocalDatabase } from "@packages/test/require-local-database";
 import { hashPassword } from "better-auth/crypto";
 import { di } from "../src/container";
-import { checkRecorder } from "./check-harness";
-import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-admin-staff");
 

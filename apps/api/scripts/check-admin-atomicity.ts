@@ -13,11 +13,11 @@ import { Result } from "@packages/ddd-kit";
 import { authSchema, db, eq } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
+import { checkRecorder } from "@packages/test/check-harness";
+import { requireLocalDatabase } from "@packages/test/require-local-database";
 import { auth } from "../src/auth";
 import { di } from "../src/container";
 import { adminProbes, appCall, codeOf } from "./admin-probes";
-import { checkRecorder } from "./check-harness";
-import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-admin-atomicity");
 

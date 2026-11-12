@@ -24,6 +24,8 @@ import {
 } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { timeIdCursorSchema } from "@packages/http/time-id-cursor";
+import { checkRecorder, internalApp } from "@packages/test/check-harness";
+import { requireLocalDatabase } from "@packages/test/require-local-database";
 import { Hono } from "hono";
 import { di } from "../src/container";
 import { staffRecipients } from "../src/queries/staff-recipients.query";
@@ -38,8 +40,7 @@ import {
   codeOf,
   currentCounter,
 } from "./admin-probes";
-import { checkRecorder, internalApp, signedInternalRequest } from "./check-harness";
-import { requireLocalDatabase } from "./require-local-database";
+import { signedInternalRequest } from "./check-seed";
 
 requireLocalDatabase("check-admin-approval");
 

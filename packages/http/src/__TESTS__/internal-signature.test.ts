@@ -6,7 +6,7 @@ import {
   parseSignatureHeader,
   sign,
   verify,
-} from "../internal-routes/internal-signature";
+} from "../internal-signature";
 
 const KEY = "test-signing-key-with-at-least-32-chars!!";
 

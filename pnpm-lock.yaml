@@ -1472,6 +1472,21 @@ importers:
       '@packages/ddd-kit':
         specifier: workspace:*
         version: link:../ddd-kit
+      '@packages/drizzle':
+        specifier: workspace:*
+        version: link:../drizzle
+      '@packages/http':
+        specifier: workspace:*
+        version: link:../http
+      hono:
+        specifier: ^4.13.14
+        version: 4.13.14
+      hono-pino:
+        specifier: ^0.10.3
+        version: 0.10.3(hono@4.13.14)(pino@10.4.0)
+      pino:
+        specifier: ^10.4.0
+        version: 10.4.0
     devDependencies:
       '@axe-core/playwright':
         specifier: ^4.14.0

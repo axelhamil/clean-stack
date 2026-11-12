@@ -20,13 +20,14 @@ import {
   sweepSchema,
 } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
+import { checkRecorder, internalApp } from "@packages/test/check-harness";
+import { requireLocalDatabase } from "@packages/test/require-local-database";
 import { Hono } from "hono";
 import { di } from "../src/container";
 import { flushNotificationEmailsRoutes } from "../src/shared/internal-routes/flush-notification-emails.route";
 import { internalLayers } from "../src/shared/internal-routes/internal-layers";
 import { adminProbes, appCall, codeOf } from "./admin-probes";
-import { checkRecorder, internalApp, signedInternalRequest } from "./check-harness";
-import { requireLocalDatabase } from "./require-local-database";
+import { signedInternalRequest } from "./check-seed";
 
 requireLocalDatabase("check-admin-workspace");
 

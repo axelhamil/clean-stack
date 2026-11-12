@@ -41,7 +41,7 @@ const storeFailure = dbOperationFailure("API_TOKEN_PROVIDER_FAILURE");
  *
  * Exported so the repository's other methods can compose it; the predicate
  * itself is proven against a real Postgres by
- * `scripts/check-api-token-visibility.ts` (`pnpm --filter api
+ * `scripts/check-api-token-visibility.ts` (`pnpm --filter @modules/api-token
  * check:api-token-visibility`), not by the unit suite: that suite mocks
  * `@packages/drizzle`'s `and`/`or`/`eq`/`isNull`, so it evaluates the mock,
  * never the actual WHERE clause.

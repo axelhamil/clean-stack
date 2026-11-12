@@ -1,6 +1,12 @@
 import { describe, expect, it, mock } from "bun:test";
-import type { IUnitOfWork } from "@packages/ddd-kit";
+import { type IUnitOfWork, NoOpInstrumentation } from "@packages/ddd-kit";
 import { outboxSchema, sql } from "@packages/drizzle";
+import {
+  buildSignatureHeader,
+  canonicalize,
+  SIGNATURE_HEADER,
+  sign,
+} from "@packages/http/internal-signature";
 import type { ISweepRunStore } from "@packages/http/sweep-run.port";
 import type { SweepBatchErrorDecision } from "@packages/http/sweep-runner";
 import { mockPort } from "@packages/test/bun";
@@ -8,8 +14,6 @@ import { Hono } from "hono";
 import { type PinoLogger, pinoLogger } from "hono-pino";
 import { pino } from "pino";
 import { env } from "../../env";
-import { NoOpInstrumentation } from "../../services/noop-instrumentation";
-import { buildSignatureHeader, canonicalize, SIGNATURE_HEADER, sign } from "../internal-signature";
 
 const foreignKeyViolation = Object.assign(new Error("violates foreign key constraint"), {
   code: "23503",

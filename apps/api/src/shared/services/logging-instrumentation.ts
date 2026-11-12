@@ -1,5 +1,4 @@
-import type { ErrorContext } from "@packages/ddd-kit";
-import { NoOpInstrumentation } from "./noop-instrumentation";
+import { type ErrorContext, NoOpInstrumentation } from "@packages/ddd-kit";
 
 interface ErrorLogger {
   error(fields: object, message: string): void;

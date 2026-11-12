@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
+import { NoOpInstrumentation } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
-import { NoOpInstrumentation } from "../../services/noop-instrumentation";
 import { denyImpersonated } from "../deny-impersonated.middleware";
 import { createErrorHandler } from "../error.middleware";
 

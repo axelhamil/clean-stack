@@ -1,7 +1,7 @@
 import { authSchema, db, eq } from "@packages/drizzle";
+import { seedEmail } from "@packages/test/check-harness";
 import { auth } from "../src/auth";
 import { di } from "../src/container";
-import { seedEmail } from "./seed-account";
 import { seedDevStaff } from "./seed-staff";
 
 // `.test` is reserved and can never carry an MX record, which the disposable-email

@@ -10,7 +10,7 @@ import "./check-admin-ops.env";
 import { StripeReplayService } from "@modules/admin/application/services/stripe-replay.service";
 import { StripeEventGateway } from "@modules/billing/infrastructure/adapters/stripe-event.gateway";
 import * as billingSchema from "@modules/billing/schemas/billing";
-import { uuidv7 } from "@packages/ddd-kit";
+import { NoOpInstrumentation, uuidv7 } from "@packages/ddd-kit";
 import {
   and,
   db,
@@ -24,16 +24,16 @@ import {
   sweepSchema,
 } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
+import { checkRecorder, internalApp } from "@packages/test/check-harness";
+import { requireLocalDatabase } from "@packages/test/require-local-database";
 import { Hono } from "hono";
 import type Stripe from "stripe";
 import { auth } from "../src/auth";
 import { di } from "../src/container";
 import { env } from "../src/shared/env";
 import { sweepStripeEventsRoutes } from "../src/shared/internal-routes/sweep-stripe-events.route";
-import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 import { adminProbes, appCall } from "./admin-probes";
-import { checkRecorder, internalApp, signedInternalRequest } from "./check-harness";
-import { requireLocalDatabase } from "./require-local-database";
+import { signedInternalRequest } from "./check-seed";
 
 requireLocalDatabase("check-admin-ops");
 

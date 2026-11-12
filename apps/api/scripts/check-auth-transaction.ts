@@ -17,8 +17,9 @@
  */
 
 import "./check-auth-transaction.env";
-import { checkRecorder, seedTwoFactor } from "./check-harness";
-import { requireLocalDatabase } from "./require-local-database";
+import { checkRecorder } from "@packages/test/check-harness";
+import { requireLocalDatabase } from "@packages/test/require-local-database";
+import { seedTwoFactor } from "./check-seed";
 
 requireLocalDatabase("check-auth-transaction");
 

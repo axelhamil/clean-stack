@@ -27,8 +27,8 @@
  * caps the lock wait with `lock_timeout` so a stuck lock fails fast instead of hanging.
  */
 
-import { checkRecorder } from "./check-harness";
-import { requireLocalDatabase } from "./require-local-database";
+import { checkRecorder } from "@packages/test/check-harness";
+import { requireLocalDatabase } from "@packages/test/require-local-database";
 
 requireLocalDatabase("check-wipe-rollback");
 
@@ -41,6 +41,7 @@ import { RgpdService } from "@modules/rgpd/application/services/rgpd.service";
 import { DrizzleRgpdRepository } from "@modules/rgpd/infrastructure/repositories/drizzle-rgpd.repository";
 import { NoOpStorageService } from "@modules/uploads/infrastructure/services/noop-storage.service";
 import type { IInstrumentation } from "@packages/ddd-kit";
+import { NoOpInstrumentation } from "@packages/ddd-kit";
 import {
   authSchema,
   db,
@@ -63,7 +64,6 @@ import { env } from "../src/shared/env";
 import { logger } from "../src/shared/logger";
 import { requireApiToken } from "../src/shared/middleware/api-token.middleware";
 import { DrizzleTotpVerifier } from "../src/shared/services/drizzle-totp-verifier";
-import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 
 const instrumentation: IInstrumentation = new NoOpInstrumentation();
 const PROBE_MARKER = "wipe-rollback-probe";
