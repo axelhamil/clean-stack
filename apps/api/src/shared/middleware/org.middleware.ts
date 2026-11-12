@@ -8,7 +8,7 @@ import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { SessionData, SessionUser } from "../../auth";
-import { findActiveMemberRole } from "../../auth-queries";
+import { findActiveMemberRole } from "../../auth/queries";
 
 const orgRoleSchema = z.enum(ORG_ROLES);
 

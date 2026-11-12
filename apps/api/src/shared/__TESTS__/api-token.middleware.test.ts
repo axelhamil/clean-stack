@@ -42,8 +42,8 @@ const ownerRow = () => ({
 
 const findUserByIdSpy = mock(async (_id: string) => ownerRow());
 
-const realAuthQueries = await import("../../auth-queries");
-mock.module("../../auth-queries", () => ({
+const realAuthQueries = await import("../../auth/queries");
+mock.module("../../auth/queries", () => ({
   ...realAuthQueries,
   findUserById: findUserByIdSpy,
 }));

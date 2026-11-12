@@ -2,7 +2,7 @@ import { type AppError, type IInstrumentation, type IUnitOfWork, Result } from "
 import { EventTypes } from "@packages/events";
 import { emitEvent } from "@packages/outbox/event-emitter";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
-import { setOrgSsoEnforced } from "../../auth-queries";
+import { setOrgSsoEnforced } from "../../auth/queries";
 
 export type AdminActionError = AppError<"ADMIN_ACTION_PROVIDER_FAILURE">;
 

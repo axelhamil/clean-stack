@@ -17,8 +17,8 @@ mock.module("../container", () => ({
   },
 }));
 
-const realAuthQueries = await import("../auth-queries");
-mock.module("../auth-queries", () => ({
+const realAuthQueries = await import("../auth/queries");
+mock.module("../auth/queries", () => ({
   ...realAuthQueries,
   findActiveMemberRole: async () => memberRole,
 }));

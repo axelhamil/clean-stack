@@ -18,4 +18,4 @@ No billing backoffice, Stripe Checkout + Billing Portal hosted. `POST /billing/p
 
 ## Events
 
-`billing.subscription.{created,updated,cancelled}`, `billing.payment.failed`, from stripe plugin callbacks in `auth.ts` (same BetterAuth bridge pattern, see skill `events-outbox`). `billing.quota.exceeded` emitted by `requireQuota` only, `reserveQuota` callers emit it themselves.
+`billing.subscription.{created,updated,cancelled}`, `billing.payment.failed`, from stripe plugin callbacks in `auth/plugins/stripe.ts` (same BetterAuth bridge pattern, see skill `events-outbox`). `billing.quota.exceeded` emitted by `requireQuota` only, `reserveQuota` callers emit it themselves.

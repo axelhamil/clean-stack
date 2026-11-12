@@ -9,7 +9,7 @@ import type { MiddlewareHandler } from "hono";
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import type { SessionUser } from "../../auth";
-import { findUserById } from "../../auth-queries";
+import { findUserById } from "../../auth/queries";
 import { getRequestId } from "../request-context";
 
 export interface ApiTokenVariables {

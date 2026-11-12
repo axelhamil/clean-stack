@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { buildSessionPayload } from "../auth-session-payload";
+import { buildSessionPayload } from "../auth/session-payload";
 
 describe("buildSessionPayload", () => {
   it("exposes the impersonator id when the session is impersonated", () => {

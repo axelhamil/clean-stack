@@ -7,7 +7,7 @@ description: Use when working on domain events, the transactional outbox, the Be
 
 `IUnitOfWork.run(cb)` opens an `EventCollector`. `repo.save(agg)` reads the ambient transaction and calls `EventCollector.collectFrom(agg)` once the write succeeded → events flushed via `outbox.enqueue` in the same TX (atomicity). `enqueue` also sends `pg_notify` on the same executor, so it leaves at commit and wakes `OutboxDispatcher`; its `OutboxRelay` claims due rows by lease (one statement, no transaction kept open) and runs every named handler not yet in the row's `deliveries` (built in `audit-log`, `webhook-fanout`, `notification-fanout`, plus each `onEvent(type, handlerName, ...)`), each in its own short transaction, then settles with `markDelivered` or `markFailed` guarded by the claimed `attempts`.
 
-## BetterAuth → outbox bridge (`auth.ts`)
+## BetterAuth → outbox bridge (`apps/api/src/auth/`)
 
 - **`databaseHooks` for core models** (user/session/account/verification), TX-bound, all flows. Used for `USER_CREATED`, `USER_SIGNED_{IN,OUT}`, `USER_ACCOUNT_UNLINKED`.
 - **`hooks.after` + `createAuthMiddleware` for plugin events** (twoFactor, passkey, email-verified, password-changed, link-social): path-based. **Guard `if (ctx.context.returned instanceof APIError) return`**, otherwise events fire on 4xx.

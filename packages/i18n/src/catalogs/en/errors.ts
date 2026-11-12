@@ -9,7 +9,7 @@ export default {
     ACCOUNT_PASSWORD_INVALID: "Invalid password.",
     TWO_FACTOR_REQUIRED: "Confirm with your password or authenticator code.",
     TWO_FACTOR_INVALID: "Invalid authenticator code.",
-    // `assertSsoEntitlementFor` (apps/api/src/auth.ts) puts the code directly in
+    // `assertSsoEntitlementFor` (apps/api/src/auth/entitlements.ts) puts the code directly in
     // the APIError's `message` rather than a separate `code` field, so the
     // front reads it back off `error.message` (see provider-card.tsx); the
     // catalog lookup itself is keyed the same as every other code either way.

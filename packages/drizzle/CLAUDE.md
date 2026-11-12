@@ -1,6 +1,6 @@
 # drizzle rules
 
-The database package: Drizzle client, schema, migrations and the transaction service. Auto-loaded under `packages/drizzle/`. Consumers: `apps/api` (stores, repositories, `auth-queries.ts`) and `modules/*`. Business tables live in their owner's `modules/<name>/schemas/`; this package keeps the kit tables and the one migration history, and drizzle-kit reads both folders. Cross-cutting rules: `/CLAUDE.md`; server usage: `apps/api/CLAUDE.md`.
+The database package: Drizzle client, schema, migrations and the transaction service. Auto-loaded under `packages/drizzle/`. Consumers: `apps/api` (stores, repositories, `auth/queries.ts`) and `modules/*`. Business tables live in their owner's `modules/<name>/schemas/`; this package keeps the kit tables and the one migration history, and drizzle-kit reads both folders. Cross-cutting rules: `/CLAUDE.md`; server usage: `apps/api/CLAUDE.md`.
 
 ## Layout
 
