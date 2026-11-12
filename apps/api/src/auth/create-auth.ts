@@ -6,6 +6,7 @@ import "@simplewebauthn/server";
 import "zod/v4/core";
 import { passkey } from "@better-auth/passkey";
 import * as billingSchema from "@modules/billing/schemas/billing";
+import { PASSWORD_LENGTH } from "@packages/access-control";
 import { authSchema, db, multiTenantSchema, ssoSchema } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
@@ -19,7 +20,6 @@ import { createAfterHook } from "./hooks/after";
 import { createBeforeHook, type SessionReader } from "./hooks/before";
 import { createDatabaseHooks } from "./hooks/database";
 import { IMPERSONATION_TTL_SECONDS } from "./impersonation-ttl";
-import { MIN_PASSWORD_LENGTH } from "./password-policy";
 import { clearExpiredBanPlugin } from "./plugins/clear-expired-ban";
 import { organizationPlugin } from "./plugins/organization";
 import { scimPlugin } from "./plugins/scim";
@@ -83,7 +83,8 @@ export function createAuth(deps: AuthDeps) {
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: true,
-      minPasswordLength: MIN_PASSWORD_LENGTH,
+      minPasswordLength: PASSWORD_LENGTH.min,
+      maxPasswordLength: PASSWORD_LENGTH.max,
       sendResetPassword: emailFlows.sendResetPassword,
       onPasswordReset: async ({ user }) => {
         await emit(EventTypes.USER_PASSWORD_CHANGED, "user", user.id, { userId: user.id });

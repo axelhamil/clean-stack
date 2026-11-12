@@ -1,9 +1,10 @@
+import { PASSWORD_LENGTH } from "@packages/access-control";
 import { totpCodeSchema } from "@packages/web-kit/auth/totp-code.schema";
 import { z } from "zod";
 
 export const passwordSchema = z.string().min(1);
 
-export const strongPasswordSchema = z.string().min(15).max(128);
+export const strongPasswordSchema = z.string().min(PASSWORD_LENGTH.min).max(PASSWORD_LENGTH.max);
 
 export const nameSchema = z.string().min(2).max(80);
 
