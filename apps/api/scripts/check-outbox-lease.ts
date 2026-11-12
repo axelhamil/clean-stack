@@ -23,6 +23,7 @@ import * as webhooksSchema from "@modules/webhooks/schemas/webhooks";
 import { Result, uuidv7 } from "@packages/ddd-kit";
 import {
   and,
+  count,
   db,
   eq,
   like,
@@ -40,7 +41,12 @@ import {
 } from "@packages/outbox/drizzle-outbox.repository";
 import { emitEvent } from "@packages/outbox/event-emitter";
 import type { OutboxRecord } from "@packages/outbox/outbox.port";
-import { checkRun, internalApp, recordingInstrumentation } from "@packages/test/check-harness";
+import {
+  checkRun,
+  internalApp,
+  recordingInstrumentation,
+  refuseForeignRows,
+} from "@packages/test/check-harness";
 import type { Hono } from "hono";
 import { Client } from "pg";
 import { env } from "../src/shared/env";
@@ -65,6 +71,7 @@ const oe = outboxSchema.outboxEvent;
 const al = auditLogSchema.auditLog;
 const org = multiTenantSchema.organization;
 const organizationId = `${AGGREGATE}-org`;
+const ROUTE_CUTOFF = new Date(Date.now() - env.OUTBOX_RETENTION_DAYS * 24 * 3_600_000);
 
 async function cleanup(): Promise<void> {
   await db.delete(org).where(eq(org.id, organizationId));
@@ -120,8 +127,21 @@ async function resetProbes(): Promise<void> {
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const ids = (records: OutboxRecord[]) => records.map((record) => record.id);
 
+async function refuseForeignSweepable(): Promise<void> {
+  const [sweepable] = await db
+    .select({ found: count() })
+    .from(oe)
+    .where(buildPurgeFilter(ROUTE_CUTOFF));
+  refuseForeignRows("check-outbox-lease", {
+    found: sweepable?.found ?? 0,
+    rows: `outbox_event rows dispatched before ${ROUTE_CUTOFF.toISOString()}`,
+    clean: `delete from outbox_event where dispatched_at < '${ROUTE_CUTOFF.toISOString()}'`,
+  });
+}
+
 async function main(): Promise<void> {
   await cleanup();
+  await refuseForeignSweepable();
 
   const probe = await claimed([TYPE_A], 1);
   const claimSql = spans.at(-1) ?? "";
@@ -432,17 +452,6 @@ async function main(): Promise<void> {
     status: "success",
     idempotencyKey: `${AGGREGATE}-delivery`,
   });
-  const routeCutoff = new Date(Date.now() - env.OUTBOX_RETENTION_DAYS * 24 * 3_600_000);
-  const eligible = await db.select({ id: oe.id }).from(oe).where(buildPurgeFilter(routeCutoff));
-  // The route sweeps the whole table: the retention set by the first import puts its
-  // cutoff before any real event, and this refuses to call it if a row the check did
-  // not seed is old enough to be swept anyway.
-  await step(
-    "the referenced probe is the only row the route would sweep",
-    eligible.length === 1 && eligible[0]?.id === referenced,
-    { eligible: eligible.length },
-  );
-
   const res = await signedInternalRequest(
     internalApp(sweepOutboxRoutes as unknown as Hono),
     "/internal/sweep-outbox",
