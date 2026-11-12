@@ -1,9 +1,9 @@
 import { EventTypes } from "@packages/events";
 import { APIError } from "better-auth/api";
 import { changedFieldsFrom, scimUserChange } from "../shared/auth/sso-paths";
-import { emit } from "./emit";
+import type { Emit } from "./emit";
 import { findMemberOf, findScimUser, scimConnectionCreator } from "./queries";
-import { SNAPSHOT_TTL_MS, scimUserSnapshots } from "./snapshots";
+import { type AuthSnapshots, SNAPSHOT_TTL_MS } from "./snapshots";
 
 /**
  * Bridges `org.member.joined` for the SCIM provisioning path. The member row is
@@ -20,6 +20,7 @@ import { SNAPSHOT_TTL_MS, scimUserSnapshots } from "./snapshots";
  * re-provisioning an existing member would emit a false "joined".
  */
 async function emitScimMemberJoined(
+  emit: Emit,
   userId: string,
   organizationId: string,
   actorUserId: string | null,
@@ -51,7 +52,9 @@ async function emitScimMemberJoined(
  * carries; every other write reads the snapshot `hooks.before` took, the only
  * record of a deleted user and the only "before" a deactivation can be told from.
  */
-export async function emitScimUserEvents(
+async function emitScimUserEvents(
+  emit: Emit,
+  snapshots: AuthSnapshots,
   method: string | undefined,
   returned: unknown,
   params: unknown,
@@ -65,7 +68,7 @@ export async function emitScimUserEvents(
       : (params as Record<string, string> | undefined)?.userId;
   if (!scimUserId) return;
 
-  const before = method === "POST" ? undefined : scimUserSnapshots.take(scimUserId);
+  const before = method === "POST" ? undefined : snapshots.scimUserSnapshots.take(scimUserId);
   const after = method === "DELETE" ? undefined : await findScimUser(scimUserId);
   const subject = after ?? before;
   if (!subject) return;
@@ -85,7 +88,7 @@ export async function emitScimUserEvents(
   const payload = change === "updated" ? { ...base, changedFields: changedFieldsFrom(body) } : base;
   await emit(eventType, "user", userId, payload, organizationId);
 
-  await emitScimMemberJoined(userId, organizationId, actorUserId);
+  await emitScimMemberJoined(emit, userId, organizationId, actorUserId);
 
   const removedMemberId = before?.memberId;
   if (!removedMemberId || (await findMemberOf(userId, organizationId))) return;
@@ -96,4 +99,21 @@ export async function emitScimUserEvents(
     { organizationId, actorUserId, userId },
     organizationId,
   );
+}
+
+export function createScimEvents(
+  emit: Emit,
+  snapshots: AuthSnapshots,
+): {
+  emitScimUserEvents(
+    method: string | undefined,
+    returned: unknown,
+    params: unknown,
+    body: Record<string, unknown> | undefined,
+  ): Promise<void>;
+} {
+  return {
+    emitScimUserEvents: (method, returned, params, body) =>
+      emitScimUserEvents(emit, snapshots, method, returned, params, body),
+  };
 }

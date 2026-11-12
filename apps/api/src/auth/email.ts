@@ -1,8 +1,13 @@
 import type { EmailTemplates, TemplateVariables } from "@packages/email/email.port";
+import { EventTypes } from "@packages/events";
 import { type Locale, toLocale } from "@packages/i18n";
 import { CryptoHasher } from "bun";
-import { di } from "../container";
-import { logger } from "../shared/logger";
+import { redirectQuery } from "../shared/auth/email-redirect";
+import { markPasswordResetDelivered } from "../shared/auth/password-reset-delivery";
+import { localeForEmail } from "../shared/locale-for-user";
+import type { AuthDeps } from "./deps";
+import type { Emit } from "./emit";
+import { setPendingEmail } from "./queries";
 import { requestClientIp } from "./visitor";
 
 /**
@@ -24,47 +29,158 @@ export function localeOf(user: object): Locale {
   return toLocale((user as { locale?: unknown }).locale);
 }
 
-/**
- * Sends a transactional email through `IEmailService` and surfaces failures
- * as a thrown `Error`, the only signal available inside BetterAuth's
- * `async () => void` hook signature. Transport-not-configured is downgraded
- * to a warning (dev/test without Resend configured should not crash).
- */
-export async function dispatchEmail<K extends keyof EmailTemplates>(
+export type DispatchEmail = <K extends keyof EmailTemplates>(
   template: K,
   to: string,
   variables: EmailTemplates[K] & TemplateVariables,
   idempotencyKey: string,
   locale: Locale,
-): Promise<void> {
-  const result = await di.IEmailService.sendTemplate(template, to, variables, {
-    idempotencyKey,
-    locale,
-  });
-  if (result.isFailure) {
-    const error = result.getError();
-    if (error.code === "EMAIL_PROVIDER_FAILURE") {
-      // BetterAuth hook signature is `async () => void`, no Result propagation possible; throw is the only signal.
-      throw new Error(`email send failed (${template}): ${error.message}`);
+) => Promise<void>;
+
+export function createMailer(deps: Pick<AuthDeps, "email" | "policies" | "logger">): {
+  dispatchEmail: DispatchEmail;
+  acceptStalePoliciesAtFirstVerification(userId: string): Promise<void>;
+} {
+  /**
+   * Sends a transactional email through `IEmailService` and surfaces failures
+   * as a thrown `Error`, the only signal available inside BetterAuth's
+   * `async () => void` hook signature. Transport-not-configured is downgraded
+   * to a warning (dev/test without Resend configured should not crash).
+   */
+  const dispatchEmail: DispatchEmail = async (template, to, variables, idempotencyKey, locale) => {
+    const result = await deps.email.sendTemplate(template, to, variables, {
+      idempotencyKey,
+      locale,
+    });
+    if (result.isFailure) {
+      const error = result.getError();
+      if (error.code === "EMAIL_PROVIDER_FAILURE") {
+        // BetterAuth hook signature is `async () => void`, no Result propagation possible; throw is the only signal.
+        throw new Error(`email send failed (${template}): ${error.message}`);
+      }
+      deps.logger.warn(
+        { template, to, code: error.code },
+        "email skipped, transport not configured",
+      );
     }
-    logger.warn({ template, to, code: error.code }, "email skipped, transport not configured");
-  }
+  };
+
+  const acceptStalePoliciesAtFirstVerification = async (userId: string): Promise<void> => {
+    const stale = await deps.policies.getStaleTypes(userId);
+    if (stale.isFailure) {
+      deps.logger.error(
+        { err: stale.getError(), userId },
+        "policy staleness check failed at verify-email",
+      );
+      return;
+    }
+    if (stale.getValue().length === 0) return;
+
+    const ip = requestClientIp() ?? undefined;
+    const recorded = await deps.policies.accept(userId, stale.getValue(), ip);
+    if (recorded.isFailure) {
+      deps.logger.error(
+        { err: recorded.getError(), userId },
+        "policy acceptance failed at verify-email",
+      );
+    }
+  };
+
+  return { dispatchEmail, acceptStalePoliciesAtFirstVerification };
 }
 
-export async function acceptStalePoliciesAtFirstVerification(userId: string): Promise<void> {
-  const stale = await di.PolicyAcceptanceService.getStaleTypes(userId);
-  if (stale.isFailure) {
-    logger.error(
-      { err: stale.getError(), userId },
-      "policy staleness check failed at verify-email",
-    );
-    return;
-  }
-  if (stale.getValue().length === 0) return;
+export interface EmailUser {
+  id: string;
+  email: string;
+  name: string;
+}
 
-  const ip = requestClientIp() ?? undefined;
-  const recorded = await di.PolicyAcceptanceService.accept(userId, stale.getValue(), ip);
-  if (recorded.isFailure) {
-    logger.error({ err: recorded.getError(), userId }, "policy acceptance failed at verify-email");
-  }
+export interface EmailFlows {
+  sendChangeEmailConfirmation(data: {
+    user: EmailUser;
+    newEmail: string;
+    url: string;
+    token: string;
+  }): Promise<void>;
+  sendResetPassword(data: { user: EmailUser; token: string }): Promise<void>;
+  beforeEmailVerification(user: { id: string }): Promise<void>;
+  sendVerificationEmail(data: { user: EmailUser; url: string; token: string }): Promise<void>;
+  sendMagicLink(data: { email: string; token: string; url: string }): Promise<void>;
+}
+
+export function createEmailFlows(
+  deps: Pick<AuthDeps, "uow" | "profiles" | "settings">,
+  parts: {
+    emit: Emit;
+    dispatchEmail: DispatchEmail;
+    acceptStalePoliciesAtFirstVerification: (userId: string) => Promise<void>;
+  },
+): EmailFlows {
+  const { emit, dispatchEmail, acceptStalePoliciesAtFirstVerification } = parts;
+  const { appUrl, adminUrl } = deps.settings;
+
+  return {
+    sendChangeEmailConfirmation: async ({ user, newEmail, url, token }) => {
+      await deps.uow.run(async () => {
+        await setPendingEmail(user.id, newEmail);
+        await emit(
+          EventTypes.USER_EMAIL_CHANGE_REQUESTED,
+          "user",
+          user.id,
+          { userId: user.id, newEmail },
+          null,
+        );
+      });
+      await dispatchEmail(
+        "change_email",
+        user.email,
+        { name: user.name ?? "", newEmail, confirmUrl: url },
+        tokenIdempotencyKey("change-email", token),
+        localeOf(user),
+      );
+    },
+
+    sendResetPassword: async ({ user, token }) => {
+      const resetUrl = `${appUrl}/reset-password?token=${encodeURIComponent(token)}`;
+      await emit(EventTypes.USER_PASSWORD_RESET_REQUESTED, "user", user.id, {
+        userId: user.id,
+        email: user.email,
+      });
+      await dispatchEmail(
+        "reset_password",
+        user.email,
+        { name: user.name ?? "", resetUrl },
+        tokenIdempotencyKey("reset-password", token),
+        localeOf(user),
+      );
+      markPasswordResetDelivered();
+    },
+
+    beforeEmailVerification: async (user) => {
+      await acceptStalePoliciesAtFirstVerification(user.id);
+    },
+
+    sendVerificationEmail: async ({ user, url, token }) => {
+      const verifyUrl = `${appUrl}/verify-email?token=${encodeURIComponent(token)}${redirectQuery(url, adminUrl)}`;
+      await dispatchEmail(
+        "verify_email",
+        user.email,
+        { name: user.name ?? "", verifyUrl },
+        tokenIdempotencyKey("verify-email", token),
+        localeOf(user),
+      );
+    },
+
+    sendMagicLink: async ({ email, token, url }) => {
+      const magicUrl = `${appUrl}/magic-link?token=${encodeURIComponent(token)}${redirectQuery(url, adminUrl)}`;
+      await emit(EventTypes.USER_MAGIC_LINK_REQUESTED, "user", email, { email });
+      await dispatchEmail(
+        "magic_link",
+        email,
+        { magicUrl },
+        tokenIdempotencyKey("magic-link", token),
+        await localeForEmail(deps.profiles, email),
+      );
+    },
+  };
 }

@@ -1,8 +1,8 @@
 import type { GenericEndpointContext } from "better-auth";
 import { APIError } from "better-auth/api";
-import { di } from "../container";
 import { SCIM_PATHS } from "../shared/auth/sso-paths";
 import { getClientIp, getVisitorGeo } from "../shared/request-context";
+import type { AuthDeps } from "./deps";
 
 /**
  * Client IP for event payloads and compliance records, as resolved by the
@@ -14,17 +14,23 @@ export function requestClientIp(): string | null {
   return getClientIp()?.slice(0, 45) ?? null;
 }
 
-export async function refuseDeniedVisitor(path: string, actorUserId: string | null): Promise<void> {
-  const refusal = await di.SecuritySignalsService.refuseDenied({
-    visitor: getVisitorGeo(),
-    ip: requestClientIp(),
-    path,
-    actorUserId,
-  });
-  if (refusal.isSuccess) return;
+export function createVisitorGuard(deps: Pick<AuthDeps, "securitySignals">): {
+  refuseDeniedVisitor(path: string, actorUserId: string | null): Promise<void>;
+} {
+  return {
+    async refuseDeniedVisitor(path, actorUserId) {
+      const refusal = await deps.securitySignals.refuseDenied({
+        visitor: getVisitorGeo(),
+        ip: requestClientIp(),
+        path,
+        actorUserId,
+      });
+      if (refusal.isSuccess) return;
 
-  const { code, message } = refusal.getError();
-  throw new APIError("FORBIDDEN", { code, message });
+      const { code, message } = refusal.getError();
+      throw new APIError("FORBIDDEN", { code, message });
+    },
+  };
 }
 
 export function renewsOwnSession(context: GenericEndpointContext | null, userId: string): boolean {

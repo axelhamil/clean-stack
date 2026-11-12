@@ -12,10 +12,12 @@ const issueToken = mock(async () =>
   Result.ok({ token: "scim-token", expiresAt: new Date("2027-01-01T00:00:00Z") }),
 );
 
+mock.module("../../../auth", () => ({
+  auth: { api: { getSession: mock(async () => null) } },
+}));
+
 mock.module("../../../container", () => ({
   di: {
-    // requireAuth loads auth/, which resolves the plan catalog once at import.
-    BillingCatalogService: { getCatalog: async () => [] },
     PolicyAcceptanceService: { hasAcceptedCurrent: async () => Result.ok(true) },
     EntitlementsService: {
       getEntitlements: async () => ({ tier, status: "active", ...entitlementsForTier(tier) }),

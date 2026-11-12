@@ -1,8 +1,8 @@
-import { type AppError, type ILogger, Option, Result } from "@packages/ddd-kit";
+import { type ILogger, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { emitEventBestEffort } from "@packages/outbox/event-emitter";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
-import type { VisitorGeo } from "../ports/ip-geo.port";
+import type { GeoDeniedError, VisitorGeo } from "../ports/ip-geo.port";
 import type { ISessionGeoStore } from "../ports/session-geo.port";
 
 export interface SecuritySignalsConfig {
@@ -10,8 +10,6 @@ export interface SecuritySignalsConfig {
   denyAsns: readonly string[];
   impossibleTravelWindowMinutes?: number;
 }
-
-export type GeoDeniedError = AppError<"SECURITY_GEO_FORBIDDEN">;
 
 const GEO_DENIED: GeoDeniedError = {
   code: "SECURITY_GEO_FORBIDDEN",

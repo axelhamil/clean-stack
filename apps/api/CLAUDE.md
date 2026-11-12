@@ -27,13 +27,17 @@ apps/api/src/
   cron/                         Standalone cron entrypoints (`sweep.ts`, `rgpd-sweep.ts`, `flush-notification-emails.ts`) over one runner (`internal-job.ts`), each its own process, see `docs/CRON.md`
   container.ts                  Composition root: `.add()` cross-cutting + `.addModule()` per context + `.build()`
   composition/                  Host side of the module contract, see "DI" below
-    settings.ts                 `apiSettings(env)`: env mapped once onto each module's typed settings
-    sources/<consumer>.ts       Binds a port a module declares to what the host or another module provides
+    settings.ts                 `apiSettings(env)`: env mapped once onto each module's typed settings and onto `authSettings`
+    sources/<consumer>.ts       Binds a port a module declares to what the host or another module provides; `sources/auth.ts` binds the ports `auth/` declares and assembles the `authDeps` key
     route-guards.ts             `routeGuards`: the `RouteGuards` of `@packages/http` built from `shared/middleware`
-  auth/                         BetterAuth singleton, deliberate exception to the modules rule (config-as-code, the lib owns the model). Routes auto-mount via the plugin (`/api/auth/*`).
-    index.ts                    `authOptions`, the `plugins` array in its load-bearing order, `export const auth`, `SessionUser` / `SessionData`
-    plugins/<name>.ts           One file per plugin with hooks or helpers of its own (`stripe`, `organization`, `sso`, `scim`, `clear-expired-ban`, `security-signals`)
-    hooks/{before,after,database}.ts   The top-level `hooks.before` / `hooks.after` / `databaseHooks`
+  auth/                         BetterAuth singleton, deliberate exception to the modules rule (config-as-code, the lib owns the model). Routes auto-mount via the plugin (`/api/auth/*`). Every file below `index.ts` reads its collaborators and settings from `AuthDeps`, never from the container or the env, so a guard test builds a real instance with `createAuth(fakeAuthDeps(...))` instead of mocking the container.
+    index.ts                    The only file in `auth/` importing the container: `export const auth = createAuth(di.authDeps)`, `SessionUser` / `SessionData`
+    create-auth.ts              `createAuth(deps)`: the options and the `plugins` array in its load-bearing order
+    deps.ts                     `AuthDeps` (every collaborator and setting `auth/` reads) and `AuthSettings`
+    ports.ts                    The ports `auth/` declares for the services it consumes that no shared port covers
+    helpers.ts                  `createAuthHelpers(deps)`: the helpers below, built once per instance and handed to plugins and hooks
+    plugins/<name>.ts           One factory over `(deps, helpers)` per plugin with hooks or helpers of its own (`stripe`, `organization`, `sso`, `scim`, `clear-expired-ban`, `security-signals`)
+    hooks/{before,after,database}.ts   Factories over `(deps, helpers)` for the top-level `hooks.before` / `hooks.after` / `databaseHooks`
     emit.ts, email.ts, visitor.ts, snapshots.ts, personal-org.ts, entitlements.ts, seats.ts, scim-events.ts   Helpers shared by the files above; a plugin file never imports another plugin file and a hook never imports a plugin file
     queries.ts                  Typed Drizzle data access for the bridge, plain functions (no port, DI or aggregate: auth is not domain), reading `resolveExecutor()`. Keeps `auth/` config + event wiring only, never inline `db.*`.
   app.ts                        `Hono` construction, chained `.route()` mounts, middleware, `export const routes` / `export type AppType`. No server boot.
@@ -120,7 +124,7 @@ export const fooModule = defineModule<FooPrerequisites>()((b) =>
 ```
 
 1. **`defineModule<<Name>Prerequisites>()` with its explicit generic, never the global `AppDeps` augmentation.** **Why**: a module typed against `AppDeps` sees every key of every other module, so its real dependencies are invisible and it cannot be type-checked outside the app that augments it, which a module living in its own package must be. Modules still on `AppDeps` are migrating; while one of them reads a key a migrated module provides, it declares that key in its own augmentation, never the provider.
-2. **Every host binding a module receives lives in `composition/`**: env mapped to typed settings in `settings.ts`, a consumer's port bound in `sources/<consumer>.ts` (`.add("IBarLookup", (c) => c.BarDirectory)`), and `app.ts` hands each route factory `di.scope({ routeGuards, ... })`, which also carries the host pieces a route needs beyond the container (`internalGuards`, the sweep runner, a route-specific rate limit, `IAuthProvider` bound to the auth instance). The module side of that contract is `modules/CLAUDE.md`. **Why**: the wiring of every context reads in one folder, so removing a module or a provider fails `tsc` at exactly the lines that named it.
+2. **Every host binding a module receives lives in `composition/`**: env mapped to typed settings in `settings.ts`, a consumer's port bound in `sources/<consumer>.ts` (`.add("IBarLookup", (c) => c.BarDirectory)`), `auth/` included (its `AuthDeps` is the `authDeps` key of `sources/auth.ts`), and `app.ts` hands each route factory `di.scope({ routeGuards, ... })`, which also carries the host pieces a route needs beyond the container (`internalGuards`, the sweep runner, a route-specific rate limit, `IAuthProvider` bound to the auth instance). The module side of that contract is `modules/CLAUDE.md`. **Why**: the wiring of every context reads in one folder, so removing a module or a provider fails `tsc` at exactly the lines that named it.
 3. **`scope`, never `extend`, to hand the container more keys.** `extend` copies the resolved cache, so a binding resolved after it exists twice (a stateful hub would split); `scope` delegates to the parent. `routeGuards` is not in `container.ts` because the middlewares it wraps import `di` (cycle).
 4. **Use `typeof di`** for the runtime shape after `.build()`, not the global `AppDeps` interface.
 5. **All deps via DI**; never `new` a collaborator outside the container (it bypasses the container and breaks per-test impl swaps). No service locators: a route reads `deps`, a test passes a plain `deps` object (`openRouteGuards()` from `@packages/http/testing/route-guards`).

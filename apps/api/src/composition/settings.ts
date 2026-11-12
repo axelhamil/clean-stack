@@ -14,7 +14,9 @@ import type {
 import type { WebhookSettings } from "@modules/webhooks/application/config/webhook-settings";
 import { Option } from "@packages/ddd-kit";
 import { defineModule } from "inwire";
+import type { AuthSettings } from "../auth/deps";
 import type { env } from "../shared/env";
+import { frontOrigins } from "../shared/env-bounds";
 
 type SettingsSource = Pick<
   typeof env,
@@ -58,6 +60,16 @@ type SettingsSource = Pick<
   | "AUDIT_TAMPER_EVIDENCE"
   | "NOTIFICATION_DIGEST_HOUR_UTC"
   | "DATABASE_URL"
+  | "BETTER_AUTH_URL"
+  | "BETTER_AUTH_SECRET"
+  | "BETTER_AUTH_SECRETS"
+  | "CORS_ORIGIN"
+  | "ADMIN_URL"
+  | "AUTH_COOKIE_DOMAIN"
+  | "SCIM_CREDENTIAL_HASH_SECRET"
+  | "AUTH_SIGN_IN_ACCOUNT_WINDOW_SEC"
+  | "AUTH_SIGN_IN_ACCOUNT_MAX"
+  | "DISPOSABLE_EMAIL_BLOCK_ENABLED"
 >;
 
 function storageSettingsOf(source: SettingsSource): StorageSettings {
@@ -133,6 +145,26 @@ export const apiSettings = (source: SettingsSource) => {
     digestHourUtc: source.NOTIFICATION_DIGEST_HOUR_UTC,
     databaseUrl: source.DATABASE_URL,
   };
+  const authSettings: AuthSettings = {
+    appUrl: source.APP_URL,
+    adminUrl: source.ADMIN_URL,
+    baseUrl: source.BETTER_AUTH_URL,
+    secret: source.BETTER_AUTH_SECRET,
+    secrets: source.BETTER_AUTH_SECRETS,
+    cookieDomain: source.AUTH_COOKIE_DOMAIN,
+    production: source.NODE_ENV === "production",
+    trustedOrigins: frontOrigins(source),
+    platformAdminIds: source.PLATFORM_ADMIN_IDS,
+    stripeWebhookSecret: source.STRIPE_WEBHOOK_SECRET ?? "",
+    scimCredentialHashSecret:
+      source.SCIM_CREDENTIAL_HASH_SECRET ??
+      "dev-only-scim-credential-secret-not-for-production-use",
+    signInAccount: {
+      windowSec: source.AUTH_SIGN_IN_ACCOUNT_WINDOW_SEC,
+      maxRequests: source.AUTH_SIGN_IN_ACCOUNT_MAX,
+    },
+    disposableEmailBlockEnabled: source.DISPOSABLE_EMAIL_BLOCK_ENABLED,
+  };
 
   return defineModule<Record<never, never>>()((b) =>
     b
@@ -146,6 +178,7 @@ export const apiSettings = (source: SettingsSource) => {
       .add("staffSettings", (): StaffEnv => staffSettings)
       .add("adminSettings", (): AdminSettings => adminSettings)
       .add("auditLogSettings", (): AuditLogSettings => auditLogSettings)
-      .add("notificationSettings", (): NotificationSettings => notificationSettings),
+      .add("notificationSettings", (): NotificationSettings => notificationSettings)
+      .add("authSettings", (): AuthSettings => authSettings),
   );
 };

@@ -177,7 +177,7 @@ The rolled back api still runs its migrator at start, which has nothing to apply
 
 ## 10. Domains, cookies and secrets
 
-**Cookie topology.** With `app.<domain>`, `api.<domain>` and `admin.<domain>` under one parent, the session cookie is same-site and `SameSite=Lax` would be enough; `auth/index.ts` sets `SameSite=None; Secure` in production, which works for both topologies. Platform domains under a public suffix are different sites: no `AUTH_COOKIE_DOMAIN` can span them, so `admin` needs your own domain in production.
+**Cookie topology.** With `app.<domain>`, `api.<domain>` and `admin.<domain>` under one parent, the session cookie is same-site and `SameSite=Lax` would be enough; `auth/create-auth.ts` sets `SameSite=None; Secure` in production, which works for both topologies. Platform domains under a public suffix are different sites: no `AUTH_COOKIE_DOMAIN` can span them, so `admin` needs your own domain in production.
 
 **`AUTH_COOKIE_DOMAIN` is off by default.** Once set, every host under that domain receives the session cookie: never set it if a subdomain serves user content or a third party. A public suffix, or a value that is not a parent of `APP_URL`, `BETTER_AUTH_URL` and `ADMIN_URL`, refuses the boot. Break-glass when a cookie change locks staff out: `PLATFORM_ADMIN_IDS` plus removing `AUTH_COOKIE_DOMAIN`.
 

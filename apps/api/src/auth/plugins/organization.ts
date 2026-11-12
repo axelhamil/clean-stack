@@ -1,17 +1,19 @@
 import { ac, isPersonalOrg, roles } from "@packages/access-control";
 import { EventTypes } from "@packages/events";
 import { organization } from "better-auth/plugins";
-import { di } from "../../container";
 import { organizationSeatGate } from "../../shared/auth/organization-seats";
-import { env } from "../../shared/env";
-import { dispatchEmail, localeOf, tokenIdempotencyKey } from "../email";
-import { emit } from "../emit";
+import type { AuthDeps } from "../deps";
+import { localeOf, tokenIdempotencyKey } from "../email";
+import type { AuthHelpers } from "../helpers";
 import { deleteOrgIfEmpty } from "../queries";
-import { seatCapFor } from "../seats";
 
-const assertSeatAvailableFor = organizationSeatGate(seatCapFor);
+export function organizationPlugin(
+  deps: Pick<AuthDeps, "uow" | "settings">,
+  helpers: Pick<AuthHelpers, "emit" | "dispatchEmail" | "seatCapFor">,
+) {
+  const { emit, dispatchEmail } = helpers;
+  const assertSeatAvailableFor = organizationSeatGate(helpers.seatCapFor);
 
-export function organizationPlugin() {
   return organization({
     ac,
     roles,
@@ -108,7 +110,7 @@ export function organizationPlugin() {
           org.id,
         );
         if (isPersonalOrg(org.slug)) return;
-        await di.ITransactionService.run(async () => {
+        await deps.uow.run(async () => {
           const deleted = await deleteOrgIfEmpty(org.id);
           if (!deleted) return;
           await emit(
@@ -181,7 +183,7 @@ export function organizationPlugin() {
       },
     },
     sendInvitationEmail: async ({ id, email, role, inviter, organization: org }) => {
-      const inviteUrl = `${env.APP_URL}/accept-invitation/${id}`;
+      const inviteUrl = `${deps.settings.appUrl}/accept-invitation/${id}`;
       // Rendered in the inviter's locale, not the invitee's: an invitee with
       // no account yet has no locale of their own to read.
       await dispatchEmail(

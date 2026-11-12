@@ -1,9 +1,8 @@
 import { type SCIMEndpoints, type SCIMPlugin, scim } from "@better-auth/scim";
 import { scimIdentityResolver, scimMembershipProjection } from "../../shared/auth/scim-membership";
-import { env } from "../../shared/env";
-import { hasSsoEntitlement } from "../entitlements";
+import type { AuthDeps } from "../deps";
+import type { AuthHelpers } from "../helpers";
 import { isVerifiedSsoDomainOf } from "../queries";
-import { seatCapFor } from "../seats";
 
 /**
  * `@better-auth/scim` leaks an unexported interface (`SCIMDiscoveryAttribute`)
@@ -18,21 +17,33 @@ export type ScimPluginWithoutDiscoveryTypes = Omit<SCIMPlugin, "endpoints"> & {
 
 // Exported for `scripts/check-scim-seats.ts`, which runs the real seat check against
 // Postgres under concurrent provisioning.
-export const scimMembershipDeps = { seatCapFor, isVerifiedSsoDomainOf, hasSsoEntitlement };
+export function scimMembershipDepsOf(
+  helpers: Pick<AuthHelpers, "seatCapFor" | "hasSsoEntitlement">,
+) {
+  return {
+    seatCapFor: helpers.seatCapFor,
+    isVerifiedSsoDomainOf,
+    hasSsoEntitlement: helpers.hasSsoEntitlement,
+  };
+}
 
 // Plugin-managed connections: one per organization, created, rotated and
 // decommissioned by `ScimConnectionService` behind the owner-only
 // `/settings/organization/scim-connection` routes. The organization id is the
 // provisioning domain, and the projection is what turns a directory's users into
 // members of it (the plugin itself knows nothing of organizations).
-export function scimPlugin(): ScimPluginWithoutDiscoveryTypes {
+export function scimPlugin(
+  deps: Pick<AuthDeps, "settings">,
+  helpers: Pick<AuthHelpers, "seatCapFor" | "hasSsoEntitlement">,
+): ScimPluginWithoutDiscoveryTypes {
+  const membershipDeps = scimMembershipDepsOf(helpers);
+
   return scim({
     connections: [],
     managedConnections: {
-      credentialHashSecret:
-        env.SCIM_CREDENTIAL_HASH_SECRET ?? "dev-only-scim-credential-secret-not-for-production-use",
+      credentialHashSecret: deps.settings.scimCredentialHashSecret,
     },
-    identity: scimIdentityResolver(scimMembershipDeps),
-    projection: scimMembershipProjection(scimMembershipDeps),
+    identity: scimIdentityResolver(membershipDeps),
+    projection: scimMembershipProjection(membershipDeps),
   });
 }

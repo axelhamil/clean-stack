@@ -1,30 +1,22 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import type { IEntitlementsReader } from "@modules/billing/application/ports/entitlements-reader.port";
+import { ENTITLEMENTS, type Feature } from "@modules/billing/domain/entitlements";
 import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
+import type { ISecuritySignals } from "../auth/ports";
 import type { IDisposableEmailService } from "../shared/ports/disposable-email.port";
 import type { IPasswordBreachService } from "../shared/ports/password-breach.port";
+import { fakeAuthDeps, outermostUnitOfWork } from "./fake-auth-deps";
 
 const outbox = mockPort<IOutboxRepository>();
 const breach = mockPort<IPasswordBreachService>();
 const disposable = mockPort<IDisposableEmailService>();
 const { unitOfWork } = mockUnitOfWork();
-let entitledFeatures: string[] = [];
-
-mock.module("../container", () => ({
-  di: {
-    BillingCatalogService: { getCatalog: async () => [] },
-    IOutboxRepository: outbox,
-    ITransactionService: unitOfWork,
-    IPasswordBreachService: breach,
-    IDisposableEmailService: disposable,
-    SecuritySignalsService: { refuseDenied: async () => Result.ok() },
-    EntitlementsService: { getEntitlements: async () => ({ features: entitledFeatures }) },
-  },
-}));
+let entitledFeatures: Feature[] = [];
 
 const clearExpiredBan = mock(async () => false);
 
@@ -35,7 +27,27 @@ mock.module("../auth/queries", () => ({
   enforcedProviderForDomain: async () => Option.none(),
 }));
 
-const { auth } = await import("../auth");
+const { createAuth } = await import("../auth/create-auth");
+const securitySignals = mockPort<ISecuritySignals>();
+securitySignals.refuseDenied.mockImplementation(async () => Result.ok());
+const entitlements = mockPort<IEntitlementsReader>();
+entitlements.getEntitlements.mockImplementation(async () => ({
+  ...ENTITLEMENTS.free,
+  tier: "free",
+  status: "free",
+  hasSubscription: false,
+  features: entitledFeatures,
+}));
+const auth = createAuth(
+  fakeAuthDeps({
+    outbox,
+    uow: outermostUnitOfWork(unitOfWork),
+    passwordBreach: breach,
+    disposableEmail: disposable,
+    securitySignals,
+    entitlements,
+  }),
+);
 const { IMPERSONATION_BLOCKED_PATHS } = await import(
   "../shared/middleware/impersonation-blocklist"
 );

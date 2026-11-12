@@ -32,6 +32,7 @@ import { container } from "inwire";
 import { Resend } from "resend";
 import { apiSettings } from "./composition/settings";
 import { adminSources } from "./composition/sources/admin";
+import { authSources } from "./composition/sources/auth";
 import { notificationsSources } from "./composition/sources/notifications";
 import { rgpdSources } from "./composition/sources/rgpd";
 import { healthModule } from "./modules/health/module";
@@ -212,6 +213,7 @@ export const di = container()
   .addModule(adminModule)
   .addModule(rgpdSources)
   .addModule(rgpdModule)
+  .addModule(authSources)
   .add(
     "OutboxDispatcher",
     (c) =>

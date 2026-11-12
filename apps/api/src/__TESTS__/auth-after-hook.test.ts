@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
+import type { ConsentError } from "@modules/consents/application/ports/consent.port";
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
 import { Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
@@ -8,21 +9,14 @@ import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { APIError } from "better-auth/api";
 import type { ITotpVerifier } from "../shared/ports/totp-verifier.port";
+import { fakeAuthDeps, outermostUnitOfWork } from "./fake-auth-deps";
 
 const outbox = mockPort<IOutboxRepository>();
 const totp = mockPort<ITotpVerifier>();
-const reconcile = mock(async (_subjectId: string, _userId: string) => Result.ok());
+const reconcile = mock(
+  async (_subjectId: string, _userId: string): Promise<Result<void, ConsentError>> => Result.ok(),
+);
 const { unitOfWork } = mockUnitOfWork();
-
-mock.module("../container", () => ({
-  di: {
-    BillingCatalogService: { getCatalog: async () => [] },
-    IOutboxRepository: outbox,
-    ITransactionService: unitOfWork,
-    ITotpVerifier: totp,
-    ConsentService: { reconcile },
-  },
-}));
 
 const realDrizzle = await import("@packages/drizzle");
 mock.module("@packages/drizzle", () => ({
@@ -72,7 +66,15 @@ mock.module("../auth/queries", () => ({
   insertPersonalOrgWithOwner,
 }));
 
-const { auth } = await import("../auth");
+const { createAuth } = await import("../auth/create-auth");
+const auth = createAuth(
+  fakeAuthDeps({
+    outbox,
+    uow: outermostUnitOfWork(unitOfWork),
+    totp,
+    consents: { reconcile },
+  }),
+);
 const { SCIM_PATHS, SSO_PATHS } = await import("../shared/auth/sso-paths");
 
 const SESSION = {
