@@ -1,3 +1,4 @@
+import { isBanLive } from "@packages/access-control";
 import {
   createDbFailure,
   type IInstrumentation,
@@ -63,8 +64,7 @@ type SessionSelection = Pick<
 >;
 
 function toUserRow(row: UserSelection): AdminUserRow {
-  const isBanOver = row.banExpires !== null && row.banExpires.getTime() <= Date.now();
-  const isBanned = row.banned === true && !isBanOver;
+  const isBanned = isBanLive(row.banned, row.banExpires, new Date());
 
   return {
     id: row.id,

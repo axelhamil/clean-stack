@@ -1,6 +1,7 @@
 import type { ApiScope } from "@modules/api-token/application/dto/create-token.dto";
 import type { IApiTokenRepository } from "@modules/api-token/application/ports/api-token.port";
 import { hmacToken, parseToken } from "@modules/api-token/domain/api-token-crypto";
+import { isBanLive } from "@packages/access-control";
 import type { IInstrumentation, ILogger, IUnitOfWork } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { emitEvent } from "@packages/outbox/event-emitter";
@@ -96,9 +97,7 @@ export function requireApiToken(
       throw new HTTPException(401, { message: "Unauthorized" });
     }
 
-    const isBanned =
-      userRow.banned === true && (userRow.banExpires === null || userRow.banExpires > now);
-    if (isBanned) {
+    if (isBanLive(userRow.banned, userRow.banExpires, now)) {
       throw new HTTPException(401, { message: "Unauthorized" });
     }
 
