@@ -62,7 +62,19 @@ describe("canonicalDeclaration", () => {
 
   it("keeps a union returned by a function type inside its return type", () => {
     expect(canonicalDeclaration("type F = (a: B | A) => D | C;")).toBe(
-      "type F = (a: A | B) => C | D",
+      "type F = (a: A | B) => C | D\n",
     );
+  });
+
+  it("reads its own output back unchanged, so a refreeze of an unchanged api is a no-op", () => {
+    const frozen = canonicalDeclaration(routes([me, billing]));
+
+    expect(canonicalDeclaration(frozen)).toBe(frozen);
+  });
+
+  it("never names the local path a type was emitted from", () => {
+    const frozen = canonicalDeclaration('type T = { a: import("./shared/ports/x.port").X; };');
+
+    expect(frozen).not.toContain("./shared");
   });
 });

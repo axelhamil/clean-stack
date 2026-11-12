@@ -148,8 +148,59 @@ function canonicalStatement(text: string): string {
 
 const LOCAL_SPECIFIER = /(import\(|from )"(\.{1,2}\/|@modules\/)[^"]*"/g;
 
+const INDENT = "  ";
+
+function brokenAtBraces(canonical: string): string {
+  let printed = "";
+  let depth = 0;
+  let index = 0;
+  const newline = () => `\n${INDENT.repeat(depth)}`;
+
+  while (index < canonical.length) {
+    const char = canonical[index] ?? "";
+
+    if (QUOTES.has(char)) {
+      const end = stringEnd(canonical, index);
+      printed += canonical.slice(index, end + 1);
+      index = end + 1;
+      continue;
+    }
+
+    if (canonical.startsWith("{}", index)) {
+      printed += "{}";
+      index += 2;
+      continue;
+    }
+
+    if (depth > 0 && canonical.startsWith("; ", index)) {
+      printed += `;${newline()}`;
+      index += 2;
+      continue;
+    }
+
+    index++;
+
+    if (char === "{") {
+      depth++;
+      printed += `{${newline()}`;
+      continue;
+    }
+
+    if (char === "}") {
+      depth--;
+      printed += `${newline()}}`;
+      continue;
+    }
+
+    printed += char;
+  }
+
+  return printed;
+}
+
 export function canonicalDeclaration(declaration: string): string {
   const located = declaration.replace(/\s+/g, " ").replace(LOCAL_SPECIFIER, '$1"<local>"');
+  const canonical = splitTopLevel(located, ";").map(canonicalStatement).join(";\n");
 
-  return splitTopLevel(located, ";").map(canonicalStatement).join(";\n");
+  return `${brokenAtBraces(canonical)}\n`;
 }
