@@ -13,10 +13,19 @@ export function buildPurgeFilter(cutoff: Date): SQL {
   return requireFilter(and(isNotNull(event.dispatchedAt), lt(event.dispatchedAt, cutoff)), LABEL);
 }
 
-const isForeignKeyViolation = (err: unknown): boolean =>
-  err instanceof Error &&
-  (err.message.includes("violates foreign key constraint") ||
-    ("code" in err && (err as { code: string }).code === "23503"));
+// 23503 foreign_key_violation, 23001 restrict_violation: an `ON DELETE RESTRICT`
+// reference raises the latter. The driver error sits under the query builder's `cause`.
+const FOREIGN_KEY_SQLSTATES = new Set(["23503", "23001"]);
+
+const isForeignKeyViolation = (err: unknown, seen = new Set<Error>()): boolean => {
+  if (!(err instanceof Error) || seen.has(err)) return false;
+  if ("code" in err && typeof err.code === "string" && FOREIGN_KEY_SQLSTATES.has(err.code)) {
+    return true;
+  }
+
+  seen.add(err);
+  return isForeignKeyViolation(err.cause, seen);
+};
 
 export const sweepOutboxRoutes = tableSweepRoute({
   label: LABEL,
