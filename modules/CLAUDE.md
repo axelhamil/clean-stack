@@ -10,7 +10,7 @@ modules/<name>/
   tsconfig.json       noEmit
   bunfig.toml         preload from @packages/test, only when a test needs one
   schemas/            the tables this module owns
-  scripts/            check-*.ts against a real database, about this module only
+  scripts/            check-*.ts against a real database, about this module only, on the generic harness of @packages/test; a module has no .env, DATABASE_URL comes from the shell
   src/
     <name>.module.ts  defineModule<<Name>Prerequisites>()
     domain/  application/{ports,services,use-cases,dto,event-handlers}  infrastructure/{repositories,adapters,http}

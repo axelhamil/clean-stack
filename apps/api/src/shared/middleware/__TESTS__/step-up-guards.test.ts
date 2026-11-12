@@ -1,7 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { type AppError, Option, Result } from "@packages/ddd-kit";
+import { type AppError, NoOpInstrumentation, Option, Result } from "@packages/ddd-kit";
 import { Hono } from "hono";
-import { NoOpInstrumentation } from "../../services/noop-instrumentation";
 import { createErrorHandler } from "../error.middleware";
 import { stepUpGuards } from "../step-up-guards";
 

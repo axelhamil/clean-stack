@@ -1,4 +1,4 @@
-import { requireLocalDatabase } from "./require-local-database";
+import { requireLocalDatabase } from "@packages/test/require-local-database";
 
 requireLocalDatabase("check-email-lease");
 
@@ -6,8 +6,13 @@ import { uuidv7 } from "@packages/ddd-kit";
 import { db, emailSchema, eq, inArray, like } from "@packages/drizzle";
 import { DrizzleEmailQueue } from "@packages/email/drizzle-email-queue";
 import type { EmailClaimRequest, EmailMessageRecord } from "@packages/email/email-queue.port";
+import {
+  checkRun,
+  probeClaims,
+  recordingInstrumentation,
+  withClockAhead,
+} from "@packages/test/check-harness";
 import { logger } from "../src/shared/logger";
-import { checkRun, probeClaims, recordingInstrumentation, withClockAhead } from "./check-harness";
 
 const PROBE = `check-email-lease-${crypto.randomUUID()}`;
 const HOUR_MS = 3_600_000;

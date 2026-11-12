@@ -20,6 +20,8 @@ import {
   outboxSchema,
 } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
+import { checkRecorder } from "@packages/test/check-harness";
+import { requireLocalDatabase } from "@packages/test/require-local-database";
 import { Hono } from "hono";
 import { app } from "../src/app";
 import { deleteOrgIfEmpty } from "../src/auth/queries";
@@ -27,8 +29,6 @@ import { di } from "../src/container";
 import { env } from "../src/shared/env";
 import { requireFeature, requirePlan } from "../src/shared/middleware/billing.middleware";
 import { adminProbes, appCall, codeOf, freshIp } from "./admin-probes";
-import { checkRecorder } from "./check-harness";
-import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-admin-accounts");
 

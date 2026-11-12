@@ -22,7 +22,8 @@
     "check": "biome check .",
     "fix": "biome check --write .",
     "type-check": "tsc --noEmit",
-    "test": "bun test --isolate"
+    "test": "bun test --isolate",
+    "check:webhook-lease": "bun scripts/check-webhook-lease.ts"
   },
   "dependencies": {
     "@noble/ciphers": "^2.4.0",

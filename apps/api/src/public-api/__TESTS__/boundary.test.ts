@@ -4,7 +4,7 @@ import type {
   IApiTokenRepository,
 } from "@modules/api-token/application/ports/api-token.port";
 import { generateToken, hmacToken } from "@modules/api-token/domain/api-token-crypto";
-import { type ILogger, Option, Result } from "@packages/ddd-kit";
+import { type ILogger, NoOpInstrumentation, Option, Result } from "@packages/ddd-kit";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { Hono } from "hono";
@@ -16,7 +16,6 @@ import type {
   RateLimitDecision,
   RateLimitError,
 } from "../../shared/ports/rate-limiter.port";
-import { NoOpInstrumentation } from "../../shared/services/noop-instrumentation";
 import { createPublicApiV1 } from "../index";
 
 // ── Module mocks (only auth surface, no container/env/rate-limit.ip) ─────

@@ -7,35 +7,32 @@
  */
 
 import { Writable } from "node:stream";
-import type { IInstrumentation, Result } from "@packages/ddd-kit";
+import { type IInstrumentation, NoOpInstrumentation, type Result } from "@packages/ddd-kit";
 import { authSchema, db, eq } from "@packages/drizzle";
-import { symmetricEncrypt } from "better-auth/crypto";
-import { Hono } from "hono";
-import { pinoLogger } from "hono-pino";
-import { pino } from "pino";
-import { authSecretKey } from "../src/auth/auth-secrets";
-import { env } from "../src/shared/env";
 import {
   buildSignatureHeader,
   canonicalize,
   SIGNATURE_HEADER,
   sign,
-} from "../src/shared/internal-routes/internal-signature";
-import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
-import { seedEmail } from "./seed-account";
+} from "@packages/http/internal-signature";
+import { Hono } from "hono";
+import { pinoLogger } from "hono-pino";
+import { type Logger, pino } from "pino";
 
-export async function seedTwoFactor(
-  userId: string,
-  secret: string,
-  verified: boolean,
-): Promise<void> {
-  await db.insert(authSchema.twoFactor).values({
-    id: `${userId}-two-factor`,
-    userId,
-    secret: await symmetricEncrypt({ key: authSecretKey(env), data: secret }),
-    backupCodes: "[]",
-    verified,
-  });
+/**
+ * The account `pnpm --filter api db:seed` creates, and the target every
+ * `check-*.ts` script that needs a real user resolves against.
+ *
+ * Single source of truth on purpose: the seed and the checks used to carry
+ * their own literal, they drifted, and `check:fanout` threw on every fresh
+ * clone, a verification gate that does not run is a gate that does not exist.
+ * `SEED_EMAIL` overrides both together or neither.
+ */
+const SEED_EMAIL_FALLBACK = "dev@example.com";
+
+export function seedEmail(): string {
+  const override = process.env.SEED_EMAIL?.trim();
+  return override && override.length > 0 ? override : SEED_EMAIL_FALLBACK;
 }
 
 export interface CheckRecorder {
@@ -189,10 +186,8 @@ export async function signedInternalRequest(
   app: Hono,
   path: string,
   body: unknown,
+  key: string,
 ): Promise<Response> {
-  const key = env.INTERNAL_SIGNING_KEY;
-  if (!key) throw new Error("INTERNAL_SIGNING_KEY is not set, cannot sign a request");
-
   const rawBody = JSON.stringify(body);
   const timestamp = Math.floor(Date.now() / 1000);
   const signature = await sign(
@@ -216,4 +211,8 @@ export async function signedInternalRequest(
     },
     body: rawBody,
   });
+}
+
+export function silentLogger(): Logger {
+  return pino({ level: "silent" });
 }

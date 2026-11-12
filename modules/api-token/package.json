@@ -23,7 +23,8 @@
     "check": "biome check .",
     "fix": "biome check --write .",
     "type-check": "tsc --noEmit",
-    "test": "bun test --isolate"
+    "test": "bun test --isolate",
+    "check:api-token-visibility": "bun scripts/check-api-token-visibility.ts"
   },
   "dependencies": {
     "@packages/ddd-kit": "workspace:*",

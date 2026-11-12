@@ -11,7 +11,7 @@
  * which a mocked executor never evaluates.
  */
 
-import { requireLocalDatabase } from "./require-local-database";
+import { requireLocalDatabase } from "@packages/test/require-local-database";
 
 requireLocalDatabase("check-outbox-lease");
 
@@ -28,9 +28,9 @@ import {
 } from "@packages/outbox/drizzle-outbox.repository";
 import { emitEvent } from "@packages/outbox/event-emitter";
 import type { OutboxRecord } from "@packages/outbox/outbox.port";
+import { checkRun, recordingInstrumentation } from "@packages/test/check-harness";
 import { Client } from "pg";
 import { buildPurgeFilter } from "../src/shared/internal-routes/sweep-outbox.route";
-import { checkRun, recordingInstrumentation } from "./check-harness";
 
 const PROBE = `check.outbox-lease.${crypto.randomUUID()}`;
 const TYPE_A = `${PROBE}.a`;

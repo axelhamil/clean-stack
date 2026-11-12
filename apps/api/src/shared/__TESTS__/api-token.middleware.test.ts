@@ -4,6 +4,7 @@ import { generateToken, hmacToken } from "@modules/api-token/domain/api-token-cr
 import {
   type IInstrumentation,
   type ILogger,
+  NoOpInstrumentation,
   Option,
   Result,
   UnitOfWorkContext,
@@ -12,7 +13,6 @@ import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { Hono } from "hono";
-import { NoOpInstrumentation } from "../services/noop-instrumentation";
 
 const PREFIX = "clean_";
 const PEPPER = "a".repeat(32);

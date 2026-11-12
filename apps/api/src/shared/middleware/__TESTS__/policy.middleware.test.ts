@@ -1,8 +1,7 @@
 import { describe, expect, it, mock } from "bun:test";
-import { Result } from "@packages/ddd-kit";
+import { NoOpInstrumentation, Result } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
-import { NoOpInstrumentation } from "../../services/noop-instrumentation";
 import { createErrorHandler } from "../error.middleware";
 
 const noopInstrumentation = new NoOpInstrumentation();

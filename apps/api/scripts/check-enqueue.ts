@@ -17,17 +17,16 @@
  * This script is that proof.
  */
 
-import { checkRecorder } from "./check-harness";
-import { requireLocalDatabase } from "./require-local-database";
+import { checkRecorder } from "@packages/test/check-harness";
+import { requireLocalDatabase } from "@packages/test/require-local-database";
 
 requireLocalDatabase("check-enqueue");
 
-import { Option } from "@packages/ddd-kit";
+import { NoOpInstrumentation, Option } from "@packages/ddd-kit";
 import { db, emailSchema, inArray } from "@packages/drizzle";
 import { DrizzleEmailQueue } from "@packages/email/drizzle-email-queue";
 import type { EmailMessageInsert } from "@packages/email/email-queue.port";
 import { logger } from "../src/shared/logger";
-import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 
 const em = emailSchema.emailMessage;
 const MARKER = "check-enqueue";

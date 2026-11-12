@@ -10,6 +10,8 @@ import * as staffSchema from "@modules/admin/schemas/staff";
 import { Result } from "@packages/ddd-kit";
 import { authSchema, db, eq } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
+import { checkRecorder } from "@packages/test/check-harness";
+import { requireLocalDatabase } from "@packages/test/require-local-database";
 import { di } from "../src/container";
 import {
   type AdminProbe,
@@ -21,8 +23,6 @@ import {
   currentCounter,
   freshIp,
 } from "./admin-probes";
-import { checkRecorder } from "./check-harness";
-import { requireLocalDatabase } from "./require-local-database";
 
 requireLocalDatabase("check-admin-step-up");
 

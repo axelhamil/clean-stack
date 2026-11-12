@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { entitlementsForTier } from "@modules/billing/domain/entitlements";
 import type { Tier } from "@packages/access-control";
-import { Option, Result } from "@packages/ddd-kit";
+import { NoOpInstrumentation, Option, Result } from "@packages/ddd-kit";
 import { Hono } from "hono";
 import { createErrorHandler } from "../../shared/middleware/error.middleware";
-import { NoOpInstrumentation } from "../../shared/services/noop-instrumentation";
 
 let tier: Tier = "business";
 const disconnect = mock(async () => Result.ok());

@@ -10,6 +10,7 @@ src/
   error-handler.ts             `createErrorHandler({ instrumentation, logger, isProduction })`: the one `onError` envelope, the host binds its telemetry, logger and environment
   time-id-cursor.ts            keyset cursor on `(time, id)`: `timeIdCursorSchema` (decode), `encodeTimeIdCursor`, `afterTimeIdCursor` (`WHERE`), `exactInstant`
   route-guards.ts              `RouteGuards` contract, `RouteGuard`, `RouteEnv`
+  internal-signature.ts        HMAC-SHA256 signing of `/internal/*` requests: `canonicalize`, `sign`, `verify`, `buildSignatureHeader`, `parseSignatureHeader`, shared by the host verifier, its signed fetch and the real-database checks
   private-ranges.ts            `PRIVATE_V4`, `PRIVATE_V6`: the non routable ranges the client-ip resolver and the webhook URL guard both refuse
   sweep-runner.ts              `runRetentionSweep`, `runBatchedSweep`, `sweepBodySchema`, `releaseLease`: the batched, time-boxed, single-flight sweep loop
   sweep-heartbeat.ts           `withSweepHeartbeat`, `beatOfSweep`: one `SweepRun` row per run

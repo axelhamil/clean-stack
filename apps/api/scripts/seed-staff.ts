@@ -2,8 +2,8 @@ import * as staffSchema from "@modules/admin/schemas/staff";
 import { authSchema, db, eq } from "@packages/drizzle";
 import { hashPassword } from "better-auth/crypto";
 import { di } from "../src/container";
-import { seedTwoFactor } from "./check-harness";
-import { requireSeedableDatabase } from "./require-local-database";
+import { seedTwoFactor } from "./check-seed";
+import { requireSeedableDatabase } from "./seed-guard";
 
 /**
  * Staff accounts for the back office gate and local work, written directly so no sign-up, email

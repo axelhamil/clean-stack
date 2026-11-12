@@ -8,19 +8,20 @@
  * Creates and removes its own probe user.
  */
 
-import { checkRecorder, seedTwoFactor } from "./check-harness";
-import { requireLocalDatabase } from "./require-local-database";
+import { checkRecorder } from "@packages/test/check-harness";
+import { requireLocalDatabase } from "@packages/test/require-local-database";
+import { seedTwoFactor } from "./check-seed";
 
 requireLocalDatabase("check-totp-enrolment");
 
 import { createOTP } from "@better-auth/utils/otp";
 import * as staffSchema from "@modules/admin/schemas/staff";
+import { NoOpInstrumentation } from "@packages/ddd-kit";
 import { authSchema, db, eq } from "@packages/drizzle";
 import { authSecretKey } from "../src/auth/auth-secrets";
 import { TOTP_OPTIONS } from "../src/auth/totp-options";
 import { env } from "../src/shared/env";
 import { DrizzleTotpVerifier } from "../src/shared/services/drizzle-totp-verifier";
-import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 
 const userId = `check-totp-enrolment-${crypto.randomUUID()}`;
 const totpSecret = `check-totp-enrolment-secret-${crypto.randomUUID()}`;

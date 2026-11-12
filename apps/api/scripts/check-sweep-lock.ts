@@ -11,9 +11,12 @@
 // reference shape. Run: `pnpm --filter api check:sweep-lock`, re-run after any change to
 // sweep-lock.ts (see docs/FEATURES.md and docs/REMOVABILITY.md).
 
+import { NoOpInstrumentation } from "@packages/ddd-kit";
 import { db, eq, resolveExecutor, sql, sweepSchema } from "@packages/drizzle";
 import { purgeBatchWithTimeout } from "@packages/drizzle/sweep-purge";
 import { sweepSpans } from "@packages/drizzle/sweep-span";
+import { checkRecorder, internalApp } from "@packages/test/check-harness";
+import { requireLocalDatabase } from "@packages/test/require-local-database";
 import type { Hono } from "hono";
 import { di } from "../src/container";
 import { env } from "../src/shared/env";
@@ -28,9 +31,7 @@ import {
 import { sweepNotificationsRoutes } from "../src/shared/internal-routes/sweep-notifications.route";
 import { sweepOutboxRoutes } from "../src/shared/internal-routes/sweep-outbox.route";
 import { sweepWebhookDeliveryRoutes } from "../src/shared/internal-routes/sweep-webhook-delivery.route";
-import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
-import { checkRecorder, internalApp, signedInternalRequest } from "./check-harness";
-import { requireLocalDatabase } from "./require-local-database";
+import { signedInternalRequest } from "./check-seed";
 
 requireLocalDatabase("check-sweep-lock");
 

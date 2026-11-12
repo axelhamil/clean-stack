@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { requireSeedableDatabase } from "../require-local-database";
+import { requireSeedableDatabase } from "../seed-guard";
 
 describe("requireSeedableDatabase", () => {
   it.each(["localhost", "127.0.0.1", "postgres"])("accepts the host %s", (host) => {

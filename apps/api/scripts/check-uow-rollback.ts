@@ -10,12 +10,18 @@
  * together with the outbox row emitted in the same transaction.
  */
 
-import { checkRecorder } from "./check-harness";
-import { requireLocalDatabase } from "./require-local-database";
+import { checkRecorder } from "@packages/test/check-harness";
+import { requireLocalDatabase } from "@packages/test/require-local-database";
 
 requireLocalDatabase("check-uow-rollback");
 
-import { EventCollector, type IInstrumentation, match, Result } from "@packages/ddd-kit";
+import {
+  EventCollector,
+  type IInstrumentation,
+  match,
+  NoOpInstrumentation,
+  Result,
+} from "@packages/ddd-kit";
 import {
   ambientTransaction,
   authSchema,
@@ -31,7 +37,6 @@ import {
 import { EventTypes } from "@packages/events";
 import { DrizzleOutboxRepository } from "@packages/outbox/drizzle-outbox.repository";
 import { emitEvent } from "@packages/outbox/event-emitter";
-import { NoOpInstrumentation } from "../src/shared/services/noop-instrumentation";
 
 const instrumentation: IInstrumentation = new NoOpInstrumentation();
 const userId = `check-uow-rollback-${crypto.randomUUID()}`;

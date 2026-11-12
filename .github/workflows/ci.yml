@@ -82,7 +82,7 @@ jobs:
       DISPOSABLE_EMAIL_BLOCK_ENABLED: "false"
       # Pinned explicitly so the CI log states which account the checks run
       # against. Both db:seed and check:fanout resolve it through
-      # apps/api/scripts/seed-account.ts, which holds the same default, so
+      # packages/test/src/check-harness.ts, which holds the same default, so
       # they stay aligned whether or not this var is set.
       SEED_EMAIL: dev@example.com
       # check:sweep-lock and check:fanout sign requests against the ephemeral CI
@@ -124,7 +124,7 @@ jobs:
         # the replayable versus terminal dead_letter split and the release live in the
         # claim CTE and the settle WHERE, which a mocked executor never evaluates.
         # Seeds and removes its own tenant, endpoint and rows.
-        run: pnpm --filter api check:webhook-lease
+        run: pnpm --filter @modules/webhooks check:webhook-lease
 
       - name: Seed the audited account
         run: pnpm --filter api db:seed
@@ -142,7 +142,7 @@ jobs:
         # Same reason as check:fanout: `visibleTokensFilter` builds a WHERE
         # clause with and/or/eq/isNull, which a mocked tx never evaluates.
         # Needs the seed too.
-        run: pnpm --filter api check:api-token-visibility
+        run: pnpm --filter @modules/api-token check:api-token-visibility
 
       - name: Check the account-wipe rollback against a real database
         # Only a real db.transaction can prove Postgres rolled the wipe back when
@@ -291,7 +291,7 @@ jobs:
       DISPOSABLE_EMAIL_BLOCK_ENABLED: "false"
       # Pinned explicitly so the CI log states which account the checks run
       # against. Both db:seed and check:fanout resolve it through
-      # apps/api/scripts/seed-account.ts, which holds the same default, so
+      # packages/test/src/check-harness.ts, which holds the same default, so
       # they stay aligned whether or not this var is set.
       SEED_EMAIL: dev@example.com
       # check:sweep-lock and check:fanout sign requests against the ephemeral CI

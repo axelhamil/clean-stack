@@ -1,10 +1,9 @@
 import { afterEach, describe, expect, it, mock, setSystemTime } from "bun:test";
 import { createOTP } from "@better-auth/utils/otp";
-import { UnitOfWorkContext } from "@packages/ddd-kit";
+import { NoOpInstrumentation, UnitOfWorkContext } from "@packages/ddd-kit";
 import { type SecretConfig, symmetricEncrypt } from "better-auth/crypto";
 import { env } from "../../env";
 import { DrizzleTotpVerifier } from "../drizzle-totp-verifier";
-import { NoOpInstrumentation } from "../noop-instrumentation";
 
 const OTP = { period: 30, digits: 6 } as const;
 const NOW = new Date("2026-10-30T12:00:10Z");

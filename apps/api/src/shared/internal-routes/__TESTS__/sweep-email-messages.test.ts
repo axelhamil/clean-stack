@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
+import { NoOpInstrumentation } from "@packages/ddd-kit";
 import { sweepSpans } from "@packages/drizzle/sweep-span";
-import { NoOpInstrumentation } from "../../services/noop-instrumentation";
 import { buildEmailSweepPasses } from "../sweep-email-messages.route";
 
 describe("buildEmailSweepPasses", () => {

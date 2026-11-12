@@ -1,12 +1,16 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { type IDomainEvent, Result, UnitOfWorkContext } from "@packages/ddd-kit";
+import {
+  type IDomainEvent,
+  NoOpInstrumentation,
+  Result,
+  UnitOfWorkContext,
+} from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import { createErrorHandler } from "../../shared/middleware/error.middleware";
 import type { UserAccountError } from "../../shared/ports/user-account.port";
-import { NoOpInstrumentation } from "../../shared/services/noop-instrumentation";
 
 const { unitOfWork, outcome } = mockUnitOfWork();
 

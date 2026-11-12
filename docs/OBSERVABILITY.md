@@ -19,9 +19,9 @@ clean-stack ships error tracking + tracing primitives via Sentry on the API (`@s
 ```
 packages/ddd-kit/src/application/
   instrumentation.ts                   IInstrumentation { startSpan, capture, addBreadcrumb, setSpanAttributes, flush }
+  noop-instrumentation.ts              Silent passthrough, base of LoggingInstrumentation and default of tests and checks
 apps/api/src/shared/
   services/
-    noop-instrumentation.ts            Always-bound default, silent passthrough
     sentry-instrumentation.ts          Wraps Sentry.startSpan + captureException + addBreadcrumb
     sentry-init.ts                     Side-effect Sentry.init() at module load if SENTRY_DSN
 

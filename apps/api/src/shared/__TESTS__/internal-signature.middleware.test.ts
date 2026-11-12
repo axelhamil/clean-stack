@@ -1,12 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { Hono } from "hono";
-import { env } from "../env";
 import {
   buildSignatureHeader,
   canonicalize,
   SIGNATURE_HEADER,
   sign,
-} from "../internal-routes/internal-signature";
+} from "@packages/http/internal-signature";
+import { Hono } from "hono";
+import { env } from "../env";
 import { requireInternalSignature } from "../internal-routes/internal-signature.middleware";
 
 const KEY = env.INTERNAL_SIGNING_KEY ?? "";
