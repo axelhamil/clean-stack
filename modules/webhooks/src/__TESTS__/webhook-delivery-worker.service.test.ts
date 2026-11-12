@@ -13,6 +13,7 @@ import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
 import { mockPort, type PortMock } from "@packages/test/bun";
 import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { mockUnitOfWork, type UnitOfWorkMock } from "@packages/test/bun/unit-of-work";
+import { serve } from "bun";
 import type { IUrlGuard } from "../application/ports/url-guard.port";
 import type {
   DeliveryFailure,
@@ -548,6 +549,45 @@ describe("WebhookDeliveryWorker", () => {
     expect(attempt?.responseBody.isNone()).toBe(true);
     expect(attempt?.error.isSome()).toBe(true);
   });
+
+  it.each([307, 308])(
+    "fails a %i delivery without posting to the redirect target",
+    async (status) => {
+      let targetHits = 0;
+      const target = serve({
+        port: 0,
+        fetch: () => {
+          targetHits++;
+          return new Response(null, { status: 200 });
+        },
+      });
+      const location = `http://127.0.0.1:${target.port}/internal`;
+      const endpoint = serve({
+        port: 0,
+        fetch: () => new Response(null, { status, headers: { location } }),
+      });
+      const realFetchToLocalEndpoint = (_url: string | URL | Request, init?: RequestInit) =>
+        fetch(`http://127.0.0.1:${endpoint.port}/hook`, init);
+      claims([makeDelivery()]);
+
+      try {
+        await runDrain(makeWorker({ fetchImpl: realFetchToLocalEndpoint }));
+      } finally {
+        endpoint.stop(true);
+        target.stop(true);
+      }
+
+      const [failure] = failures();
+      const [attempt] = attempts();
+      expect(targetHits).toBe(0);
+      expect(deliveries.markSuccess).not.toHaveBeenCalled();
+      expect(failure?.status).toBe("failed");
+      expect(failure?.retryAfterSeconds.unwrapOr(0)).toBeGreaterThan(0);
+      expect(failure?.lastResponseStatus.unwrap()).toBe(status);
+      expect(attempt?.responseStatus.unwrap()).toBe(status);
+      expect(attempt?.responseHeaders.unwrap()).toMatchObject({ location });
+    },
+  );
 
   it("resets the endpoint failure counter on success", async () => {
     claims([makeDelivery()]);

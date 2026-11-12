@@ -345,6 +345,7 @@ export class WebhookDeliveryWorker {
                 method: "POST",
                 headers: requestHeaders,
                 body: rawBody,
+                redirect: "manual",
                 signal: ctrl.signal,
               }),
           );
