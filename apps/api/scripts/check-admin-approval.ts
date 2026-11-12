@@ -49,6 +49,8 @@ const checks = checkRecorder();
 const { check } = checks;
 const { adminApproval, staffMember, staffPermissionOverride } = staffSchema;
 
+const fannedApprovalIds: string[] = [];
+
 const RACERS = 6;
 const SWEEP_PATH = "/internal/sweep-admin-approvals";
 const adminInternalRoutes = createAdminInternalRoutes({
@@ -355,7 +357,7 @@ async function proveSubjectStaysOut(): Promise<void> {
   check("the subject's refusal leaves it pending", (await rowOf(id)).status === "pending");
 
   const requested = EventTypes.ADMIN_APPROVAL_REQUESTED;
-  await di.NotificationFanoutSubscriber.handle({
+  await fanOut({
     eventId: crypto.randomUUID(),
     eventType: requested,
     aggregateId: id,
@@ -1095,6 +1097,21 @@ async function staffRole(userId: string): Promise<string | undefined> {
   return row?.role;
 }
 
+async function fanOut(
+  event: Parameters<typeof di.NotificationFanoutSubscriber.handle>[0],
+): Promise<void> {
+  fannedApprovalIds.push(event.aggregateId);
+  await di.NotificationFanoutSubscriber.handle(event);
+}
+
+async function cleanup(): Promise<void> {
+  if (fannedApprovalIds.length > 0) {
+    const n = notificationSchema.notification;
+    await db.delete(n).where(inArray(sql`${n.payload}->>'approvalId'`, fannedApprovalIds));
+  }
+  await probes.cleanup();
+}
+
 async function hasNotification(userId: string, type: string): Promise<boolean> {
   const n = notificationSchema.notification;
   const rows = await db
@@ -1135,7 +1152,7 @@ async function proveWhoIsNotified(): Promise<void> {
   });
 
   const requested = EventTypes.ADMIN_APPROVAL_REQUESTED;
-  await di.NotificationFanoutSubscriber.handle(event(requested, requester.probe.id));
+  await fanOut(event(requested, requester.probe.id));
   check("an approver is told", await hasNotification(approver.probe.id, requested));
   check("an override grant is told", await hasNotification(granted.probe.id, requested));
   check("an override deny is not", !(await hasNotification(denied.probe.id, requested)));
@@ -1147,7 +1164,7 @@ async function proveWhoIsNotified(): Promise<void> {
   check("the subject is not told", !(await hasNotification(target.id, requested)));
 
   const executed = EventTypes.ADMIN_APPROVAL_EXECUTED;
-  await di.NotificationFanoutSubscriber.handle(event(executed, approver.probe.id));
+  await fanOut(event(executed, approver.probe.id));
   check("the requester learns the outcome", await hasNotification(requester.probe.id, executed));
   check(
     "the approver is not told of their own act",
@@ -1155,7 +1172,7 @@ async function proveWhoIsNotified(): Promise<void> {
   );
 
   const expired = EventTypes.ADMIN_APPROVAL_EXPIRED;
-  await di.NotificationFanoutSubscriber.handle(event(expired, null));
+  await fanOut(event(expired, null));
   check("with no actor, the requester is told", await hasNotification(requester.probe.id, expired));
   check("with no actor, approvers are told", await hasNotification(approver.probe.id, expired));
 }
@@ -1185,7 +1202,7 @@ async function main(): Promise<void> {
   await proveLiveBanStatus();
   await proveSweepGuards();
   await proveRecipientParity();
-  await probes.cleanup();
+  await cleanup();
 
   if (checks.failures > 0) {
     console.error(`\n${checks.failures} check(s) failed`);
@@ -1197,6 +1214,6 @@ async function main(): Promise<void> {
 
 main().catch(async (err) => {
   console.error("check-admin-approval crashed:", err);
-  await probes.cleanup().catch(() => {});
+  await cleanup().catch(() => {});
   process.exit(1);
 });

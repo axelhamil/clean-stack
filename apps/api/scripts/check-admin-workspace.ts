@@ -20,7 +20,7 @@ import {
   sweepSchema,
 } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
-import { checkRecorder, internalApp } from "@packages/test/check-harness";
+import { checkRecorder, internalApp, refuseForeignRows } from "@packages/test/check-harness";
 import { requireLocalDatabase } from "@packages/test/require-local-database";
 import { Hono } from "hono";
 import { di } from "../src/container";
@@ -45,6 +45,7 @@ const probes = adminProbes(PREFIX);
 const checks = checkRecorder();
 const { check } = checks;
 const staffIds: string[] = [];
+const flushedDigestIds: string[] = [];
 const sweepLabels = ["rgpd-sweep", "flush-notification-emails", `${PREFIX}-sweep`];
 
 async function cleanup(): Promise<void> {
@@ -53,6 +54,9 @@ async function cleanup(): Promise<void> {
     await db.delete(oe).where(inArray(sql`${oe.payload}->>'actorUserId'`, staffIds));
   }
   await db.delete(emailMessage).where(eq(emailMessage.toAddress, `${PREFIX}@example.com`));
+  if (flushedDigestIds.length > 0) {
+    await db.delete(emailMessage).where(inArray(emailMessage.id, flushedDigestIds));
+  }
   await db.delete(sweepRun).where(inArray(sweepRun.label, sweepLabels));
   await probes.cleanup();
 }
@@ -314,6 +318,15 @@ async function proveInbox(manager: string, requesterId: string) {
   check("a non-staff account is refused", refused.status === 403, refused.body);
 }
 
+async function digestIds(): Promise<string[]> {
+  const rows = await db
+    .select({ id: emailMessage.id })
+    .from(emailMessage)
+    .where(eq(emailMessage.template, "notification_digest"));
+
+  return rows.map((row) => row.id);
+}
+
 async function proveHeartbeats() {
   await db.delete(sweepRun).where(inArray(sweepRun.label, sweepLabels.slice(0, 2)));
 
@@ -331,6 +344,7 @@ async function proveHeartbeats() {
       )
       .route("/", flushNotificationEmailsRoutes),
   );
+  const digestsBefore = new Set(await digestIds());
   for (const label of ["rgpd-sweep", "flush-notification-emails"]) {
     const dry = await signedInternalRequest(app, `/internal/${label}`, { dryRun: true });
     const noBeat = await db.select().from(sweepRun).where(eq(sweepRun.label, label));
@@ -346,9 +360,23 @@ async function proveHeartbeats() {
       beat,
     });
   }
+  const enqueued = (await digestIds()).filter((id) => !digestsBefore.has(id));
+  flushedDigestIds.push(...enqueued);
+}
+
+async function refuseForeignDueNotifications(): Promise<void> {
+  const due = await di.INotificationDigestStore.countDue(new Date());
+  if (due.isFailure) throw new Error(due.getError().message);
+
+  refuseForeignRows("check-admin-workspace", {
+    found: due.getValue(),
+    rows: "notifications due for an email digest",
+    clean: "update notification set email_pending_at = null where email_sent_at is null",
+  });
 }
 
 async function main(): Promise<void> {
+  await refuseForeignDueNotifications();
   const owner = await staffCookie("owner", "manager");
   const other = await staffCookie("other", "manager");
 
