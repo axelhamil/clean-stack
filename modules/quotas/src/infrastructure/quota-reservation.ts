@@ -1,4 +1,3 @@
-import type { QuotaKey } from "@modules/billing/domain/entitlements";
 import type { AnyPgColumn, AnyPgTable } from "@packages/drizzle";
 import {
   ambientTransaction,
@@ -7,7 +6,7 @@ import {
   lockForTransaction,
   resolveExecutor,
 } from "@packages/drizzle";
-import { assertQuota } from "../middleware/billing.middleware";
+import { hasQuotaRemaining, quotaExceededError } from "../domain/quota-remaining";
 
 export async function countScopedRows(
   table: AnyPgTable,
@@ -21,9 +20,9 @@ export async function countScopedRows(
   return rows[0]?.n ?? 0;
 }
 
-export async function reserveQuota(
+export async function reserveQuota<K extends string>(
   orgId: string,
-  key: QuotaKey,
+  key: K,
   limit: number | null,
   countFn: () => Promise<number>,
 ): Promise<void> {
@@ -36,5 +35,5 @@ export async function reserveQuota(
 
   await lockForTransaction(`${orgId}:${key}`);
   const used = await countFn();
-  assertQuota(used, limit);
+  if (!hasQuotaRemaining(used, limit)) throw quotaExceededError(used, limit);
 }
