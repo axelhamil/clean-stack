@@ -14,7 +14,7 @@ interface Probe {
   name: string;
   file: string;
   read: () => string;
-  comparable: (text: string) => string;
+  frozenForm: (text: string) => string;
 }
 
 function emitAppTypeDeclaration(): string {
@@ -56,13 +56,13 @@ const probes: Probe[] = [
     name: "AppType",
     file: "app-type.d.ts.snap",
     read: emitAppTypeDeclaration,
-    comparable: canonicalDeclaration,
+    frozenForm: canonicalDeclaration,
   },
   {
     name: "route inventory",
     file: "routes.txt",
     read: () => `${listBackRoutes().join("\n")}\n`,
-    comparable: (text) => text,
+    frozenForm: (text) => text,
   },
 ];
 
@@ -87,7 +87,7 @@ function firstDifference(frozen: string, current: string): string {
 
 function update(): void {
   for (const probe of probes) {
-    writeFileSync(join(SHAPE_DIR, probe.file), probe.read());
+    writeFileSync(join(SHAPE_DIR, probe.file), probe.frozenForm(probe.read()));
     console.log(`api-shape: froze the ${probe.name} in shape/${probe.file}`);
   }
 }
@@ -96,9 +96,8 @@ function check(): boolean {
   let equal = true;
 
   for (const probe of probes) {
-    const frozenFile = readFrozen(probe.file);
-    const frozen = frozenFile === undefined ? undefined : probe.comparable(frozenFile);
-    const current = probe.comparable(probe.read());
+    const frozen = readFrozen(probe.file);
+    const current = probe.frozenForm(probe.read());
 
     if (frozen === current) {
       console.log(`api-shape: the ${probe.name} matches shape/${probe.file}`);
