@@ -1,4 +1,5 @@
 import {
+  isBanLive,
   isStaffPermission,
   isStaffRole,
   type StaffPermission,
@@ -70,12 +71,6 @@ export function overrideOf(row: {
   });
 }
 
-function banIsLive(banned: boolean | null, banExpires: Date | null, now: Date): boolean {
-  if (banned !== true) return false;
-
-  return banExpires === null || banExpires > now;
-}
-
 const { session } = authSchema;
 function expiredImpersonations(now: Date) {
   return requireFilter(
@@ -107,7 +102,7 @@ function stillCountsAsManager(
 ): boolean {
   if (owner.deletedAt || owner.pendingDeletionUntil) return false;
 
-  return !banIsLive(owner.banned, owner.banExpires, now);
+  return !isBanLive(owner.banned, owner.banExpires, now);
 }
 
 export class DrizzleStaffStore implements IStaffStore {
@@ -163,7 +158,7 @@ export class DrizzleStaffStore implements IStaffStore {
             userId,
             role,
             source,
-            banned: banIsLive(first.banned, first.banExpires, new Date()),
+            banned: isBanLive(first.banned, first.banExpires, new Date()),
             overrides: rows.flatMap(({ permission, effect, expiresAt }) => {
               if (permission === null || effect === null) return [];
 

@@ -1,20 +1,15 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Result } from "@packages/ddd-kit";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
+import { mockPort } from "@packages/test/bun";
 import { IMPERSONATE_PATH } from "../shared/middleware/impersonation-blocklist";
-import type { GeoDeniedError } from "../shared/services/security-signals.service";
+import type { GeoDeniedError } from "../shared/ports/ip-geo.port";
+import { fakeAuthDeps } from "./fake-auth-deps";
 
 const refuseDenied = mock(async (): Promise<Result<void, GeoDeniedError>> => Result.ok());
 const reportImpossibleTravel = mock(async () => undefined);
 const sessionFields = mock((): { country?: string } => ({}));
 const enqueue = mock(async () => undefined);
-
-mock.module("../container", () => ({
-  di: {
-    BillingCatalogService: { getCatalog: async () => [] },
-    IOutboxRepository: { enqueue },
-    SecuritySignalsService: { refuseDenied, reportImpossibleTravel, sessionFields },
-  },
-}));
 
 const realAuthQueries = await import("../auth/queries");
 mock.module("../auth/queries", () => ({
@@ -22,7 +17,15 @@ mock.module("../auth/queries", () => ({
   emailFor: async () => undefined,
 }));
 
-const { auth } = await import("../auth");
+const { createAuth } = await import("../auth/create-auth");
+const outbox = mockPort<IOutboxRepository>();
+outbox.enqueue.mockImplementation(enqueue);
+const auth = createAuth(
+  fakeAuthDeps({
+    outbox,
+    securitySignals: { refuseDenied, reportImpossibleTravel, sessionFields },
+  }),
+);
 
 const sessionHooks = auth.options.databaseHooks?.session?.create;
 const session = {

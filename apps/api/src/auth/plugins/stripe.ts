@@ -1,4 +1,5 @@
 import { stripe } from "@better-auth/stripe";
+import type { IStripeEventStore } from "@modules/billing/application/ports/stripe-event.port";
 import {
   authorizeSubscriptionAction,
   subscriptionEventSource,
@@ -11,16 +12,16 @@ import { type EventType, EventTypes } from "@packages/events";
 import { derivedEventId } from "@packages/outbox/event-emitter";
 import { scrubText } from "@packages/sentry-scrub";
 import type Stripe from "stripe";
-import { di } from "../../container";
-import { env } from "../../shared/env";
-import { emit } from "../emit";
+import type { AuthDeps } from "../deps";
+import type { Emit } from "../emit";
+import type { AuthHelpers } from "../helpers";
 import { findActiveMemberRole, findOrgOwnerUserId } from "../queries";
 
 /**
  * Stripe is the caller, so a failed invoice names no user. Bookkeeping aside, this is all
  * the platform does with a webhook on top of the plugin's own subscription sync.
  */
-async function handleStripeEvent(event: Stripe.Event): Promise<void> {
+async function handleStripeEvent(emit: Emit, event: Stripe.Event): Promise<void> {
   const failure = paymentFailureOf(event);
   if (failure.isNone()) return;
 
@@ -36,8 +37,12 @@ async function handleStripeEvent(event: Stripe.Event): Promise<void> {
 }
 
 /** Delivery bookkeeping: a store failure is captured there and must not make Stripe retry. */
-async function recordStripeDelivery(event: Stripe.Event, lastError: Option<string>): Promise<void> {
-  await di.IStripeEventStore.recordDelivery({ id: event.id, type: event.type, lastError });
+async function recordStripeDelivery(
+  stripeEvents: IStripeEventStore,
+  event: Stripe.Event,
+  lastError: Option<string>,
+): Promise<void> {
+  await stripeEvents.recordDelivery({ id: event.id, type: event.type, lastError });
 }
 
 /**
@@ -46,6 +51,7 @@ async function recordStripeDelivery(event: Stripe.Event, lastError: Option<strin
  * started or changed the subscription.
  */
 async function emitSubscriptionEvent(
+  emit: Emit,
   eventType: EventType,
   subscription: {
     id: string;
@@ -82,15 +88,20 @@ async function emitSubscriptionEvent(
   );
 }
 
-export function stripePlugin() {
+export function stripePlugin(
+  deps: Pick<AuthDeps, "stripeClient" | "stripeEvents" | "plans" | "stripeSync" | "settings">,
+  helpers: Pick<AuthHelpers, "emit">,
+) {
+  const { emit } = helpers;
+
   return stripe({
-    stripeClient: di.StripeClient,
-    stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET ?? "",
+    stripeClient: deps.stripeClient,
+    stripeWebhookSecret: deps.settings.stripeWebhookSecret,
     createCustomerOnSignUp: true,
     subscription: {
       enabled: true,
       plans: async () => {
-        const catalog = await di.BillingCatalogService.getCatalog();
+        const catalog = await deps.plans.getCatalog();
         return catalog
           .filter((p) => p.priceId !== null)
           .map((p) => ({ name: p.tier, priceId: p.priceId as string }));
@@ -105,6 +116,7 @@ export function stripePlugin() {
       },
       onSubscriptionComplete: async ({ event, subscription, plan }) => {
         await emitSubscriptionEvent(
+          emit,
           EventTypes.BILLING_SUBSCRIPTION_CREATED,
           subscription,
           plan.name,
@@ -113,6 +125,7 @@ export function stripePlugin() {
       },
       onSubscriptionCreated: async ({ event, subscription, plan }) => {
         await emitSubscriptionEvent(
+          emit,
           EventTypes.BILLING_SUBSCRIPTION_CREATED,
           subscription,
           plan.name,
@@ -121,6 +134,7 @@ export function stripePlugin() {
       },
       onSubscriptionDeleted: async ({ event, subscription }) => {
         await emitSubscriptionEvent(
+          emit,
           EventTypes.BILLING_SUBSCRIPTION_CANCELLED,
           subscription,
           subscription.plan,
@@ -129,6 +143,7 @@ export function stripePlugin() {
       },
       onSubscriptionUpdate: async ({ event, subscription }) => {
         await emitSubscriptionEvent(
+          emit,
           subscriptionEventType(subscription.status),
           subscription,
           subscription.plan,
@@ -138,13 +153,13 @@ export function stripePlugin() {
     },
     onEvent: async (event) => {
       try {
-        await handleStripeEvent(event);
+        await handleStripeEvent(emit, event);
       } catch (err) {
-        await recordStripeDelivery(event, Option.some(scrubText(String(err))));
+        await recordStripeDelivery(deps.stripeEvents, event, Option.some(scrubText(String(err))));
         throw err;
       }
 
-      await recordStripeDelivery(event, await di.StripeSyncVerifier.check(event));
+      await recordStripeDelivery(deps.stripeEvents, event, await deps.stripeSync.check(event));
     },
   });
 }

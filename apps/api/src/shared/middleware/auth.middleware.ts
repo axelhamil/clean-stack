@@ -1,3 +1,4 @@
+import { isBanLive } from "@packages/access-control";
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { auth, type SessionData, type SessionUser } from "../../auth";
@@ -14,9 +15,7 @@ export function isCurrentlyBanned(user: {
   banned?: boolean | null;
   banExpires?: Date | null;
 }): boolean {
-  if (user.banned !== true) return false;
-
-  return !user.banExpires || new Date(user.banExpires).getTime() > Date.now();
+  return isBanLive(user.banned, user.banExpires ? new Date(user.banExpires) : null, new Date());
 }
 
 export const sessionMiddleware = createMiddleware<{

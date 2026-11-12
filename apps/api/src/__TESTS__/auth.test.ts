@@ -1,21 +1,19 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
+import type { IOutboxRepository } from "@packages/outbox/outbox.port";
+import { mockPort } from "@packages/test/bun";
+import type { IPolicyAcceptance } from "../auth/ports";
 import { runWithRequestContext } from "../shared/request-context";
+import { fakeAuthDeps } from "./fake-auth-deps";
 
-const accept = mock(async (_userId: string, _types: string[], _ip?: string) => Result.ok());
-const getStaleTypes = mock(async () => Result.ok(["terms"]));
+const policies = mockPort<IPolicyAcceptance>();
+const { accept, getStaleTypes } = policies;
+accept.mockImplementation(async () => Result.ok());
+getStaleTypes.mockImplementation(async () => Result.ok(["terms"]));
 const enqueue = mock(async (_events: { eventType: string; payload: unknown }[]) => undefined);
 
 let memberRole: string | null = null;
-
-mock.module("../container", () => ({
-  di: {
-    BillingCatalogService: { getCatalog: async () => [] },
-    IOutboxRepository: { enqueue },
-    PolicyAcceptanceService: { accept, getStaleTypes },
-  },
-}));
 
 const realAuthQueries = await import("../auth/queries");
 mock.module("../auth/queries", () => ({
@@ -23,7 +21,15 @@ mock.module("../auth/queries", () => ({
   findActiveMemberRole: async () => memberRole,
 }));
 
-const { auth } = await import("../auth");
+const { createAuth } = await import("../auth/create-auth");
+const outbox = mockPort<IOutboxRepository>();
+outbox.enqueue.mockImplementation(enqueue);
+const auth = createAuth(
+  fakeAuthDeps({
+    outbox,
+    policies,
+  }),
+);
 
 const RESOLVED_IP = "198.51.100.7";
 const SPOOFED_IP = "203.0.113.66";

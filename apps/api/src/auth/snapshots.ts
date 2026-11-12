@@ -17,11 +17,11 @@ export const SNAPSHOT_TTL_MS = 30_000;
  * rebuilds parts of that object between `hooks.before` and `hooks.after` and reference
  * identity across the two isn't guaranteed. Read-and-delete in the after hook.
  */
-export const ssoProviderDeleteSnapshots = new RequestSnapshots<{
+type SsoProviderDeleteSnapshot = {
   organizationId: string | null;
   domain: string;
   issuer: string;
-}>(SNAPSHOT_TTL_MS);
+};
 
 /**
  * The stored SCIM User a `PUT`, `PATCH` or `DELETE /scim/v2/Users/:userId` is about
@@ -32,6 +32,16 @@ export const ssoProviderDeleteSnapshots = new RequestSnapshots<{
  * caller's own connection. The snapshot is a database read, never request input,
  * so a stranded entry cannot carry anything a caller chose.
  */
-export const scimUserSnapshots = new RequestSnapshots<
-  ScimUserSnapshot & { memberId: string | undefined }
->(SNAPSHOT_TTL_MS);
+type ScimUserBeforeWrite = ScimUserSnapshot & { memberId: string | undefined };
+
+export interface AuthSnapshots {
+  ssoProviderDeleteSnapshots: RequestSnapshots<SsoProviderDeleteSnapshot>;
+  scimUserSnapshots: RequestSnapshots<ScimUserBeforeWrite>;
+}
+
+export function createSnapshots(): AuthSnapshots {
+  return {
+    ssoProviderDeleteSnapshots: new RequestSnapshots<SsoProviderDeleteSnapshot>(SNAPSHOT_TTL_MS),
+    scimUserSnapshots: new RequestSnapshots<ScimUserBeforeWrite>(SNAPSHOT_TTL_MS),
+  };
+}

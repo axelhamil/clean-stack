@@ -1,24 +1,18 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
+import type { IEntitlementsReader } from "@modules/billing/application/ports/entitlements-reader.port";
+import { ENTITLEMENTS } from "@modules/billing/domain/entitlements";
 import { EventTypes } from "@packages/events";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { ORGANIZATION_SEAT_PAYMENT_REQUIRED } from "../shared/auth/organization-seats";
+import { fakeAuthDeps, outermostUnitOfWork } from "./fake-auth-deps";
 
 const MAX_MEMBERS = 3;
 
 const outbox = mockPort<IOutboxRepository>();
 const { unitOfWork } = mockUnitOfWork();
-
-mock.module("../container", () => ({
-  di: {
-    BillingCatalogService: { getCatalog: async () => [] },
-    IOutboxRepository: outbox,
-    ITransactionService: unitOfWork,
-    EntitlementsService: { getEntitlements: async () => ({ maxMembers: MAX_MEMBERS }) },
-  },
-}));
 
 const deleteOrgIfEmpty = mock(async () => false);
 const countActiveMembers = mock(async () => 0);
@@ -31,7 +25,18 @@ mock.module("../auth/queries", () => ({
   lockSeatsOf: async () => undefined,
 }));
 
-const { auth } = await import("../auth");
+const { createAuth } = await import("../auth/create-auth");
+const entitlements = mockPort<IEntitlementsReader>();
+entitlements.getEntitlements.mockImplementation(async () => ({
+  ...ENTITLEMENTS.free,
+  tier: "free",
+  status: "free",
+  hasSubscription: false,
+  maxMembers: MAX_MEMBERS,
+}));
+const auth = createAuth(
+  fakeAuthDeps({ outbox, uow: outermostUnitOfWork(unitOfWork), entitlements }),
+);
 
 const hooks = auth.options.plugins.find((plugin) => plugin.id === "organization")?.options
   ?.organizationHooks;

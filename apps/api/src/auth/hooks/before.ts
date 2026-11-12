@@ -1,23 +1,19 @@
 import { EventTypes } from "@packages/events";
 import { APIError, createAuthMiddleware } from "better-auth/api";
-import { di } from "../../container";
 import { normalizeSamlConfig } from "../../shared/auth/saml-config";
 import { isSsoEnforcedFor } from "../../shared/auth/sso-enforcement";
 import { isSsoCallbackPath, SCIM_PATHS, SSO_PATHS } from "../../shared/auth/sso-paths";
-import { env } from "../../shared/env";
-import { logger } from "../../shared/logger";
 import { isBlockedDuringImpersonation } from "../../shared/middleware/impersonation-blocklist";
 import { validatePassword } from "../../shared/password-policy";
-import { emitBestEffort } from "../emit";
-import { assertSsoEntitlementFor } from "../entitlements";
+import type { AuthDeps } from "../deps";
+import type { AuthHelpers } from "../helpers";
 import {
   enforcedProviderForDomain,
   findMemberOf,
   findScimUser,
   findSsoProviderByProviderId,
 } from "../queries";
-import { scimUserSnapshots, ssoProviderDeleteSnapshots } from "../snapshots";
-import { refuseDeniedVisitor, requestClientIp } from "../visitor";
+import { requestClientIp } from "../visitor";
 
 const OAUTH_CALLBACK_PATH = "/callback/:id";
 
@@ -46,7 +42,20 @@ export type SessionReader = (headers: Headers) => Promise<{
   user: { id: string; email: string; name: string };
 } | null>;
 
-export function createBeforeHook(readSession: SessionReader) {
+export function createBeforeHook(
+  deps: Pick<
+    AuthDeps,
+    "rateLimiter" | "disposableEmail" | "passwordBreach" | "logger" | "settings"
+  >,
+  helpers: Pick<
+    AuthHelpers,
+    "emitBestEffort" | "refuseDeniedVisitor" | "assertSsoEntitlementFor" | "snapshots"
+  >,
+  readSession: SessionReader,
+) {
+  const { emitBestEffort, refuseDeniedVisitor, assertSsoEntitlementFor } = helpers;
+  const { scimUserSnapshots, ssoProviderDeleteSnapshots } = helpers.snapshots;
+
   return createAuthMiddleware(async (ctx) => {
     const path = ctx.path;
     const body = ctx.body as Record<string, unknown> | undefined;
@@ -90,11 +99,11 @@ export function createBeforeHook(readSession: SessionReader) {
       const email = body?.email as string | undefined;
       if (!email) return;
       const ip = requestClientIp() ?? "unknown";
-      const rl = await di.IRateLimiter.consume(`auth-sign-in:account:${email}`, [
+      const rl = await deps.rateLimiter.consume(`auth-sign-in:account:${email}`, [
         {
           policyName: "auth-sign-in-account",
-          windowSec: env.AUTH_SIGN_IN_ACCOUNT_WINDOW_SEC,
-          maxRequests: env.AUTH_SIGN_IN_ACCOUNT_MAX,
+          windowSec: deps.settings.signInAccount.windowSec,
+          maxRequests: deps.settings.signInAccount.maxRequests,
         },
       ]);
       if (rl.isFailure) {
@@ -179,10 +188,10 @@ export function createBeforeHook(readSession: SessionReader) {
       actorName = body?.name as string;
 
       // Disposable email check (fail-open, DNS error → allow + warn)
-      if (env.DISPOSABLE_EMAIL_BLOCK_ENABLED && actorEmail) {
-        const d = await di.IDisposableEmailService.isDisposable(actorEmail);
+      if (deps.settings.disposableEmailBlockEnabled && actorEmail) {
+        const d = await deps.disposableEmail.isDisposable(actorEmail);
         if (d.isFailure) {
-          logger.warn({ err: d.getError() }, "disposable-email check failed, failing open");
+          deps.logger.warn({ err: d.getError() }, "disposable-email check failed, failing open");
         } else if (d.getValue()) {
           await emitBestEffort(EventTypes.SECURITY_SIGNUP_REJECTED, "security", actorEmail, {
             actorUserId: null,
@@ -214,7 +223,7 @@ export function createBeforeHook(readSession: SessionReader) {
     const result = await validatePassword(
       password,
       { email: actorEmail, name: actorName, appName: "clean-stack" },
-      di.IPasswordBreachService,
+      deps.passwordBreach,
     );
     if (result.isNone()) return;
 

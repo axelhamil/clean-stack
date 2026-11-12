@@ -36,6 +36,7 @@ const _member = _ac.newRole({
   organization: ["leave"],
 });
 
+export { isBanLive } from "./ban";
 export {
   APPROVAL_ACTION_PERMISSION,
   APPROVAL_ACTIONS,
