@@ -10,6 +10,7 @@ import { type IInstrumentation, Result } from "@packages/ddd-kit";
 import {
   and,
   authSchema,
+  banIsNotLive,
   dbOperationFailure,
   eq,
   gt,
@@ -27,7 +28,9 @@ const failure = dbOperationFailure("NOTIFICATION_STAFF_RECIPIENTS_PROVIDER_FAILU
 /**
  * Who can use a staff permission now, read the way `staffAccessOf` and `staffReachable` decide it,
  * plus the requester, minus whoever acted and whoever the request is about. A listed id is always
- * a manager and carries no override; an `env` row off the list grants nothing.
+ * a manager and carries no override; an `env` row off the list grants nothing. Every branch keeps
+ * only live accounts, the rule the session and token guards apply: not deleted, no ban per
+ * `isBanLive`.
  */
 export function staffRecipients(target: StaffAudienceTarget, env: StaffAudienceSettings): SQL {
   const s = staffSchema.staffMember;
@@ -37,14 +40,19 @@ export function staffRecipients(target: StaffAudienceTarget, env: StaffAudienceS
     (id) => id !== null,
   );
   const included = (ids: readonly string[]) => ids.filter((id) => !excluded.includes(id));
-  const reachable = env.PLATFORM_ADMIN_REQUIRE_MFA ? eq(u.twoFactorEnabled, true) : undefined;
+  const now = new Date();
+  const live = and(isNull(u.deletedAt), banIsNotLive(now));
+  const reachable = and(
+    live,
+    env.PLATFORM_ADMIN_REQUIRE_MFA ? eq(u.twoFactorEnabled, true) : undefined,
+  );
   const liveOverride = (effect: "grant" | "deny") =>
     sql`EXISTS (SELECT 1 FROM ${o} WHERE ${and(
       eq(o.userId, s.userId),
       eq(o.permission, target.permission),
       eq(o.effect, effect),
       isNull(o.revokedAt),
-      or(isNull(o.expiresAt), gt(o.expiresAt, new Date())),
+      or(isNull(o.expiresAt), gt(o.expiresAt, now)),
     )})`;
   const staffWhere = and(
     isNull(s.revokedAt),
@@ -58,7 +66,7 @@ export function staffRecipients(target: StaffAudienceTarget, env: StaffAudienceS
 
   return sql`(SELECT ${s.userId} AS user_id FROM ${s} INNER JOIN ${u} ON ${eq(u.id, s.userId)} WHERE ${staffWhere}
     UNION SELECT ${u.id} FROM ${u} WHERE ${and(inArray(u.id, included(env.PLATFORM_ADMIN_IDS)), reachable)}
-    UNION SELECT ${u.id} FROM ${u} WHERE ${and(inArray(u.id, included(requester)), isNull(u.deletedAt))})`;
+    UNION SELECT ${u.id} FROM ${u} WHERE ${and(inArray(u.id, included(requester)), live)})`;
 }
 
 export class StaffRecipientsQuery implements IStaffRecipientsReader {

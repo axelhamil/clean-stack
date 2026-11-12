@@ -61,6 +61,8 @@ mock.module("@packages/drizzle", () => ({
     member: { userId: {}, organizationId: {} },
     organization: { id: {} },
   },
+  banIsLive: mk("banIsLive"),
+  banIsNotLive: mk("banIsNotLive"),
   and: mk("and"),
   or: mk("or"),
   eq: mk("eq"),

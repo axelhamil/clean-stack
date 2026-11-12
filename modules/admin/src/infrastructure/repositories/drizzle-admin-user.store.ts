@@ -9,13 +9,12 @@ import {
 import {
   and,
   authSchema,
+  banIsLive,
+  banIsNotLive,
   desc,
   eq,
-  gt,
   ilike,
   inArray,
-  isNull,
-  lte,
   multiTenantSchema,
   or,
   resolveExecutor,
@@ -89,15 +88,6 @@ function toSessionRow(row: SessionSelection): AdminSessionRow {
   };
 }
 
-function liveBanIs(banned: boolean) {
-  const { user } = authSchema;
-  const now = new Date();
-
-  return banned
-    ? and(eq(user.banned, true), or(isNull(user.banExpires), gt(user.banExpires, now)))
-    : or(isNull(user.banned), eq(user.banned, false), lte(user.banExpires, now));
-}
-
 function sessionsHeldOrImpersonatedBy(userId: string) {
   const { session } = authSchema;
 
@@ -129,7 +119,10 @@ export class DrizzleAdminUserStore implements IAdminUserStore {
               or(ilike(user.email, `%${input.search}%`), ilike(user.name, `%${input.search}%`)),
             );
           }
-          if (input.banned !== undefined) conditions.push(liveBanIs(input.banned));
+          if (input.banned !== undefined) {
+            const now = new Date();
+            conditions.push(input.banned ? banIsLive(now) : banIsNotLive(now));
+          }
           if (input.cursor) {
             conditions.push(afterTimeIdCursor(user.createdAt, user.id, input.cursor));
           }

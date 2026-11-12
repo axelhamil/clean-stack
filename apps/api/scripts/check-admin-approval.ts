@@ -10,7 +10,7 @@ import { createAdminInternalRoutes } from "@modules/admin/infrastructure/http/ad
 import * as staffSchema from "@modules/admin/schemas/staff";
 import * as auditLogSchema from "@modules/audit-log/schemas/audit-log";
 import * as notificationSchema from "@modules/notifications/schemas/notification";
-import { APPROVAL_ACTIONS, authorizeStaff } from "@packages/access-control";
+import { APPROVAL_ACTIONS, authorizeStaff, isBanLive } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
 import {
   and,
@@ -905,9 +905,22 @@ async function proveRecipientParity(): Promise<void> {
   const now = new Date();
   const past = new Date(now.getTime() - 60_000);
   const fixtures = await Promise.all(
-    ["role", "no-role", "grant", "deny", "expired", "revoked", "env", "listed", "listed-env"].map(
-      (name) => probes.user(`parity-${name}`),
-    ),
+    [
+      "role",
+      "no-role",
+      "grant",
+      "deny",
+      "expired",
+      "revoked",
+      "env",
+      "listed",
+      "listed-env",
+      "deleted",
+      "banned",
+      "ban-over",
+      "listed-deleted",
+      "listed-banned",
+    ].map((name) => probes.user(`parity-${name}`)),
   );
   const named = (name: string) => {
     const found = fixtures.find((fixture) => fixture.id.endsWith(`parity-${name}`));
@@ -931,6 +944,9 @@ async function proveRecipientParity(): Promise<void> {
       { ...row("revoked", "manager", "console"), revokedAt: past },
       row("env", "manager", "env"),
       row("listed-env", "manager", "env"),
+      row("deleted", "manager", "console"),
+      row("banned", "manager", "console"),
+      row("ban-over", "manager", "console"),
     ]);
   await grant(named("grant"), permission, "grant");
   await grant(named("deny"), permission, "deny");
@@ -944,12 +960,31 @@ async function proveRecipientParity(): Promise<void> {
   await db
     .update(authSchema.user)
     .set({ twoFactorEnabled: true })
-    .where(inArray(authSchema.user.id, [named("role"), named("listed")]));
+    .where(
+      inArray(
+        authSchema.user.id,
+        ["role", "listed", "deleted", "banned", "ban-over", "listed-deleted", "listed-banned"].map(
+          named,
+        ),
+      ),
+    );
+  await db
+    .update(authSchema.user)
+    .set({ deletedAt: past })
+    .where(inArray(authSchema.user.id, [named("deleted"), named("listed-deleted")]));
+  await db
+    .update(authSchema.user)
+    .set({ banned: true })
+    .where(inArray(authSchema.user.id, [named("banned"), named("listed-banned")]));
+  await db
+    .update(authSchema.user)
+    .set({ banned: true, banExpires: past })
+    .where(eq(authSchema.user.id, named("ban-over")));
 
   const ids = fixtures.map((fixture) => fixture.id);
   for (const requireMfa of [false, true]) {
     const staffEnv = {
-      PLATFORM_ADMIN_IDS: [named("listed"), named("listed-env")],
+      PLATFORM_ADMIN_IDS: ["listed", "listed-env", "listed-deleted", "listed-banned"].map(named),
       PLATFORM_ADMIN_REQUIRE_MFA: requireMfa,
     };
     const recipients = staffRecipients(
@@ -971,20 +1006,52 @@ async function proveRecipientParity(): Promise<void> {
     const decided: string[] = [];
     for (const id of ids) {
       const [user] = await db
-        .select({ twoFactorEnabled: authSchema.user.twoFactorEnabled })
+        .select({
+          twoFactorEnabled: authSchema.user.twoFactorEnabled,
+          deletedAt: authSchema.user.deletedAt,
+          banned: authSchema.user.banned,
+          banExpires: authSchema.user.banExpires,
+        })
         .from(authSchema.user)
         .where(eq(authSchema.user.id, id));
+      const live = user?.deletedAt === null && !isBanLive(user.banned, user.banExpires, now);
+      if (!live) continue;
+
       const found = await di.IStaffStore.findActive(id);
       const access = staffAccessOf({ id, ...user }, found.getValue(), staffEnv).toNull();
       if (authorizeStaff(access, permission)) decided.push(id);
     }
 
     check(
-      `the audience matches staffAccessOf with MFA ${requireMfa ? "required" : "optional"}`,
+      `the audience matches staffAccessOf on live accounts with MFA ${requireMfa ? "required" : "optional"}`,
       JSON.stringify(fromSql) === JSON.stringify(decided.sort()),
       { fromSql, decided },
     );
   }
+
+  const requesters = ["no-role", "deleted", "banned", "ban-over"].map(named);
+  const kept: string[] = [];
+  for (const requester of requesters) {
+    const audience = staffRecipients(
+      {
+        kind: "staff",
+        permission,
+        requesterUserId: Option.some(requester),
+        actorUserId: Option.none(),
+        subjectUserId: Option.none(),
+      },
+      { PLATFORM_ADMIN_IDS: [], PLATFORM_ADMIN_REQUIRE_MFA: false },
+    );
+    const answered = await db.execute(
+      sql`SELECT user_id FROM ${audience} AS r WHERE r.user_id = ${requester}`,
+    );
+    if (answered.rows.length > 0) kept.push(requester);
+  }
+  check(
+    "the requester is told only while their account is live",
+    JSON.stringify(kept) === JSON.stringify([named("no-role"), named("ban-over")]),
+    kept,
+  );
 }
 
 async function proveParamsRevalidated(): Promise<void> {
