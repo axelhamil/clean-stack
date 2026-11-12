@@ -3,40 +3,17 @@
 import * as billingSchema from "@modules/billing/schemas/billing";
 import { lt } from "@packages/drizzle";
 import { requireFilter } from "@packages/drizzle/sweep-purge";
-import { sweepBodySchema } from "@packages/http/sweep-runner";
-import { zV } from "@packages/http/validator";
-import { Hono } from "hono";
-import type { PinoLogger } from "hono-pino";
 import { env } from "../env";
-import { internalLayers } from "./internal-layers";
-import { runSweepRequest, tableRetentionPass } from "./sweep-route";
-
-type HonoEnv = { Variables: { logger: PinoLogger } };
+import { tableSweepRoute } from "./sweep-route";
 
 const event = billingSchema.stripeEvent;
 const LABEL = "sweep-stripe-events";
 
-export const sweepStripeEventsRoutes = new Hono<HonoEnv>()
-  .use("*", ...internalLayers)
-  .post("/sweep-stripe-events", zV("json", sweepBodySchema), async (c) => {
-    const response = await runSweepRequest({
-      label: LABEL,
-      body: c.req.valid("json"),
-      logger: c.var.logger,
-      passes: (spans) => [
-        tableRetentionPass(
-          {
-            label: "default",
-            retentionDays: env.STRIPE_EVENT_RETENTION_DAYS,
-            table: event,
-            idColumn: event.id,
-            orderBy: event.receivedAt,
-            filterFor: (cutoff) => requireFilter(lt(event.receivedAt, cutoff), LABEL),
-          },
-          spans,
-        ),
-      ],
-    });
-
-    return c.json(response);
-  });
+export const sweepStripeEventsRoutes = tableSweepRoute({
+  label: LABEL,
+  retentionDays: env.STRIPE_EVENT_RETENTION_DAYS,
+  table: event,
+  idColumn: event.id,
+  orderBy: event.receivedAt,
+  filterFor: (cutoff) => requireFilter(lt(event.receivedAt, cutoff), LABEL),
+});
