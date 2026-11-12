@@ -7,7 +7,7 @@ description: Use when working on BetterAuth server-side, the request pipeline, s
 
 **Module-level singleton** (`src/auth/index.ts`, one file per plugin and hook under `src/auth/`), not wrapped in port/adapter (wrapping recopies `auth.api.*` and loses `auth.$Infer.*`). Every consumer imports `auth` directly. **Built by `createAuth(deps)`** from `AuthDeps`, which the composition root binds in `composition/sources/auth.ts`; `index.ts` is the only file in `auth/` importing the container. A new collaborator or setting is a key of `AuthDeps` (with a port in `auth/ports.ts` when no existing one fits), never a container, env or logger import; a plugin or hook is a factory over `(deps, helpers)`. **Why**: a guard test builds a real instance with `createAuth(fakeAuthDeps(...))` instead of mocking the container, whose mock outlives the file and hides which collaborators auth really needs. **No inline `db.*` in `auth/`**, SQL lives in `auth/queries.ts` as typed Drizzle functions reading `resolveExecutor()`. Auth is infra, not domain: no repository, no aggregate.
 
-## Server pipeline (in order, `index.ts`)
+## Server pipeline (in order, `app.ts`)
 
 `/csp-report` (own cors + rate-limit, before globals to preserve cross-origin CORP) → `requestId()` → `httpLogger` → `secureHeaders()`+`cors()` → `sessionMiddleware` (single `auth.api.getSession()`, stores user/session on ctx, skips `/api/auth/*`) → `requireRateLimit(GLOBAL_POLICY)` + auth-burst per-route → `requireCsrf` on `CSRF_GUARDED_PATHS` in `app.ts` (`/me`,`/uploads`,`/settings`,`/admin`,`/consents`,`/billing/portal`,`/notifications`) → `app.on(["GET","POST"], "/api/auth/*", auth.handler)` → business routes → `app.onError(errorHandler)`.
 

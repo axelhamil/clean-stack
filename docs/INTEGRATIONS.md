@@ -127,7 +127,7 @@ K8s CronJob, Inngest, BullMQ) are in [`CRON.md`](./CRON.md). Pick by infra:
 
 Each new business job follows the same pattern:
 
-1. Add an internal endpoint under `apps/api/src/modules/<context>/routes.ts (internal sub-app)`.
+1. Add an internal endpoint in the module's `src/infrastructure/http/<name>-internal.routes.ts` (`create<Name>InternalRoutes(deps)`, gated by the `internalGuards` it receives, as in `modules/rgpd/src/infrastructure/http/rgpd-internal.routes.ts`), mounted under `/internal` by `apps/api/src/app.ts`.
 2. Document it in [`CRON.md`](./CRON.md) and in the table above.
 3. Wire it in your chosen scheduler.
 

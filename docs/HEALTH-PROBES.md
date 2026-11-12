@@ -50,53 +50,66 @@ DB down (critical) = `fail` + 503. Resend / storage hiccup (non-critical) = `war
 
 ## Registering a probe (from a new module)
 
-Each module **owner of an external dependency** ships its own `XxxHealthProbe` class implementing `OnInit`. inwire's `preload()` (called once after `.build()`) fires `onInit()` and the probe self-registers, no manual wiring list to keep in sync.
+Each module **owner of an external dependency** ships its own `XxxHealthProbe` class implementing `OnInit` and declares the registry port it needs. inwire's `preload()` (called once after `.build()`) fires `onInit()` and the probe self-registers, no manual wiring list to keep in sync. The shipped example is the storage probe of `modules/uploads`:
 
 ```ts
-// modules/billing/src/infrastructure/stripe-health-probe.ts
-import type { OnInit } from "inwire";
+// modules/uploads/src/application/ports/health.port.ts
 import type { HealthCheckFn } from "@packages/ddd-kit";
-import type { IHealthCheckRegistry } from "../../../shared/ports/health.port";
-import type { IBillingProvider } from "../../../shared/ports/billing.port";
 
-export class StripeHealthProbe implements OnInit {
+export interface IHealthCheckRegistry {
+  register(name: string, fn: HealthCheckFn, opts: { critical: boolean }): void;
+}
+```
+
+```ts
+// modules/uploads/src/infrastructure/storage-health-probe.ts
+import type { HealthCheckFn } from "@packages/ddd-kit";
+import type { OnInit } from "inwire";
+import type { IHealthCheckRegistry } from "../application/ports/health.port";
+import type { IStorageService } from "../application/ports/storage.port";
+
+export class StorageHealthProbe implements OnInit {
   constructor(
     private readonly registry: IHealthCheckRegistry,
-    private readonly billing: IBillingProvider,
+    private readonly storage: IStorageService,
   ) {}
 
   onInit(): void {
-    this.registry.register("billing:stripe", this.probe, { critical: false });
+    this.registry.register("storage:s3", this.probe, { critical: false });
   }
 
   private readonly probe: HealthCheckFn = async () => {
     const start = performance.now();
-    const ok = await this.billing.ping();
+    const result = await this.storage.headBucket();
     const observedValue = Math.round(performance.now() - start);
-    return ok
-      ? { status: "pass", observedValue, observedUnit: "ms" }
-      : { status: "fail", output: "stripe unreachable", observedValue, observedUnit: "ms" };
+    if (result.isFailure) {
+      return { status: "fail", output: "bucket unreachable", observedValue, observedUnit: "ms" };
+    }
+    return { status: "pass", observedValue, observedUnit: "ms" };
   };
 }
 ```
 
 ```ts
-// modules/billing/src/billing.module.ts
-declare module "inwire" {
-  interface AppDeps {
-    StripeHealthProbe: StripeHealthProbe;
-    // …
-  }
+// modules/uploads/src/uploads.module.ts (excerpt)
+export interface UploadsPrerequisites {
+  IHealthCheckRegistry: IHealthCheckRegistry;
+  // …
 }
 
-export const billingModule = defineModule()((b) =>
+export const uploadsModule = defineModule<UploadsPrerequisites>()((b) =>
   b
-    .add("IBillingProvider", () => new StripeAdapter())
-    .add("StripeHealthProbe", (c) => new StripeHealthProbe(c.IHealthCheckRegistry, c.IBillingProvider)),
+    // …
+    .add(
+      "StorageHealthProbe",
+      (c) => new StorageHealthProbe(c.IHealthCheckRegistry, c.IStorageService),
+    ),
 );
 ```
 
-That's it. `trash modules/billing` removes both the binding and the probe, no orphan check, no stale registration.
+The host binds the `IHealthCheckRegistry` key once, in `apps/api/src/health/module.ts`, so every module that lists it in its prerequisites receives the same registry.
+
+That's it. `trash modules/uploads` removes both the binding and the probe, no orphan check, no stale registration.
 
 **Decisor `critical: true` vs `false`**: flip to `true` only if the dep being down makes the api unable to serve **any** request meaningfully. DB = `true` (no business logic without it). Storage, email, billing = `false` (most routes work without them; let the LB keep traffic flowing, alerting handles the degraded state).
 

@@ -32,7 +32,7 @@ apps/api/src/container.ts              Conditional binding: SentryInstrumentatio
 
 Every repository / external-I/O service receives `IInstrumentation` via constructor injection (inwire). Same pattern as `IEmailService` / `IStorageService`: no service-locator, no module-level singleton, no DI override magic. `trash`-able provider swap = change 1 binding in `container.ts`.
 
-For the HTTP error path, `error.middleware.ts` exports a `createErrorHandler(instrumentation)` factory called once in `index.ts` after `di.build()`: avoids any future cycle between the middleware and the container.
+For the HTTP error path, `error.middleware.ts` exports a `createErrorHandler(instrumentation)` factory called once in `app.ts` after `di.build()`: avoids any future cycle between the middleware and the container.
 
 ## Setup
 

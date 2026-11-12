@@ -1,6 +1,6 @@
 # Modules
 
-Each module is a vertical slice. Removable in minutes via a documented contract. Cross-cutting ports stay in `shared/ports/` with NoOp adapters always shipped, so dropping a module never breaks call sites.
+Each module is a vertical slice. Removable in minutes via a documented contract. A need towards another module is a port declared by the consumer and bound by the host in `apps/api/src/composition/sources/`, so dropping a module fails `tsc` at exactly the lines that named it.
 
 This file doubles as a **value sheet for client proposals**. Each module is priced as "what a competent senior dev (solo or small studio) would realistically charge to wire it cleanly on a client engagement, given that the underlying libraries (BetterAuth, shadcn, Resend SDK, AWS SDK, etc.) already do 70-80% of the work."
 

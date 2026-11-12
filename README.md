@@ -127,7 +127,7 @@ Everything wired today, and the short list of what's left. Prefer prose? [`docs/
 - Internal `/internal/*` endpoints: HMAC-signed, optional private-network layer
 
 **Architecture & conventions**: *the part that keeps shipping fast sustainable*
-- Clean Architecture + DDD **enforced by structure**: layers import inward, modules never import each other (only via domain events / shared ports), each module removable by a documented contract (`trash` + line delete, `tsc` points to the rest)
+- Clean Architecture + DDD **enforced by structure**: layers import inward, modules never import each other (a consumer-declared port the host binds, or domain events), each module removable by a documented contract (`trash` + line delete, `tsc` points to the rest)
 - **8 cross-cutting rules**, each tied to an architectural property with its *why*: every state change emits a typed event (audit + webhooks opt-out, not opt-in) · every I/O method spans + captures (no silent prod failure) · every event payload names its actor (RGPD forensic trail) · internal packages ship source not artifacts · ORM-first, raw SQL only where the ORM can't model it
 - **DDD scoped to the business domain only**: never billing / auth / gating / quotas (config + middleware suffices); the discipline that cut ~70% of code vs full-DDD plumbing (lesson learned the hard way)
 - **Domain & repo rules**: no `throw` in domain/application (`Result`), no `null` for absence (`Option`), value objects validated via zod, aggregates expose only `get id()`; ownership enforced at the port (`ScopedRepository` scopes `organizationId`/`userId` across HTTP, cron, queue, events: wrong owner leaks nothing)

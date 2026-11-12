@@ -133,28 +133,40 @@ That's it. The event is in `outbox_event` (same TX as the order row), `audit_log
 
 ## How to add an in-process handler
 
-Oneline factory + inwire binding:
+A handler factory in the module's `src/application/event-handlers/`, bound in its `src/<x>.module.ts` under the `defineModule<XPrerequisites>()` it already has. The shipped example is `modules/api-token`:
 
 ```ts
-// modules/orders/module.ts
+// modules/api-token/src/application/event-handlers/revoke-on-membership-lost.ts (excerpt)
 import { type EventHandler, onEvent } from "@packages/ddd-kit";
-import { EventTypes } from "@packages/events";
+import { EventTypes, PayloadByEventType } from "@packages/events";
+import { payloadParser } from "@packages/outbox/payload-parser";
 
-declare module "inwire" {
-  interface AppDeps {
-    NotifyCustomerOnOrderPlaced: EventHandler<OrderPlacedEvent>;
-  }
-}
+const parsePayload = payloadParser(PayloadByEventType[EventTypes.ORG_MEMBER_REMOVED]);
 
-export const ordersModule = defineModule()((b) =>
-  b.add(
-    "NotifyCustomerOnOrderPlaced",
-    onEvent(EventTypes.ORDER_PLACED, "notify-customer-on-order-placed", (c) => async (event) => {
-      await c.IEmailService.sendTemplate(
-        "order_confirmation", ..., handlerIdempotency("notify-customer-on-order-placed", event),
-      );
-    }),
-  ),
+export const revokeTokensOnMembershipLost: (deps: Deps) => EventHandler = onEvent(
+  EventTypes.ORG_MEMBER_REMOVED,
+  "revoke-api-tokens-on-membership-lost",
+  (c: Deps) => async (_event, payload) => {
+    // revokes the member's tokens and emits api_token.revoked in one c.ITransactionService.run
+  },
+  { payload: parsePayload },
+);
+```
+
+```ts
+// modules/api-token/src/api-token.module.ts (excerpt)
+export const apiTokenModule = defineModule<ApiTokenPrerequisites>()((b) =>
+  b
+    // …
+    .add(
+      "RevokeTokensOnMembershipLost",
+      (c): EventHandler =>
+        revokeTokensOnMembershipLost({
+          IApiTokenRepository: c.IApiTokenRepository,
+          IOutboxRepository: c.IOutboxRepository,
+          ITransactionService: c.ITransactionService,
+        }),
+    ),
 );
 ```
 
@@ -550,7 +562,7 @@ Emitted via `emitEvent(outbox, ...)` in `requireQuota` when a request hits a quo
 
 ### Via `auth/hooks/after.ts` (Phase C.7: `@better-auth/sso` / `@better-auth/scim`)
 
-The SSO events are emitted via `emitEvent(outbox, ...)` in `apps/api/src/auth/hooks/after.ts`, path-keyed off `SSO_PATHS`/`SCIM_PATHS` (`apps/api/src/shared/auth/sso-paths.ts`). The SCIM connection events come from `ScimConnectionService` (`apps/api/src/shared/services/scim-connection.service.ts`), the only caller of the plugin's managed-connection server APIs. SCIM user endpoints authenticate with a bearer token, not a session: the actor is the owner who created the connection (`scimConnectionCreator`), not `ctx.context.session`. `scimProviderId`/`providerId` in the SCIM payloads carry the managed connection id; the key names are kept for payload stability.
+The SSO events are emitted via `emitEvent(outbox, ...)` in `apps/api/src/auth/hooks/after.ts`, path-keyed off `SSO_PATHS`/`SCIM_PATHS` (`apps/api/src/auth/sso-paths.ts`). The SCIM connection events come from `ScimConnectionService` (`apps/api/src/organization/scim-connection.service.ts`), the only caller of the plugin's managed-connection server APIs. SCIM user endpoints authenticate with a bearer token, not a session: the actor is the owner who created the connection (`scimConnectionCreator`), not `ctx.context.session`. `scimProviderId`/`providerId` in the SCIM payloads carry the managed connection id; the key names are kept for payload stability.
 
 - `SSO_PROVIDER_REGISTERED` (`sso.provider.registered`): `path === SSO_PATHS.register`. Payload: `{ actorUserId, organizationId, providerId, protocol: "oidc" | "saml", domain }`, retention `internal`.
 - `SSO_PROVIDER_UPDATED` (`sso.provider.updated`): `path === SSO_PATHS.updateProvider`. Payload includes `changedFields: string[]`.
@@ -567,7 +579,7 @@ The SSO events are emitted via `emitEvent(outbox, ...)` in `apps/api/src/auth/ho
 - `SCIM_USER_DEACTIVATED` (`scim.user.deactivated`): public. `PUT`/`PATCH` after which a user who was active is not (`scimUserChange`, comparing the `scim_user` row snapshotted in `hooks.before` with the one read back after).
 - `SCIM_USER_DEPROVISIONED` (`scim.user.deprovisioned`): public. `DELETE`. **This removes only the `member` row for the owning org**: the global `user` row (and any other org membership) is untouched. A SCIM deprovision is an org departure, not an account deletion; it does not route through the RGPD grace-period wipe.
 
-Membership itself is written by the SCIM membership projection (`apps/api/src/shared/auth/scim-membership.ts`) inside the plugin's transaction, so no organization hook fires: the SCIM after-hook reads the member row back and emits `org.member.joined` or `org.member.removed` itself.
+Membership itself is written by the SCIM membership projection (`apps/api/src/auth/scim-membership.ts`) inside the plugin's transaction, so no organization hook fires: the SCIM after-hook reads the member row back and emits `org.member.joined` or `org.member.removed` itself.
 
 ## Payload validation guarantee
 
@@ -618,4 +630,4 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 | `packages/outbox/src/jitter.ts` | Decorrelated jitter math |
 | `packages/outbox/src/event-emitter.ts` | `emitEvent()` shared helper (used by RGPD, uploads, BetterAuth bridge) |
 | `apps/api/src/auth/` | BetterAuth bridge (23 events: 15 user + 8 org) |
-| `apps/api/src/modules/{audit-log,webhooks}/` | Built-in modules (admin routes + worker) |
+| `modules/{audit-log,webhooks}/` | Built-in modules (admin routes + worker) |
