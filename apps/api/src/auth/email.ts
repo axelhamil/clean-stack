@@ -1,5 +1,5 @@
 import type { EmailTemplates, TemplateVariables } from "@packages/email/email.port";
-import { DEFAULT_LOCALE, type Locale, toLocale } from "@packages/i18n";
+import { type Locale, toLocale } from "@packages/i18n";
 import { CryptoHasher } from "bun";
 import { di } from "../container";
 import { logger } from "../shared/logger";
@@ -22,19 +22,6 @@ export function tokenIdempotencyKey(template: string, token: string): string {
  */
 export function localeOf(user: object): Locale {
   return toLocale((user as { locale?: unknown }).locale);
-}
-
-/**
- * Resolves the locale to write a message in when the hook only hands over an
- * address. Magic-link sign-in is the one auth flow with no user object in
- * scope; an address with no account yet legitimately falls back to the
- * default rather than failing the send.
- */
-export async function localeForEmail(email: string): Promise<Locale> {
-  const found = await di.IProfileStore.findLocaleByEmail(email);
-  if (found.isFailure) return DEFAULT_LOCALE;
-  const locale = found.getValue();
-  return locale.isSome() ? locale.unwrap() : DEFAULT_LOCALE;
 }
 
 /**

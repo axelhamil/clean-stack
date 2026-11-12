@@ -20,11 +20,11 @@ import { markPasswordResetDelivered } from "../shared/auth/password-reset-delive
 import { TOTP_OPTIONS } from "../shared/auth/totp-options";
 import { asUnitOfWork } from "../shared/auth/unit-of-work-adapter";
 import { env, FRONT_ORIGINS } from "../shared/env";
+import { localeForEmail } from "../shared/locale-for-user";
 import { MIN_PASSWORD_LENGTH } from "../shared/password-policy";
 import {
   acceptStalePoliciesAtFirstVerification,
   dispatchEmail,
-  localeForEmail,
   localeOf,
   tokenIdempotencyKey,
 } from "./email";
@@ -186,7 +186,7 @@ const authOptions = {
           email,
           { magicUrl },
           tokenIdempotencyKey("magic-link", token),
-          await localeForEmail(email),
+          await localeForEmail(di.IProfileStore, email),
         );
       },
     }),
