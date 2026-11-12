@@ -1,6 +1,6 @@
 # ddd-kit rules
 
-Domain primitives and the ports every backend package shares. Where and when to use them in the server: `apps/api/CLAUDE.md`.
+Domain primitives and the ports every backend package shares. Where and when a module uses them: `modules/CLAUDE.md`.
 
 ## Layout
 
@@ -37,7 +37,7 @@ Framework-free: it imports only Node built-ins, nothing from Drizzle, Hono, Zod 
 ## Rules
 
 1. **`Result.ok()` with no argument is `Result<void, E>`, and its single type parameter is the error.** `Result.ok<string>()` compiles, but as `Result<void, string>`. What the type system guarantees is that a no-argument success can never be assigned to `Result<string, E>` (pinned by a `@ts-expect-error` in `__TESTS__/result.test.ts`), so a success carrying a real value must pass it. **Why**: `getValue()` must never lie about its type.
-2. **A port never expresses absence as `T | null`.** `Result<Option<T>, E>` for a lookup that may find nothing, `Option<T>` for a record field that may be unset. `null` exists only inside a store while mapping a driver row, converted with `Option.fromNullable` before it leaves. **Why**: `T | null` forces every caller to remember a guard the type does not impose; `Option` makes the check structural. `unwrap()` only behind an `isSome()` guard (`None.unwrap()` throws).
+2. **A port never expresses absence as `T | null`.** `Result<Option<T>, E>` for a lookup that may find nothing, `Option<T>` for a record field that may be unset. `null` exists only inside a store while mapping a driver row, converted with `Option.fromNullable` before it leaves, and when a route serialises JSON. Not violations: an input DTO whose caller legitimately holds a raw nullable, and a SQL filter where `undefined`/`null`/value mean don't-filter / `IS NULL` / equality. **Why**: `T | null` forces every caller to remember a guard the type does not impose; `Option` makes the check structural. `unwrap()` only behind an `isSome()` guard (`None.unwrap()` throws).
 3. **Value object**: `extends ValueObject<T>`, `protected validate(value): Result<T, E>`, built with `X.create(v)` (returns a `Result`), read with `.value`. A closed union is a `type XValue` + a class; the aggregate holds the instances. A primitive is allowed only where there is no rule (free text, counter, date); otherwise it is a value object.
 4. **Aggregate**: constructor `protected` (or `private`), built through a static factory on the subclass (`create` for a new one, a rehydrating factory for rows). `addEvent` is `protected`: events come from business methods, never from callers. Mutation is by business method returning `void` or `Result<void, E>`, no setters. `clone(props)` returns the same class and id with its own arrays and watched lists, so editing the clone never edits the original.
 5. **Events must be collected inside a unit of work.** `addEvent()` outside `run()` loses the events (the dev warning comes from `EventCollector.setOutOfContextLogger`; a host that stops releases only its own with `releaseOutOfContextLogger`); a nested `run()` collects into its own scope and hands its events to the outermost run only when it succeeds. Flush mechanics and the rollback contract: `packages/drizzle/CLAUDE.md`.
