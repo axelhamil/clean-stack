@@ -76,7 +76,7 @@ export function signInForm(page: Page): Locator {
 
 export async function tabTo(page: Page, target: Locator, maxPresses = 20): Promise<void> {
   for (let i = 0; i < maxPresses; i++) {
-    if (await target.evaluate((el) => el === document.activeElement)) return;
+    if (await target.evaluate((el) => el === el.ownerDocument.activeElement)) return;
     await page.keyboard.press("Tab");
   }
   throw new Error(`Target never received focus after ${maxPresses} Tab presses`);
