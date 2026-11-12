@@ -18,7 +18,7 @@ description: Use when working on domain events, the transactional outbox, the Be
 
 ## Hard rules
 
-A nested `uow.run()` joins the open transaction (no savepoint); a failed `Result` or a throw at any depth rolls the whole unit back, even when the outer work caught it; a BetterAuth transaction is a `runOutermost`, its own connection, never joined to an app run; a run's scope is closed when it settles, so a late promise reads the pool; a run with collected events and no flush handler rolls back (`EventsWithoutOutbox`). No store, port or service takes a `tx`: `run(work)` hands `work` nothing and the store (outbox enqueue included) reads `resolveExecutor()`; the open transaction is read through `ambientTransaction()`, never `UnitOfWorkContext`. `addEvent` outside `uow.run()` = events lost (dev-mode warning via `EventCollector.setOutOfContextLogger`).
+Unit of work semantics (nesting, rollback, `runOutermost`, ambient executor, flush without outbox): `packages/drizzle/CLAUDE.md`; events collected outside a run: `packages/ddd-kit/CLAUDE.md` rule 5; emitting from a module: `modules/CLAUDE.md`, Domain events.
 
 Relay, lease and handler contract (idempotent on the event id, failure surfaced and never captured, release on shutdown, dead after the max attempts and announced once): `packages/outbox/CLAUDE.md`. Specific to wiring a handler: `handlerName` is a persisted key (kebab-case, unique per type), renaming one reruns it on every pending event; an external call is made idempotent with `handlerIdempotency(name, event)`. Proof against Postgres: `check:outbox-lease`.
 

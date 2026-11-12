@@ -1,6 +1,6 @@
 # http rules
 
-The HTTP kit a module's routes are written against: the zod request validator, time-id cursor pagination, the route-guard contract, the private address ranges and the retention sweep loop (its queries live in `@packages/drizzle`). Auto-loaded under `packages/http/`. Consumer: `apps/api` (and every `@modules/<name>` once modules move). Server conventions (RPC chaining, error envelope): `apps/api/CLAUDE.md`.
+The HTTP kit a module's routes are written against: the zod request validator, time-id cursor pagination, the route-guard contract, the private address ranges and the retention sweep loop (its queries live in `@packages/drizzle`). Auto-loaded under `packages/http/`. Consumers: `apps/api` and the route factories of every `@modules/<name>`. Server conventions (RPC chaining, error envelope): `apps/api/CLAUDE.md`.
 
 ## Layout
 

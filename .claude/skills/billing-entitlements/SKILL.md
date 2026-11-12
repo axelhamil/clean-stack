@@ -14,6 +14,8 @@ Pragmatic infra, **NOT DDD**. `modules/billing/src/domain/entitlements.ts` holds
 3. **Tier/feature**: `requireFeature(flag)` / `requirePlan(minTier)` → 402 `BILLING_PAYMENT_REQUIRED`.
 4. **Quota** (Phase B.2, dormant): limits in `ENTITLEMENTS[tier].quotas` (`null` = unlimited). `requireQuota(key, readUsage)` = best-effort pre-check → 429 `BILLING_QUOTA_EXCEEDED`; `reserveQuota(orgId, key, limit, countFn)` = **authoritative** gate (TOCTOU-safe: `pg_advisory_xact_lock` + count in the ambient transaction of `uow.run()`, refuses outside one). Counting: live `countScopedRows` (default) or `IQuotaUsageStore.{increment,current,reset}` (high-volume, increment in same TX as gated write, never background). Details: [`docs/QUOTA-GATING.md`](../../docs/QUOTA-GATING.md).
 
+Where the gates live: `apps/api/src/shared/middleware/billing.middleware.ts` (feature, plan, quota pre-check), `apps/api/src/auth/organization-seats.ts` and the organization plugin hooks (seats), `modules/quotas/src/infrastructure/quota-reservation.ts` (`reserveQuota`). Never a use case.
+
 No billing backoffice, Stripe Checkout + Billing Portal hosted. `POST /billing/portal` gated `requireOrgPermission({ billing:["manage"] })`.
 
 ## Events

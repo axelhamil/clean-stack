@@ -28,7 +28,7 @@ Protected handlers compose `requireAuth`. **Never re-call `auth.api.getSession()
 
 ## Email URLs route through the app
 
-`${env.APP_URL}/<route>?token=...` (opaque) or `${env.APP_URL}/<route>/<id>`. **Why**: branded UX; Outlook/Gmail mangle `?callbackURL=...` in API URLs. Don't pass `redirectTo`/`callbackURL` to auth-client methods when a `send*` server hook already builds the URL, silently overrides the canonical URL. One exception: `sendVerificationEmail` and `sendMagicLink` read `callbackURL` to carry a same-origin path as `redirect` on the app URL (`shared/auth/email-redirect.ts`), which the front revalidates. Never pass it to `signIn.email`: its response then makes the client hard-navigate.
+`${env.APP_URL}/<route>?token=...` (opaque) or `${env.APP_URL}/<route>/<id>`. **Why**: branded UX; Outlook/Gmail mangle `?callbackURL=...` in API URLs. Don't pass `redirectTo`/`callbackURL` to auth-client methods when a `send*` server hook already builds the URL, silently overrides the canonical URL. One exception: `sendVerificationEmail` and `sendMagicLink` read `callbackURL` to carry a same-origin path as `redirect` on the app URL (`apps/api/src/auth/email-redirect.ts`), which the front revalidates. Never pass it to `signIn.email`: its response then makes the client hard-navigate.
 
 ## Don't re-implement the organization plugin
 

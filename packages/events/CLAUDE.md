@@ -1,6 +1,6 @@
 # events rules
 
-The single event catalog: every domain event type, its payload schema, retention, visibility, public description and notification mapping. Auto-loaded under `packages/events/`. Cross-cutting rules 6 and 7 (every state change emits, every payload names its actor): `/CLAUDE.md`. Emit mechanics, outbox, dispatcher, subscribers: `apps/api/CLAUDE.md`, skill `events-outbox`, `docs/EVENTS.md`.
+The single event catalog: every domain event type, its payload schema, retention, visibility, public description and notification mapping. Auto-loaded under `packages/events/`. Cross-cutting rules 6 and 7 (every state change emits, every payload names its actor): `/CLAUDE.md`. Emit mechanics and subscribers: `modules/CLAUDE.md` (Domain events); outbox and dispatcher: `packages/outbox/CLAUDE.md`, skill `events-outbox`, `docs/EVENTS.md`.
 
 ## Layout
 

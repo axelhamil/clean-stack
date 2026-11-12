@@ -26,7 +26,7 @@ Run roles sequentially with the Agent tool. Each role's final message is a raw h
 
 → **GATE 1: present the plan to the user, wait for explicit approval.**
 
-**3. Back implementer** (`general-purpose`), receives the plan's back section + explorer brief. Strict TDD (superpowers:test-driven-development): domain → application → route. Layer rules auto-load via `apps/api/CLAUDE.md` the moment it touches API files, its prompt carries the acceptance criteria, not a re-derivation of the rules.
+**3. Back implementer** (`general-purpose`), receives the plan's back section + explorer brief. Strict TDD (superpowers:test-driven-development): domain → application → route. Layer rules auto-load via `modules/CLAUDE.md` the moment it touches a module (`apps/api/CLAUDE.md` for host files), its prompt carries the acceptance criteria, not a re-derivation of the rules.
 
 **4. Front implementer** (`general-purpose`), receives the plan's front section + mockup file paths. First action: `Read` every mockup. Then factory → hooks → components → route file. Rules auto-load via `apps/app/CLAUDE.md`.
 
