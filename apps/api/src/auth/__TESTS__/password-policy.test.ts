@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { Result } from "@packages/ddd-kit";
+import type { IPasswordBreachService } from "../../shared/ports/password-breach.port";
 import { findPasswordViolation, validatePassword } from "../password-policy";
-import type { IPasswordBreachService } from "../ports/password-breach.port";
 
 describe("findPasswordViolation", () => {
   const ctx = { email: "alice@example.com", name: "Alice Dupont", appName: "clean-stack" };

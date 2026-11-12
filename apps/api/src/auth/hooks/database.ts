@@ -2,13 +2,13 @@ import { AppErrorException } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import type { BetterAuthOptions } from "better-auth";
 import { APIError } from "better-auth/api";
-import { isSsoEnforcedFor } from "../../shared/auth/sso-enforcement";
-import { isSsoCallbackPath } from "../../shared/auth/sso-paths";
 import { IMPERSONATE_PATH } from "../../shared/middleware/impersonation-blocklist";
 import { getVisitorGeo } from "../../shared/request-context";
 import type { AuthDeps } from "../deps";
 import type { AuthHelpers } from "../helpers";
 import { clearConfirmedPendingEmail, emailFor, enforcedProviderForDomain } from "../queries";
+import { isSsoEnforcedFor } from "../sso-enforcement";
+import { isSsoCallbackPath } from "../sso-paths";
 import { provisionsForSomeoneElse, renewsOwnSession, requestClientIp } from "../visitor";
 
 export function createDatabaseHooks(

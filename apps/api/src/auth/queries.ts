@@ -18,7 +18,7 @@ import {
   sql,
   ssoSchema,
 } from "@packages/drizzle";
-import type { EnforcementLookup } from "../shared/auth/sso-enforcement";
+import type { EnforcementLookup } from "./sso-enforcement";
 
 // ── #1: ensurePersonalOrgFor queries ──────────────────────────────────────
 

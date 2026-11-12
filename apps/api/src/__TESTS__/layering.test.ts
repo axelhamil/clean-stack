@@ -22,11 +22,14 @@ function isApiRouteFile(file: string): boolean {
 
 describe("layering rules of the api", () => {
   it("routes never write to the database", () => {
-    const routeFiles = [...scan.sourceFiles("modules"), ...scan.sourceFiles("public-api")].filter(
-      isApiRouteFile,
-    );
+    const routeFiles = [
+      ...scan.sourceFiles("health"),
+      ...scan.sourceFiles("organization"),
+      ...scan.sourceFiles("public-api"),
+    ].filter(isApiRouteFile);
     const writes = {
-      ...scan.writeCallsPerFile("modules"),
+      ...scan.writeCallsPerFile("health"),
+      ...scan.writeCallsPerFile("organization"),
       ...scan.writeCallsPerFile("public-api"),
     };
 
@@ -38,7 +41,9 @@ describe("layering rules of the api", () => {
 
   it("no repository, port or service declares a tx parameter", () => {
     const declared = {
-      ...scan.transactionParametersPerFile("modules"),
+      ...scan.transactionParametersPerFile("auth"),
+      ...scan.transactionParametersPerFile("health"),
+      ...scan.transactionParametersPerFile("organization"),
       ...scan.transactionParametersPerFile("shared"),
     };
 

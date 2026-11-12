@@ -21,8 +21,8 @@ import type { SCIMTransactionContext } from "@better-auth/scim";
 import { ENTITLEMENTS } from "@modules/billing/domain/entitlements";
 import { authSchema, db, eq, inArray, multiTenantSchema } from "@packages/drizzle";
 import { auth, createAuthHelpers, scimMembershipDepsOf } from "../src/auth";
+import { scimMembershipProjection } from "../src/auth/scim-membership";
 import { di } from "../src/container";
-import { scimMembershipProjection } from "../src/shared/auth/scim-membership";
 
 const scimDeps = scimMembershipDepsOf(createAuthHelpers(di.authDeps));
 

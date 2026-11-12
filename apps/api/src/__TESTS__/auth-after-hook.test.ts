@@ -75,7 +75,7 @@ const auth = createAuth(
     consents: { reconcile },
   }),
 );
-const { SCIM_PATHS, SSO_PATHS } = await import("../shared/auth/sso-paths");
+const { SCIM_PATHS, SSO_PATHS } = await import("../auth/sso-paths");
 
 const SESSION = {
   user: { id: "user-1", email: "user@example.com", createdAt: new Date() },

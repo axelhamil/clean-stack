@@ -1,8 +1,8 @@
 import { type SCIMEndpoints, type SCIMPlugin, scim } from "@better-auth/scim";
-import { scimIdentityResolver, scimMembershipProjection } from "../../shared/auth/scim-membership";
 import type { AuthDeps } from "../deps";
 import type { AuthHelpers } from "../helpers";
 import { isVerifiedSsoDomainOf } from "../queries";
+import { scimIdentityResolver, scimMembershipProjection } from "../scim-membership";
 
 /**
  * `@better-auth/scim` leaks an unexported interface (`SCIMDiscoveryAttribute`)

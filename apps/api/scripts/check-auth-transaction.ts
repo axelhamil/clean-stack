@@ -41,8 +41,8 @@ import {
 } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import { auth } from "../src/auth";
+import { TOTP_OPTIONS } from "../src/auth/totp-options";
 import { di } from "../src/container";
-import { TOTP_OPTIONS } from "../src/shared/auth/totp-options";
 import { env } from "../src/shared/env";
 import { runWithRequestContext } from "../src/shared/request-context";
 

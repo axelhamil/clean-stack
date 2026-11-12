@@ -26,8 +26,8 @@ mock.module("@packages/drizzle", () => ({
   savepoint: <T>(work: () => Promise<T>) => work(),
 }));
 
-const { ScimConnectionService } = await import("../services/scim-connection.service");
-const { NoOpInstrumentation } = await import("../services/noop-instrumentation");
+const { ScimConnectionService } = await import("../scim-connection.service");
+const { NoOpInstrumentation } = await import("../../shared/services/noop-instrumentation");
 
 describe("ScimConnectionService.issueToken", () => {
   it("still returns the token when its event cannot be recorded, and reports the failure", async () => {

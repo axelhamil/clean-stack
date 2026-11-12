@@ -6,7 +6,7 @@ import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
-import { ORGANIZATION_SEAT_PAYMENT_REQUIRED } from "../shared/auth/organization-seats";
+import { ORGANIZATION_SEAT_PAYMENT_REQUIRED } from "../auth/organization-seats";
 import { fakeAuthDeps, outermostUnitOfWork } from "./fake-auth-deps";
 
 const MAX_MEMBERS = 3;

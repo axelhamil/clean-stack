@@ -29,8 +29,8 @@ import {
 import { EventTypes } from "@packages/events";
 import { auth } from "../src/auth";
 import { di } from "../src/container";
+import { ScimConnectionService } from "../src/organization/scim-connection.service";
 import { env } from "../src/shared/env";
-import { ScimConnectionService } from "../src/shared/services/scim-connection.service";
 
 const CONCURRENT_ISSUES = 4;
 const organizationId = `check-scim-connection-${crypto.randomUUID()}`;

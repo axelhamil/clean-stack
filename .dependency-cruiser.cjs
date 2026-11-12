@@ -1,48 +1,10 @@
-const API_MODULES = "^apps/api/src/modules";
 const MODULES = "^modules";
 const LIBS = "^packages/";
-const TESTS = "(\\.test\\.tsx?$|/__TESTS__/|/__tests__/)";
 const FRAMEWORKS =
   "node_modules/(hono|hono-pino|@hono/[^/]+|drizzle-orm|pg|better-auth|@aws-sdk|resend|stripe|@sentry)(/|$)";
 
 module.exports = {
   forbidden: [
-    {
-      name: "no-cross-module-import-in-api",
-      comment:
-        "A module never imports another one: share through domain events, shared/ports or shared/services, the container wires it.",
-      severity: "error",
-      from: { path: `${API_MODULES}/([^/]+)/`, pathNot: TESTS },
-      to: { path: `${API_MODULES}/([^/]+)/`, pathNot: `${API_MODULES}/$1/` },
-    },
-    {
-      name: "pure-domain-and-application",
-      comment: "Domain and application import no framework, no database and no infrastructure.",
-      severity: "error",
-      from: { path: `${API_MODULES}/[^/]+/(domain|application)/`, pathNot: TESTS },
-      to: { path: [`${API_MODULES}/[^/]+/infrastructure/`, "^packages/drizzle/", FRAMEWORKS] },
-    },
-    {
-      name: "domain-imports-only-the-kernel",
-      comment:
-        "A domain stays portable: it reaches only the DDD kit, the event catalog, zod and its own module.",
-      severity: "error",
-      from: { path: `${API_MODULES}/([^/]+)/domain/`, pathNot: TESTS },
-      to: {
-        pathNot: [
-          `${API_MODULES}/$1/`,
-          "^packages/(ddd-kit|events)/",
-          "node_modules/(@packages/(ddd-kit|events)|zod)/",
-        ],
-      },
-    },
-    {
-      name: "domain-does-not-depend-on-application",
-      comment: "Layers import inwards: application depends on domain, never the other way.",
-      severity: "error",
-      from: { path: `${API_MODULES}/[^/]+/domain/` },
-      to: { path: `${API_MODULES}/[^/]+/application/` },
-    },
     {
       name: "no-cross-module-import",
       comment:
