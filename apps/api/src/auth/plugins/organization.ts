@@ -5,10 +5,9 @@ import type { AuthDeps } from "../deps";
 import { localeOf, tokenIdempotencyKey } from "../email";
 import type { AuthHelpers } from "../helpers";
 import { organizationSeatGate } from "../organization-seats";
-import { deleteOrgIfEmpty } from "../queries";
 
 export function organizationPlugin(
-  deps: Pick<AuthDeps, "uow" | "settings">,
+  deps: Pick<AuthDeps, "uow" | "queries" | "settings">,
   helpers: Pick<AuthHelpers, "emit" | "dispatchEmail" | "seatCapFor">,
 ) {
   const { emit, dispatchEmail } = helpers;
@@ -111,7 +110,7 @@ export function organizationPlugin(
         );
         if (isPersonalOrg(org.slug)) return;
         await deps.uow.run(async () => {
-          const deleted = await deleteOrgIfEmpty(org.id);
+          const deleted = await deps.queries.deleteOrgIfEmpty(org.id);
           if (!deleted) return;
           await emit(
             EventTypes.ORG_DELETED,

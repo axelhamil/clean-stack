@@ -26,7 +26,6 @@ import { scimPlugin } from "./plugins/scim";
 import { securitySignalsPlugin } from "./plugins/security-signals";
 import { ssoPlugin } from "./plugins/sso";
 import { stripePlugin } from "./plugins/stripe";
-import { findActiveMemberRole } from "./queries";
 import { buildSessionPayload } from "./session-payload";
 import { TOTP_OPTIONS } from "./totp-options";
 import { asUnitOfWork } from "./unit-of-work-adapter";
@@ -155,7 +154,7 @@ export function createAuth(deps: AuthDeps) {
       ...authOptions.plugins,
       customSession(async ({ user, session }) => {
         const role = session.activeOrganizationId
-          ? await findActiveMemberRole(user.id, session.activeOrganizationId)
+          ? await deps.queries.findActiveMemberRole(user.id, session.activeOrganizationId)
           : undefined;
 
         return buildSessionPayload(user, session, role);

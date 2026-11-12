@@ -2,10 +2,9 @@ import { EventTypes } from "@packages/events";
 import type { BetterAuthPlugin } from "better-auth";
 import type { AuthDeps } from "../deps";
 import type { AuthHelpers } from "../helpers";
-import { clearExpiredBan } from "../queries";
 
 export function clearExpiredBanPlugin(
-  deps: Pick<AuthDeps, "uow">,
+  deps: Pick<AuthDeps, "uow" | "queries">,
   helpers: Pick<AuthHelpers, "emit">,
 ) {
   return {
@@ -17,7 +16,7 @@ export function clearExpiredBanPlugin(
             create: {
               before: async (session: { userId: string }) => {
                 await deps.uow.run(async () => {
-                  if (!(await clearExpiredBan(session.userId))) return;
+                  if (!(await deps.queries.clearExpiredBan(session.userId))) return;
                   await helpers.emit(EventTypes.ADMIN_USER_UNBANNED, "user", session.userId, {
                     actorUserId: null,
                     userId: session.userId,

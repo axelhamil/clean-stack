@@ -41,6 +41,7 @@ describe("ScimConnectionService.issueToken", () => {
       outbox,
       mockUnitOfWork().unitOfWork,
       instrumentation,
+      { findMemberOf: async () => undefined, scimProvisionedMembers: async () => [] },
     ).issueToken({
       organizationId: "org-1",
       actorUserId: "owner-1",

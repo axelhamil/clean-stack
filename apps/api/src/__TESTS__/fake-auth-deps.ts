@@ -2,7 +2,7 @@ import type { IEntitlementsReader } from "@modules/billing/application/ports/ent
 import type { IStripeEventStore } from "@modules/billing/application/ports/stripe-event.port";
 import { ENTITLEMENTS } from "@modules/billing/domain/entitlements";
 import type { IProfileStore } from "@modules/profile/application/ports/profile.port";
-import type { ILogger, IUnitOfWork } from "@packages/ddd-kit";
+import { type ILogger, type IUnitOfWork, NoOpInstrumentation } from "@packages/ddd-kit";
 import type { IEmailService } from "@packages/email/email.port";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { mockPort } from "@packages/test/bun";
@@ -17,6 +17,7 @@ import type {
   IStaffSessionEnder,
   IStripeSyncCheck,
 } from "../auth/ports";
+import { type AuthQueries, createAuthQueries } from "../auth/queries";
 import type { OutermostUnitOfWork } from "../auth/unit-of-work-adapter";
 import type { IDisposableEmailService } from "../shared/ports/disposable-email.port";
 import type { IPasswordBreachService } from "../shared/ports/password-breach.port";
@@ -65,6 +66,10 @@ function emptyPlanCatalog(): IPlanCatalog {
   return plans;
 }
 
+export function fakeAuthQueries(overrides: Partial<AuthQueries> = {}): AuthQueries {
+  return { ...createAuthQueries(new NoOpInstrumentation()), ...overrides };
+}
+
 export function fakeAuthDeps(overrides: Partial<AuthDeps> = {}): AuthDeps {
   return {
     uow: outermostUnitOfWork(mockUnitOfWork().unitOfWork),
@@ -85,6 +90,7 @@ export function fakeAuthDeps(overrides: Partial<AuthDeps> = {}): AuthDeps {
     staffSessions: mockPort<IStaffSessionEnder>(),
     securitySignals: mockPort<ISecuritySignals>(),
     logger: mockPort<ILogger>(),
+    queries: fakeAuthQueries(),
     settings: TEST_SETTINGS,
     ...overrides,
   };

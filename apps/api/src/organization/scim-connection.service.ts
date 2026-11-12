@@ -12,7 +12,7 @@ import { EventTypes } from "@packages/events";
 import { emitEvent } from "@packages/outbox/event-emitter";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { auth } from "../auth";
-import { findMemberOf, scimProvisionedMembers } from "../auth/queries";
+import type { AuthQueries } from "../auth/queries";
 
 export type ScimConnectionError = AppError<
   "SCIM_CONNECTION_NOT_FOUND" | "SCIM_CONNECTION_PROVIDER_FAILURE"
@@ -72,6 +72,7 @@ export class ScimConnectionService {
     private readonly outbox: IOutboxRepository,
     private readonly uow: IUnitOfWork,
     private readonly instrumentation: IInstrumentation,
+    private readonly queries: Pick<AuthQueries, "findMemberOf" | "scimProvisionedMembers">,
   ) {}
 
   async find(
@@ -194,13 +195,13 @@ export class ScimConnectionService {
         }
 
         const { connectionId } = connection;
-        const provisioned = await scimProvisionedMembers(connectionId, organizationId);
+        const provisioned = await this.queries.scimProvisionedMembers(connectionId, organizationId);
         await auth.api.decommissionSCIMManagedConnection({
           body: { connectionId, provisioningDomainId: organizationId, actorId: actorUserId },
         });
 
         for (const { memberId, userId } of provisioned) {
-          if (await findMemberOf(userId, organizationId)) continue;
+          if (await this.queries.findMemberOf(userId, organizationId)) continue;
           await this.emitCommitted(() =>
             emitEvent(
               this.outbox,

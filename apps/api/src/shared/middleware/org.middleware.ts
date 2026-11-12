@@ -8,7 +8,7 @@ import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { SessionData, SessionUser } from "../../auth";
-import { findActiveMemberRole } from "../../auth/queries";
+import { di } from "../../container";
 
 const orgRoleSchema = z.enum(ORG_ROLES);
 
@@ -29,7 +29,7 @@ export const requireOrg = createMiddleware<{ Variables: OrgVariables }>(async (c
   const orgId = c.get("session")?.activeOrganizationId;
   if (!orgId) throw new HTTPException(403, { message: "No active organization" });
 
-  const role = parseRole(await findActiveMemberRole(c.get("user").id, orgId));
+  const role = parseRole(await di.AuthQueries.findActiveMemberRole(c.get("user").id, orgId));
   if (!role) throw new HTTPException(403, { message: "No active organization" });
 
   c.set("orgId", orgId);
@@ -45,7 +45,9 @@ export const requireOrgPermission = (permissions: OrgPermissions) =>
         message: "requireOrgPermission: orgId missing, chain requireOrg before",
       });
 
-    const role = c.get("orgRole") ?? parseRole(await findActiveMemberRole(c.get("user").id, orgId));
+    const role =
+      c.get("orgRole") ??
+      parseRole(await di.AuthQueries.findActiveMemberRole(c.get("user").id, orgId));
     if (!authorizeRole(role, permissions))
       throw new HTTPException(403, { message: "Insufficient permission" });
 

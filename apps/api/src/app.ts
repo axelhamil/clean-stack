@@ -238,6 +238,7 @@ app.route(
     uow: di.ITransactionService,
     instrumentation: di.IInstrumentation,
     logger,
+    queries: di.AuthQueries,
     prefix: env.API_TOKEN_PREFIX,
     pepper: apiTokenPepper,
     pepperVersion: env.API_TOKEN_PEPPER_VERSION,

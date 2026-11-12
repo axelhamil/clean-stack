@@ -7,7 +7,7 @@ import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { ORGANIZATION_SEAT_PAYMENT_REQUIRED } from "../auth/organization-seats";
-import { fakeAuthDeps, outermostUnitOfWork } from "./fake-auth-deps";
+import { fakeAuthDeps, fakeAuthQueries, outermostUnitOfWork } from "./fake-auth-deps";
 
 const MAX_MEMBERS = 3;
 
@@ -16,14 +16,6 @@ const { unitOfWork } = mockUnitOfWork();
 
 const deleteOrgIfEmpty = mock(async () => false);
 const countActiveMembers = mock(async () => 0);
-
-const realAuthQueries = await import("../auth/queries");
-mock.module("../auth/queries", () => ({
-  ...realAuthQueries,
-  deleteOrgIfEmpty,
-  countActiveMembers,
-  lockSeatsOf: async () => undefined,
-}));
 
 const { createAuth } = await import("../auth/create-auth");
 const entitlements = mockPort<IEntitlementsReader>();
@@ -35,7 +27,16 @@ entitlements.getEntitlements.mockImplementation(async () => ({
   maxMembers: MAX_MEMBERS,
 }));
 const auth = createAuth(
-  fakeAuthDeps({ outbox, uow: outermostUnitOfWork(unitOfWork), entitlements }),
+  fakeAuthDeps({
+    outbox,
+    uow: outermostUnitOfWork(unitOfWork),
+    entitlements,
+    queries: fakeAuthQueries({
+      deleteOrgIfEmpty,
+      countActiveMembers,
+      lockSeatsOf: async () => undefined,
+    }),
+  }),
 );
 
 const hooks = auth.options.plugins.find((plugin) => plugin.id === "organization")?.options

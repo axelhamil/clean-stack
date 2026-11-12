@@ -28,15 +28,13 @@ const writeTransactions: unknown[] = [];
 const setOrgSsoEnforced = mock(async (_organizationId: string, _enforced: boolean) => {
   writeTransactions.push(UnitOfWorkContext.transaction());
 });
-const realAuthQueries = await import("../../../auth/queries");
-mock.module("../../../auth/queries", () => ({ ...realAuthQueries, setOrgSsoEnforced }));
 
 const { AdminActionService } = await import("../admin-action.service");
 
 const instrumentation = mockInstrumentation();
 
 function service(unitOfWork = mockUnitOfWork().unitOfWork) {
-  return new AdminActionService({} as never, unitOfWork, instrumentation);
+  return new AdminActionService({} as never, unitOfWork, instrumentation, { setOrgSsoEnforced });
 }
 
 describe("AdminActionService", () => {

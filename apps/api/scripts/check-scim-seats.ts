@@ -24,7 +24,7 @@ import { auth, createAuthHelpers, scimMembershipDepsOf } from "../src/auth";
 import { scimMembershipProjection } from "../src/auth/scim-membership";
 import { di } from "../src/container";
 
-const scimDeps = scimMembershipDepsOf(createAuthHelpers(di.authDeps));
+const scimDeps = scimMembershipDepsOf(di.authDeps, createAuthHelpers(di.authDeps));
 
 const CONCURRENT_PROVISIONINGS = 5;
 const RACE_WINDOW_MS = 150;

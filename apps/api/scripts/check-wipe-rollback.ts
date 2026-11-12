@@ -58,6 +58,7 @@ import { EventTypes } from "@packages/events";
 import { DrizzleOutboxRepository } from "@packages/outbox/drizzle-outbox.repository";
 import { Hono } from "hono";
 import { authSecretKey } from "../src/auth/auth-secrets";
+import { createAuthQueries } from "../src/auth/queries";
 import { staffAccessRules } from "../src/composition/sources/rgpd";
 import { di } from "../src/container";
 import { env } from "../src/shared/env";
@@ -247,6 +248,7 @@ async function requestWithToken(raw: string): Promise<number> {
           uow: new TransactionService(instrumentation),
           instrumentation,
           logger,
+          queries: createAuthQueries(instrumentation),
           prefix: TOKEN_PREFIX,
           pepper: TOKEN_PEPPER,
           pepperVersion: 1,

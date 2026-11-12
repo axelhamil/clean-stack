@@ -25,7 +25,6 @@ import { checkRecorder } from "@packages/test/check-harness";
 import { requireLocalDatabase } from "@packages/test/require-local-database";
 import { Hono } from "hono";
 import { app } from "../src/app";
-import { deleteOrgIfEmpty } from "../src/auth/queries";
 import { di } from "../src/container";
 import { env } from "../src/shared/env";
 import { requireFeature, requirePlan } from "../src/shared/middleware/billing.middleware";
@@ -474,7 +473,7 @@ async function proveWipes(cookie: string, ownerId: string): Promise<void> {
 
   const emptied = await seedOrg("emptied", []);
   await seedNote({ organizationId: emptied });
-  check("the last member leaving deletes the org", await deleteOrgIfEmpty(emptied));
+  check("the last member leaving deletes the org", await di.AuthQueries.deleteOrgIfEmpty(emptied));
   check("that deletion removes the org's notes", (await notesOf("org", emptied)).length === 0);
 
   const owned = await seedOrg("owned", []);

@@ -4,12 +4,6 @@ import { isBlockedDuringImpersonation } from "../../shared/middleware/impersonat
 import type { AuthDeps } from "../deps";
 import type { AuthHelpers } from "../helpers";
 import { validatePassword } from "../password-policy";
-import {
-  enforcedProviderForDomain,
-  findMemberOf,
-  findScimUser,
-  findSsoProviderByProviderId,
-} from "../queries";
 import { normalizeSamlConfig } from "../saml-config";
 import { isSsoEnforcedFor } from "../sso-enforcement";
 import { isSsoCallbackPath, SCIM_PATHS, SSO_PATHS } from "../sso-paths";
@@ -45,7 +39,7 @@ export type SessionReader = (headers: Headers) => Promise<{
 export function createBeforeHook(
   deps: Pick<
     AuthDeps,
-    "rateLimiter" | "disposableEmail" | "passwordBreach" | "logger" | "settings"
+    "rateLimiter" | "disposableEmail" | "passwordBreach" | "logger" | "queries" | "settings"
   >,
   helpers: Pick<
     AuthHelpers,
@@ -84,7 +78,10 @@ export function createBeforeHook(
     if (emailBearingPaths.includes(path)) {
       const candidateEmail = body?.email as string | undefined;
       if (candidateEmail) {
-        const enforced = await isSsoEnforcedFor(candidateEmail, enforcedProviderForDomain);
+        const enforced = await isSsoEnforcedFor(
+          candidateEmail,
+          deps.queries.enforcedProviderForDomain,
+        );
         if (enforced.isSome()) {
           throw new APIError("FORBIDDEN", {
             message: "SSO_REQUIRED",
@@ -161,7 +158,7 @@ export function createBeforeHook(
     if (path === SSO_PATHS.deleteProvider) {
       const providerId = body?.providerId as string | undefined;
       if (providerId) {
-        const provider = await findSsoProviderByProviderId(providerId);
+        const provider = await deps.queries.findSsoProviderByProviderId(providerId);
         if (provider) ssoProviderDeleteSnapshots.set(providerId, provider);
       }
       return;
@@ -169,9 +166,9 @@ export function createBeforeHook(
 
     if (path === SCIM_PATHS.user && ctx.method !== "GET") {
       const scimUserId = (ctx.params as Record<string, string> | undefined)?.userId;
-      const scimUser = scimUserId ? await findScimUser(scimUserId) : undefined;
+      const scimUser = scimUserId ? await deps.queries.findScimUser(scimUserId) : undefined;
       if (scimUserId && scimUser) {
-        const member = await findMemberOf(scimUser.userId, scimUser.organizationId);
+        const member = await deps.queries.findMemberOf(scimUser.userId, scimUser.organizationId);
         scimUserSnapshots.set(scimUserId, { ...scimUser, memberId: member?.id });
       }
       return;

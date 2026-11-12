@@ -5,7 +5,7 @@ import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { mockPort } from "@packages/test/bun";
 import type { IPolicyAcceptance } from "../auth/ports";
 import { runWithRequestContext } from "../shared/request-context";
-import { fakeAuthDeps } from "./fake-auth-deps";
+import { fakeAuthDeps, fakeAuthQueries } from "./fake-auth-deps";
 
 const policies = mockPort<IPolicyAcceptance>();
 const { accept, getStaleTypes } = policies;
@@ -15,17 +15,14 @@ const enqueue = mock(async (_events: { eventType: string; payload: unknown }[]) 
 
 let memberRole: string | null = null;
 
-const realAuthQueries = await import("../auth/queries");
-mock.module("../auth/queries", () => ({
-  ...realAuthQueries,
-  findActiveMemberRole: async () => memberRole,
-}));
-
 const { createAuth } = await import("../auth/create-auth");
 const outbox = mockPort<IOutboxRepository>();
 outbox.enqueue.mockImplementation(enqueue);
 const auth = createAuth(
   fakeAuthDeps({
+    queries: fakeAuthQueries({
+      findActiveMemberRole: async () => memberRole,
+    }),
     outbox,
     policies,
   }),

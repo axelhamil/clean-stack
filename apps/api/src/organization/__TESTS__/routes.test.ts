@@ -17,6 +17,7 @@ mock.module("../../auth", () => ({
 
 mock.module("../../container", () => ({
   di: {
+    AuthQueries: { findActiveMemberRole: async () => "owner" },
     PolicyAcceptanceService: { hasAcceptedCurrent: async () => Result.ok(true) },
     EntitlementsService: {
       getEntitlements: async () => ({ tier, status: "active", ...entitlementsForTier(tier) }),
@@ -30,12 +31,6 @@ mock.module("../scim-connection.service", () => ({
     issueToken = issueToken;
     disconnect = disconnect;
   },
-}));
-
-const realAuthQueries = await import("../../auth/queries");
-mock.module("../../auth/queries", () => ({
-  ...realAuthQueries,
-  findActiveMemberRole: async () => "owner",
 }));
 
 const { organizationSettingsRoutes } = await import("../routes");

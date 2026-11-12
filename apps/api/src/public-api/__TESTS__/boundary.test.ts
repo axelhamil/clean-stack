@@ -8,7 +8,6 @@ import { type ILogger, NoOpInstrumentation, Option, Result } from "@packages/ddd
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { Hono } from "hono";
-import * as realAuthQueries from "../../auth/queries";
 import { createErrorHandler } from "../../shared/middleware/error.middleware";
 import { API_TOKEN_IP_POLICY } from "../../shared/middleware/rate-limit.policies";
 import type {
@@ -20,8 +19,8 @@ import { createPublicApiV1 } from "../index";
 
 // ── Module mocks (only auth surface, no container/env/rate-limit.ip) ─────
 // auth is mocked because it builds the BetterAuth singleton at module load
-// time; auth/queries spreads the real module and only replaces the calls the
-// middleware and routes can reach. container and env are NOT mocked (apps/api/.env is loaded by
+// time; the queries the middleware and routes reach are injected as deps.
+// container and env are NOT mocked (apps/api/.env is loaded by
 // the Bun test runner, avoiding global state pollution across the test suite).
 
 mock.module("../../auth", () => ({
@@ -46,13 +45,13 @@ const testUser = {
   pendingDeletionUntil: null,
   deletedAt: null,
   lastExportRequestedAt: null,
+  locale: null,
 };
 
-mock.module("../../auth/queries", () => ({
-  ...realAuthQueries,
+const queries = {
   findUserById: async (id: string) => (id === "u1" ? testUser : undefined),
   findUserOrganizations: async () => [],
-}));
+};
 
 // ── Token fixtures ────────────────────────────────────────────────────────
 
@@ -141,6 +140,7 @@ const publicApiV1 = createPublicApiV1({
   uow: mockUnitOfWork().unitOfWork,
   instrumentation: new NoOpInstrumentation(),
   logger: mockPort<ILogger>(),
+  queries,
   prefix: PREFIX,
   pepper: PEPPER,
   pepperVersion: 1,
@@ -264,6 +264,7 @@ describe("public API rate limit order", () => {
         uow: mockUnitOfWork().unitOfWork,
         instrumentation: new NoOpInstrumentation(),
         logger: mockPort<ILogger>(),
+        queries,
         prefix: PREFIX,
         pepper: PEPPER,
         pepperVersion: 1,

@@ -9,7 +9,7 @@ import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import { APIError } from "better-auth/api";
 import type { ITotpVerifier } from "../shared/ports/totp-verifier.port";
-import { fakeAuthDeps, outermostUnitOfWork } from "./fake-auth-deps";
+import { fakeAuthDeps, fakeAuthQueries, outermostUnitOfWork } from "./fake-auth-deps";
 
 const outbox = mockPort<IOutboxRepository>();
 const totp = mockPort<ITotpVerifier>();
@@ -53,22 +53,19 @@ const findMemberOf = mock(
 const findActiveMemberOrgId = mock(async (): Promise<string | undefined> => "org-1");
 const insertPersonalOrgWithOwner = mock(async () => undefined);
 
-const realAuthQueries = await import("../auth/queries");
-mock.module("../auth/queries", () => ({
-  ...realAuthQueries,
-  findLatestPasskey,
-  findLatestLinkedAccount,
-  findSsoProviderByProviderId,
-  findScimUser,
-  findMemberOf,
-  scimConnectionCreator: async () => "owner-1",
-  findActiveMemberOrgId,
-  insertPersonalOrgWithOwner,
-}));
-
 const { createAuth } = await import("../auth/create-auth");
 const auth = createAuth(
   fakeAuthDeps({
+    queries: fakeAuthQueries({
+      findLatestPasskey,
+      findLatestLinkedAccount,
+      findSsoProviderByProviderId,
+      findScimUser,
+      findMemberOf,
+      scimConnectionCreator: async () => "owner-1",
+      findActiveMemberOrgId,
+      insertPersonalOrgWithOwner,
+    }),
     outbox,
     uow: outermostUnitOfWork(unitOfWork),
     totp,

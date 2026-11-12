@@ -4,24 +4,21 @@ import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { mockPort } from "@packages/test/bun";
 import { IMPERSONATE_PATH } from "../shared/middleware/impersonation-blocklist";
 import type { GeoDeniedError } from "../shared/ports/ip-geo.port";
-import { fakeAuthDeps } from "./fake-auth-deps";
+import { fakeAuthDeps, fakeAuthQueries } from "./fake-auth-deps";
 
 const refuseDenied = mock(async (): Promise<Result<void, GeoDeniedError>> => Result.ok());
 const reportImpossibleTravel = mock(async () => undefined);
 const sessionFields = mock((): { country?: string } => ({}));
 const enqueue = mock(async () => undefined);
 
-const realAuthQueries = await import("../auth/queries");
-mock.module("../auth/queries", () => ({
-  ...realAuthQueries,
-  emailFor: async () => undefined,
-}));
-
 const { createAuth } = await import("../auth/create-auth");
 const outbox = mockPort<IOutboxRepository>();
 outbox.enqueue.mockImplementation(enqueue);
 const auth = createAuth(
   fakeAuthDeps({
+    queries: fakeAuthQueries({
+      emailFor: async () => undefined,
+    }),
     outbox,
     securitySignals: { refuseDenied, reportImpossibleTravel, sessionFields },
   }),

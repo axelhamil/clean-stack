@@ -1,9 +1,14 @@
 import { EventTypes } from "@packages/events";
 import { APIError } from "better-auth/api";
 import type { Emit } from "./emit";
-import { findMemberOf, findScimUser, scimConnectionCreator } from "./queries";
+import type { AuthQueries } from "./queries";
 import { type AuthSnapshots, SNAPSHOT_TTL_MS } from "./snapshots";
 import { changedFieldsFrom, scimUserChange } from "./sso-paths";
+
+type ScimEventQueries = Pick<
+  AuthQueries,
+  "findMemberOf" | "findScimUser" | "scimConnectionCreator"
+>;
 
 /**
  * Bridges `org.member.joined` for the SCIM provisioning path. The member row is
@@ -21,11 +26,12 @@ import { changedFieldsFrom, scimUserChange } from "./sso-paths";
  */
 async function emitScimMemberJoined(
   emit: Emit,
+  queries: ScimEventQueries,
   userId: string,
   organizationId: string,
   actorUserId: string | null,
 ): Promise<void> {
-  const member = await findMemberOf(userId, organizationId);
+  const member = await queries.findMemberOf(userId, organizationId);
   if (!member || member.createdAt.getTime() < Date.now() - SNAPSHOT_TTL_MS) return;
   await emit(
     EventTypes.ORG_MEMBER_JOINED,
@@ -54,6 +60,7 @@ async function emitScimMemberJoined(
  */
 async function emitScimUserEvents(
   emit: Emit,
+  queries: ScimEventQueries,
   snapshots: AuthSnapshots,
   method: string | undefined,
   returned: unknown,
@@ -69,7 +76,7 @@ async function emitScimUserEvents(
   if (!scimUserId) return;
 
   const before = method === "POST" ? undefined : snapshots.scimUserSnapshots.take(scimUserId);
-  const after = method === "DELETE" ? undefined : await findScimUser(scimUserId);
+  const after = method === "DELETE" ? undefined : await queries.findScimUser(scimUserId);
   const subject = after ?? before;
   if (!subject) return;
 
@@ -77,7 +84,7 @@ async function emitScimUserEvents(
   if (!change) return;
 
   const { userId, organizationId, connectionId, externalId } = subject;
-  const actorUserId = await scimConnectionCreator(connectionId);
+  const actorUserId = await queries.scimConnectionCreator(connectionId);
   const base = { userId, actorUserId, organizationId, scimProviderId: connectionId, externalId };
   const eventType = {
     created: EventTypes.SCIM_USER_CREATED,
@@ -88,10 +95,10 @@ async function emitScimUserEvents(
   const payload = change === "updated" ? { ...base, changedFields: changedFieldsFrom(body) } : base;
   await emit(eventType, "user", userId, payload, organizationId);
 
-  await emitScimMemberJoined(emit, userId, organizationId, actorUserId);
+  await emitScimMemberJoined(emit, queries, userId, organizationId, actorUserId);
 
   const removedMemberId = before?.memberId;
-  if (!removedMemberId || (await findMemberOf(userId, organizationId))) return;
+  if (!removedMemberId || (await queries.findMemberOf(userId, organizationId))) return;
   await emit(
     EventTypes.ORG_MEMBER_REMOVED,
     "member",
@@ -103,6 +110,7 @@ async function emitScimUserEvents(
 
 export function createScimEvents(
   emit: Emit,
+  queries: ScimEventQueries,
   snapshots: AuthSnapshots,
 ): {
   emitScimUserEvents(
@@ -114,6 +122,6 @@ export function createScimEvents(
 } {
   return {
     emitScimUserEvents: (method, returned, params, body) =>
-      emitScimUserEvents(emit, snapshots, method, returned, params, body),
+      emitScimUserEvents(emit, queries, snapshots, method, returned, params, body),
   };
 }
