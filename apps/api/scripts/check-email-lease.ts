@@ -3,13 +3,26 @@ import { requireLocalDatabase } from "@packages/test/require-local-database";
 requireLocalDatabase("check-email-lease");
 
 import { uuidv7 } from "@packages/ddd-kit";
-import { db, emailSchema, eq, inArray, like } from "@packages/drizzle";
+import {
+  and,
+  count,
+  db,
+  emailSchema,
+  eq,
+  gt,
+  inArray,
+  isDeadDue,
+  isDue,
+  like,
+  or,
+} from "@packages/drizzle";
 import { DrizzleEmailQueue } from "@packages/email/drizzle-email-queue";
 import type { EmailClaimRequest, EmailMessageRecord } from "@packages/email/email-queue.port";
 import {
   checkRun,
   probeClaims,
   recordingInstrumentation,
+  refuseForeignRows,
   withClockAhead,
 } from "@packages/test/check-harness";
 import { logger } from "../src/shared/logger";
@@ -71,8 +84,27 @@ async function rowOf(id: string) {
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const ids = (records: EmailMessageRecord[]) => records.map((record) => record.id);
 
+async function refuseForeignClaimable(): Promise<void> {
+  const inWindow = gt(em.createdAt, new Date(Date.now() - DAY_MS));
+  const [claimable] = await db
+    .select({ found: count() })
+    .from(em)
+    .where(
+      or(
+        and(eq(em.status, "pending"), isDue(em.nextAttemptAt)),
+        and(eq(em.status, "dead"), isDeadDue(em.nextAttemptAt), inWindow),
+      ),
+    );
+  refuseForeignRows("check-email-lease", {
+    found: claimable?.found ?? 0,
+    rows: "claimable email_message rows",
+    clean: "delete from email_message where status in ('pending', 'dead')",
+  });
+}
+
 async function main(): Promise<void> {
   await cleanup();
+  await refuseForeignClaimable();
 
   await claimed({ limit: 1 });
   const claimSql = spans.find((name) => name.includes('from "due"')) ?? "";

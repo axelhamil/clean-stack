@@ -127,6 +127,30 @@ export function probeClaims<TRow, TRequest>(queue: {
   };
 }
 
+export interface ForeignRows {
+  found: number;
+  rows: string;
+  clean: string;
+}
+
+/**
+ * Stops a check before it seeds anything when the table it exercises already holds rows
+ * it did not create that its global query would pick up: they would skew every count
+ * the check asserts on. The check never deletes them; the message says what it found
+ * and how to give it a database of its own.
+ */
+export function refuseForeignRows(name: string, { found, rows, clean }: ForeignRows): void {
+  if (found === 0) return;
+
+  console.error(
+    `${name} refuses to run: the database holds ${found} ${rows} this check did not seed, ` +
+      "and the query it exercises is global to the table, so it would act on them and skew its counts. " +
+      `It never deletes rows it did not create: clear them yourself (${clean}) ` +
+      "or point DATABASE_URL at a fresh local database (create it, then `pnpm db:push`).",
+  );
+  process.exit(1);
+}
+
 export function withClockAhead<T>(ms: number, work: () => Promise<T>): Promise<T> {
   const RealDate = Date;
   class AheadDate extends RealDate {
