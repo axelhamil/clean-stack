@@ -1,8 +1,5 @@
 {
-  "extends": "@packages/typescript-config/node.json",
-  "compilerOptions": {
-    "noEmit": true
-  },
+  "extends": "@packages/typescript-config/hono.json",
   "include": ["**/*.ts"],
   "exclude": ["node_modules"]
 }
