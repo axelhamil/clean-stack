@@ -4,21 +4,33 @@
  * stale attempt count writes nothing, deliveries merge instead of overwriting, a dead
  * row is replayed only once due, a type outside the list is never claimed, and an
  * enqueue rolled back with its run leaves neither a row nor a notification, a
- * redelivered audit-log handler appends a single link to the hash chain, and the
- * retention purge removes delivered rows past the cutoff but never a dead one.
+ * redelivered audit-log handler appends a single link to the hash chain, the
+ * retention purge removes delivered rows past the cutoff but never a dead one, and the
+ * sweep route stops cleanly when a webhook delivery still references an aged event.
  *
  * Every one of these lives in the claim CTE, the settle WHERE or the transaction,
  * which a mocked executor never evaluates.
  */
 
 import { requireLocalDatabase } from "@packages/test/require-local-database";
+import { BEFORE_ROUTE_CUTOFF } from "./check-outbox-lease.env";
 
 requireLocalDatabase("check-outbox-lease");
 
 import { AuditEventSubscriber } from "@modules/audit-log/infrastructure/services/audit-event-subscriber";
 import * as auditLogSchema from "@modules/audit-log/schemas/audit-log";
+import * as webhooksSchema from "@modules/webhooks/schemas/webhooks";
 import { Result, uuidv7 } from "@packages/ddd-kit";
-import { and, db, eq, like, or, outboxSchema, TransactionService } from "@packages/drizzle";
+import {
+  and,
+  db,
+  eq,
+  like,
+  multiTenantSchema,
+  or,
+  outboxSchema,
+  TransactionService,
+} from "@packages/drizzle";
 import { purgeBatchWithTimeout, requireFilter } from "@packages/drizzle/sweep-purge";
 import { sweepSpans } from "@packages/drizzle/sweep-span";
 import { EventTypes } from "@packages/events";
@@ -28,9 +40,15 @@ import {
 } from "@packages/outbox/drizzle-outbox.repository";
 import { emitEvent } from "@packages/outbox/event-emitter";
 import type { OutboxRecord } from "@packages/outbox/outbox.port";
-import { checkRun, recordingInstrumentation } from "@packages/test/check-harness";
+import { checkRun, internalApp, recordingInstrumentation } from "@packages/test/check-harness";
+import type { Hono } from "hono";
 import { Client } from "pg";
-import { buildPurgeFilter } from "../src/shared/internal-routes/sweep-outbox.route";
+import { env } from "../src/shared/env";
+import {
+  buildPurgeFilter,
+  sweepOutboxRoutes,
+} from "../src/shared/internal-routes/sweep-outbox.route";
+import { signedInternalRequest } from "./check-seed";
 
 const PROBE = `check.outbox-lease.${crypto.randomUUID()}`;
 const TYPE_A = `${PROBE}.a`;
@@ -45,8 +63,11 @@ const uow = new TransactionService(instrumentation, async (events) => {
 
 const oe = outboxSchema.outboxEvent;
 const al = auditLogSchema.auditLog;
+const org = multiTenantSchema.organization;
+const organizationId = `${AGGREGATE}-org`;
 
 async function cleanup(): Promise<void> {
+  await db.delete(org).where(eq(org.id, organizationId));
   await db.delete(al).where(eq(al.targetId, AGGREGATE));
   await db.delete(oe).where(or(like(oe.eventType, `${PROBE}%`), eq(oe.aggregateId, AGGREGATE)));
 }
@@ -388,6 +409,58 @@ async function main(): Promise<void> {
       keptIds.includes(deliveredRecent) &&
       keptIds.includes(deadOld),
     { purged, kept: keptIds.length },
+  );
+
+  await resetProbes();
+  const [referenced = ""] = await seed(1, TYPE_A, {
+    occurredAt: BEFORE_ROUTE_CUTOFF,
+    dispatchedAt: BEFORE_ROUTE_CUTOFF,
+  });
+  await db.insert(org).values({ id: organizationId, name: PROBE, slug: organizationId });
+  await db.insert(webhooksSchema.webhookEndpoint).values({
+    id: `${AGGREGATE}-endpoint`,
+    organizationId,
+    url: "https://check-outbox-lease.invalid/hook",
+    secretCipher: "unused",
+  });
+  await db.insert(webhooksSchema.webhookDelivery).values({
+    id: `${AGGREGATE}-delivery`,
+    endpointId: `${AGGREGATE}-endpoint`,
+    outboxEventId: referenced,
+    eventType: TYPE_A,
+    payload: {},
+    status: "success",
+    idempotencyKey: `${AGGREGATE}-delivery`,
+  });
+  const routeCutoff = new Date(Date.now() - env.OUTBOX_RETENTION_DAYS * 24 * 3_600_000);
+  const eligible = await db.select({ id: oe.id }).from(oe).where(buildPurgeFilter(routeCutoff));
+  // The route sweeps the whole table: the retention set by the first import puts its
+  // cutoff before any real event, and this refuses to call it if a row the check did
+  // not seed is old enough to be swept anyway.
+  await step(
+    "the referenced probe is the only row the route would sweep",
+    eligible.length === 1 && eligible[0]?.id === referenced,
+    { eligible: eligible.length },
+  );
+
+  const res = await signedInternalRequest(
+    internalApp(sweepOutboxRoutes as unknown as Hono),
+    "/internal/sweep-outbox",
+    {},
+  );
+  const body: unknown = res.ok ? await res.json() : await res.text();
+  const [stillThere] = await db.select({ id: oe.id }).from(oe).where(eq(oe.id, referenced));
+  await step(
+    "the sweep route stops on an event a webhook delivery still references instead of failing",
+    res.status === 200 &&
+      typeof body === "object" &&
+      body !== null &&
+      "deleted" in body &&
+      body.deleted === 0 &&
+      "stopReasons" in body &&
+      JSON.stringify(body.stopReasons) === JSON.stringify({ default: "batch-error" }) &&
+      stillThere !== undefined,
+    { status: res.status, body },
   );
 }
 

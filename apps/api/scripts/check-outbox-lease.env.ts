@@ -1,0 +1,3 @@
+process.env.OUTBOX_RETENTION_DAYS = "36500";
+
+export const BEFORE_ROUTE_CUTOFF = new Date("1900-01-01T00:00:00Z");

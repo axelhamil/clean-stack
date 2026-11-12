@@ -1,4 +1,4 @@
-import { describe, expect, it, mock } from "bun:test";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { type IUnitOfWork, NoOpInstrumentation } from "@packages/ddd-kit";
 import { outboxSchema, sql } from "@packages/drizzle";
 import {
@@ -15,16 +15,23 @@ import { type PinoLogger, pinoLogger } from "hono-pino";
 import { pino } from "pino";
 import { env } from "../../env";
 
-const foreignKeyViolation = Object.assign(new Error("violates foreign key constraint"), {
-  code: "23503",
+const restrictViolation = new Error('Failed query: delete from "outbox_event"', {
+  cause: Object.assign(
+    new Error(
+      'update or delete on table "outbox_event" violates RESTRICT setting of foreign key constraint',
+    ),
+    { code: "23001" },
+  ),
 });
+
+let batchError: Error = restrictViolation;
 
 const realPurge = await import("@packages/drizzle/sweep-purge");
 
 mock.module("@packages/drizzle/sweep-purge", () => ({
   ...realPurge,
   purgeBatchWithTimeout: async () => {
-    throw foreignKeyViolation;
+    throw batchError;
   },
 }));
 
@@ -41,17 +48,18 @@ mock.module("../sweep-lock", () => ({
 }));
 
 const { tableSweepRoute } = await import("../sweep-route");
+const { sweepOutboxRoutes } = await import("../sweep-outbox.route");
 
 const PATH = "/internal/sweep-test";
 
-async function signedInit(): Promise<RequestInit> {
+async function signedInit(path = PATH): Promise<RequestInit> {
   const rawBody = JSON.stringify({});
   const timestamp = Math.floor(Date.now() / 1000);
   const signature = await sign(
     canonicalize({
       timestamp,
       method: "POST",
-      path: PATH,
+      path,
       host: "localhost",
       contentType: "application/json",
       rawBody,
@@ -71,6 +79,10 @@ async function signedInit(): Promise<RequestInit> {
 }
 
 describe("tableSweepRoute", () => {
+  beforeEach(() => {
+    batchError = restrictViolation;
+  });
+
   it("hands a failed batch and the request logger to onBatchError, and stops the sweep on break", async () => {
     const event = outboxSchema.outboxEvent;
     const onBatchError = mock((): SweepBatchErrorDecision => "break");
@@ -99,6 +111,32 @@ describe("tableSweepRoute", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ deleted: 0, stopReasons: { default: "batch-error" } });
-    expect(onBatchError).toHaveBeenCalledWith(foreignKeyViolation, loggers[0]);
+    expect(onBatchError).toHaveBeenCalledWith(restrictViolation, loggers[0]);
   });
+
+  it("stops the outbox sweep instead of failing when a webhook delivery still references an aged event", async () => {
+    const res = await requestOutboxSweep();
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ deleted: 0, stopReasons: { default: "batch-error" } });
+  });
+
+  it("fails the outbox sweep on an error whose cause chain loops back on itself", async () => {
+    const looping = new Error("first");
+    looping.cause = new Error("second", { cause: looping });
+    batchError = looping;
+
+    const res = await requestOutboxSweep();
+
+    expect(res.status).toBe(500);
+  }, 1_000);
 });
+
+async function requestOutboxSweep(): Promise<Response> {
+  const app = new Hono();
+  app.use("*", pinoLogger({ pino: pino({ level: "silent" }) }));
+  app.onError((_err, c) => c.text("failed", 500));
+  app.route("/internal", sweepOutboxRoutes);
+
+  return app.request("/internal/sweep-outbox", await signedInit("/internal/sweep-outbox"));
+}
