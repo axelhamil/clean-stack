@@ -12,6 +12,7 @@ src/
   schema/<topic>.ts            one file per kit topic (auth, multi-tenant, outbox, sweep, ...), re-exported as `<topic>Schema` from `index.ts` and also a sub-path export (`@packages/drizzle/schema/<topic>`) for module schemas; a business table lives in its module's `schemas/`
   db-failure.ts                `dbOperationFailure(code)`: the error a store returns when a query throws
   advisory-lock.ts             `lockForTransaction`, `tryLockForTransaction` (transaction scoped advisory lock)
+  ban.ts                       `banIsLive(now)`, `banIsNotLive(now)`: the `isBanLive` rule of `@packages/access-control` as a filter on the user table
   sweep-purge.ts               `purgeBatchWithTimeout`, `withSweepGuards`, `requireFilter`: the batched retention delete under its `SET LOCAL` guards
   sweep-count.ts               `countEligibleWithTimeout`: the bounded dry-run count of a sweep
   sweep-span.ts                `sweepSpans(instrumentation)`: the per-request span facade of a sweep, with its batch budget
