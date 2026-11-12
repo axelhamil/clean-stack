@@ -14,7 +14,7 @@ import {
   schema,
 } from "@packages/drizzle";
 import { type SecretConfig, symmetricDecrypt } from "better-auth/crypto";
-import { TOTP_OPTIONS } from "../auth/totp-options";
+import { TOTP_OPTIONS } from "../../auth/totp-options";
 import type { ITotpVerifier, TotpOutcome, TotpVerifierError } from "../ports/totp-verifier.port";
 
 const IMPORTED_SECRET_PREFIX = "base32:";

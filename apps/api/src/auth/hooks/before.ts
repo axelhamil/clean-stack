@@ -1,18 +1,18 @@
 import { EventTypes } from "@packages/events";
 import { APIError, createAuthMiddleware } from "better-auth/api";
-import { normalizeSamlConfig } from "../../shared/auth/saml-config";
-import { isSsoEnforcedFor } from "../../shared/auth/sso-enforcement";
-import { isSsoCallbackPath, SCIM_PATHS, SSO_PATHS } from "../../shared/auth/sso-paths";
 import { isBlockedDuringImpersonation } from "../../shared/middleware/impersonation-blocklist";
-import { validatePassword } from "../../shared/password-policy";
 import type { AuthDeps } from "../deps";
 import type { AuthHelpers } from "../helpers";
+import { validatePassword } from "../password-policy";
 import {
   enforcedProviderForDomain,
   findMemberOf,
   findScimUser,
   findSsoProviderByProviderId,
 } from "../queries";
+import { normalizeSamlConfig } from "../saml-config";
+import { isSsoEnforcedFor } from "../sso-enforcement";
+import { isSsoCallbackPath, SCIM_PATHS, SSO_PATHS } from "../sso-paths";
 import { requestClientIp } from "../visitor";
 
 const OAUTH_CALLBACK_PATH = "/callback/:id";

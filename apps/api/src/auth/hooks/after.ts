@@ -1,12 +1,6 @@
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
 import { EventTypes } from "@packages/events";
 import { APIError, createAuthMiddleware } from "better-auth/api";
-import {
-  isSamlCallbackPath,
-  isSsoCallbackPath,
-  SCIM_PATHS,
-  SSO_PATHS,
-} from "../../shared/auth/sso-paths";
 import type { AuthDeps } from "../deps";
 import type { AuthHelpers } from "../helpers";
 import {
@@ -14,6 +8,7 @@ import {
   findLatestPasskey,
   findSsoProviderByProviderId,
 } from "../queries";
+import { isSamlCallbackPath, isSsoCallbackPath, SCIM_PATHS, SSO_PATHS } from "../sso-paths";
 import { requestClientIp } from "../visitor";
 
 const TOTP_VERIFY_PATH = "/two-factor/verify-totp";

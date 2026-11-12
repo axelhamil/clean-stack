@@ -1,8 +1,8 @@
 import type { GenericEndpointContext } from "better-auth";
 import { APIError } from "better-auth/api";
-import { SCIM_PATHS } from "../shared/auth/sso-paths";
 import { getClientIp, getVisitorGeo } from "../shared/request-context";
 import type { AuthDeps } from "./deps";
+import { SCIM_PATHS } from "./sso-paths";
 
 /**
  * Client IP for event payloads and compliance records, as resolved by the

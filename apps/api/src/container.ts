@@ -30,14 +30,14 @@ import {
 import { OutboxRelay } from "@packages/outbox/outbox-relay";
 import { container } from "inwire";
 import { Resend } from "resend";
+import { authSecretKey } from "./auth/auth-secrets";
+import type { OutermostUnitOfWork } from "./auth/unit-of-work-adapter";
 import { apiSettings } from "./composition/settings";
 import { adminSources } from "./composition/sources/admin";
 import { authSources } from "./composition/sources/auth";
 import { notificationsSources } from "./composition/sources/notifications";
 import { rgpdSources } from "./composition/sources/rgpd";
-import { healthModule } from "./modules/health/module";
-import { authSecretKey } from "./shared/auth/auth-secrets";
-import type { OutermostUnitOfWork } from "./shared/auth/unit-of-work-adapter";
+import { healthModule } from "./health/module";
 import { env } from "./shared/env";
 import { logger } from "./shared/logger";
 import type { ICaptchaService } from "./shared/ports/captcha.port";

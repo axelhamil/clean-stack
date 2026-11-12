@@ -4,7 +4,7 @@ import { authSchema, db, eq, inArray, or, outboxSchema, sql } from "@packages/dr
 import { hashPassword } from "better-auth/crypto";
 import { app } from "../src/app";
 import { auth } from "../src/auth";
-import { TOTP_OPTIONS } from "../src/shared/auth/totp-options";
+import { TOTP_OPTIONS } from "../src/auth/totp-options";
 import { env } from "../src/shared/env";
 import { seedTwoFactor } from "./check-harness";
 

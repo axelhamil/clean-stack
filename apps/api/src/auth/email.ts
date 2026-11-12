@@ -2,11 +2,11 @@ import type { EmailTemplates, TemplateVariables } from "@packages/email/email.po
 import { EventTypes } from "@packages/events";
 import { type Locale, toLocale } from "@packages/i18n";
 import { CryptoHasher } from "bun";
-import { redirectQuery } from "../shared/auth/email-redirect";
-import { markPasswordResetDelivered } from "../shared/auth/password-reset-delivery";
 import { localeForEmail } from "../shared/locale-for-user";
 import type { AuthDeps } from "./deps";
+import { redirectQuery } from "./email-redirect";
 import type { Emit } from "./emit";
+import { markPasswordResetDelivered } from "./password-reset-delivery";
 import { setPendingEmail } from "./queries";
 import { requestClientIp } from "./visitor";
 

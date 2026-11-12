@@ -1,5 +1,5 @@
 import { defineModule } from "inwire";
-import type { IHealthCheckRegistry } from "../../shared/ports/health.port";
+import type { IHealthCheckRegistry } from "./health.port";
 import { DbHealthProbe } from "./infrastructure/db-health-probe";
 import { InMemoryHealthCheckRegistry } from "./infrastructure/in-memory-health-check-registry";
 

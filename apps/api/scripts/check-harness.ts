@@ -13,7 +13,7 @@ import { symmetricEncrypt } from "better-auth/crypto";
 import { Hono } from "hono";
 import { pinoLogger } from "hono-pino";
 import { pino } from "pino";
-import { authSecretKey } from "../src/shared/auth/auth-secrets";
+import { authSecretKey } from "../src/auth/auth-secrets";
 import { env } from "../src/shared/env";
 import {
   buildSignatureHeader,

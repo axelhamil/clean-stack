@@ -10,7 +10,7 @@ import type {
   AggregatedReport,
   HealthCheckRegistration,
   IHealthCheckRegistry,
-} from "../../../shared/ports/health.port";
+} from "../health.port";
 
 const CHECK_TIMEOUT_MS = 5_000;
 const CACHE_TTL_PASS_MS = 30_000;

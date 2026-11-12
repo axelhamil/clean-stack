@@ -1,10 +1,10 @@
 import { ac, isPersonalOrg, roles } from "@packages/access-control";
 import { EventTypes } from "@packages/events";
 import { organization } from "better-auth/plugins";
-import { organizationSeatGate } from "../../shared/auth/organization-seats";
 import type { AuthDeps } from "../deps";
 import { localeOf, tokenIdempotencyKey } from "../email";
 import type { AuthHelpers } from "../helpers";
+import { organizationSeatGate } from "../organization-seats";
 import { deleteOrgIfEmpty } from "../queries";
 
 export function organizationPlugin(

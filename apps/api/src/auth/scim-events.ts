@@ -1,9 +1,9 @@
 import { EventTypes } from "@packages/events";
 import { APIError } from "better-auth/api";
-import { changedFieldsFrom, scimUserChange } from "../shared/auth/sso-paths";
 import type { Emit } from "./emit";
 import { findMemberOf, findScimUser, scimConnectionCreator } from "./queries";
 import { type AuthSnapshots, SNAPSHOT_TTL_MS } from "./snapshots";
+import { changedFieldsFrom, scimUserChange } from "./sso-paths";
 
 /**
  * Bridges `org.member.joined` for the SCIM provisioning path. The member row is

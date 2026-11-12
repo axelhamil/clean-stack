@@ -1,8 +1,8 @@
 import type { IAuthProvider } from "@modules/admin/application/ports/auth-provider.port";
 import type { IInstrumentation } from "@packages/ddd-kit";
 import { auth } from "../auth";
-import { IMPERSONATION_TTL_SECONDS } from "../shared/auth/impersonation-ttl";
-import { deliverPasswordReset } from "../shared/auth/password-reset-delivery";
+import { IMPERSONATION_TTL_SECONDS } from "../auth/impersonation-ttl";
+import { deliverPasswordReset } from "../auth/password-reset-delivery";
 
 export class BetterAuthProvider implements IAuthProvider {
   readonly impersonationTtlSeconds = IMPERSONATION_TTL_SECONDS;

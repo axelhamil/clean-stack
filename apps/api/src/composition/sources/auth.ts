@@ -19,7 +19,7 @@ import type {
   IStaffSessionEnder,
   IStripeSyncCheck,
 } from "../../auth/ports";
-import type { OutermostUnitOfWork } from "../../shared/auth/unit-of-work-adapter";
+import type { OutermostUnitOfWork } from "../../auth/unit-of-work-adapter";
 import type { IDisposableEmailService } from "../../shared/ports/disposable-email.port";
 import type { IPasswordBreachService } from "../../shared/ports/password-breach.port";
 import type { IProfileStore } from "../../shared/ports/profile.port";

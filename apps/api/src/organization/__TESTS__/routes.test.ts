@@ -3,8 +3,8 @@ import { entitlementsForTier } from "@modules/billing/domain/entitlements";
 import type { Tier } from "@packages/access-control";
 import { Option, Result } from "@packages/ddd-kit";
 import { Hono } from "hono";
-import { createErrorHandler } from "../../../shared/middleware/error.middleware";
-import { NoOpInstrumentation } from "../../../shared/services/noop-instrumentation";
+import { createErrorHandler } from "../../shared/middleware/error.middleware";
+import { NoOpInstrumentation } from "../../shared/services/noop-instrumentation";
 
 let tier: Tier = "business";
 const disconnect = mock(async () => Result.ok());
@@ -12,11 +12,11 @@ const issueToken = mock(async () =>
   Result.ok({ token: "scim-token", expiresAt: new Date("2027-01-01T00:00:00Z") }),
 );
 
-mock.module("../../../auth", () => ({
+mock.module("../../auth", () => ({
   auth: { api: { getSession: mock(async () => null) } },
 }));
 
-mock.module("../../../container", () => ({
+mock.module("../../container", () => ({
   di: {
     PolicyAcceptanceService: { hasAcceptedCurrent: async () => Result.ok(true) },
     EntitlementsService: {
@@ -25,7 +25,7 @@ mock.module("../../../container", () => ({
   },
 }));
 
-mock.module("../../../shared/services/scim-connection.service", () => ({
+mock.module("../scim-connection.service", () => ({
   ScimConnectionService: class {
     find = async () => Result.ok(Option.none());
     issueToken = issueToken;
@@ -33,8 +33,8 @@ mock.module("../../../shared/services/scim-connection.service", () => ({
   },
 }));
 
-const realAuthQueries = await import("../../../auth/queries");
-mock.module("../../../auth/queries", () => ({
+const realAuthQueries = await import("../../auth/queries");
+mock.module("../../auth/queries", () => ({
   ...realAuthQueries,
   findActiveMemberRole: async () => "owner",
 }));

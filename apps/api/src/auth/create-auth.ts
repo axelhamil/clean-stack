@@ -13,15 +13,13 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin, bearer, customSession, magicLink, twoFactor } from "better-auth/plugins";
 // biome-ignore lint/correctness/noUnusedImports: type anchor, the inferred `auth` type names Stripe resources through this alias (TS2883)
 import type Stripe from "stripe";
-import { IMPERSONATION_TTL_SECONDS } from "../shared/auth/impersonation-ttl";
-import { TOTP_OPTIONS } from "../shared/auth/totp-options";
-import { asUnitOfWork } from "../shared/auth/unit-of-work-adapter";
-import { MIN_PASSWORD_LENGTH } from "../shared/password-policy";
 import type { AuthDeps } from "./deps";
 import { createAuthHelpers } from "./helpers";
 import { createAfterHook } from "./hooks/after";
 import { createBeforeHook, type SessionReader } from "./hooks/before";
 import { createDatabaseHooks } from "./hooks/database";
+import { IMPERSONATION_TTL_SECONDS } from "./impersonation-ttl";
+import { MIN_PASSWORD_LENGTH } from "./password-policy";
 import { clearExpiredBanPlugin } from "./plugins/clear-expired-ban";
 import { organizationPlugin } from "./plugins/organization";
 import { scimPlugin } from "./plugins/scim";
@@ -30,6 +28,8 @@ import { ssoPlugin } from "./plugins/sso";
 import { stripePlugin } from "./plugins/stripe";
 import { findActiveMemberRole } from "./queries";
 import { buildSessionPayload } from "./session-payload";
+import { TOTP_OPTIONS } from "./totp-options";
+import { asUnitOfWork } from "./unit-of-work-adapter";
 
 export function createAuth(deps: AuthDeps) {
   const { settings } = deps;

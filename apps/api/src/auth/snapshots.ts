@@ -1,5 +1,5 @@
-import { RequestSnapshots } from "../shared/auth/request-snapshots";
 import type { ScimUserSnapshot } from "./queries";
+import { RequestSnapshots } from "./request-snapshots";
 
 /**
  * How long a value captured in `hooks.before`, or a row written by the request in

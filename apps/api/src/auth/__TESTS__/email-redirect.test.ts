@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { REDIRECT_ADMIN_ORIGIN, REDIRECT_VECTORS } from "@packages/test/redirect-vectors";
-import { redirectQuery } from "../auth/email-redirect";
+import { redirectQuery } from "../email-redirect";
 
 const authUrl = (callback: string) =>
   `https://api.test/api/auth/verify-email?token=t&callbackURL=${encodeURIComponent(callback)}`;

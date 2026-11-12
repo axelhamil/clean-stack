@@ -1,5 +1,5 @@
 import { Option } from "@packages/ddd-kit";
-import type { IPasswordBreachService } from "./ports/password-breach.port";
+import type { IPasswordBreachService } from "../shared/ports/password-breach.port";
 
 export const MIN_PASSWORD_LENGTH = 15;
 

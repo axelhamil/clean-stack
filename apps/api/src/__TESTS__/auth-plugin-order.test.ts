@@ -51,7 +51,7 @@ const auth = createAuth(
 const { IMPERSONATION_BLOCKED_PATHS } = await import(
   "../shared/middleware/impersonation-blocklist"
 );
-const { SSO_PATHS } = await import("../shared/auth/sso-paths");
+const { SSO_PATHS } = await import("../auth/sso-paths");
 
 const getSession = spyOn(auth.api, "getSession");
 const HEADERS = new Headers({ cookie: "session=abc" });
