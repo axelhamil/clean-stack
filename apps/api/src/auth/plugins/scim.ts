@@ -1,7 +1,6 @@
 import { type SCIMEndpoints, type SCIMPlugin, scim } from "@better-auth/scim";
 import type { AuthDeps } from "../deps";
 import type { AuthHelpers } from "../helpers";
-import { isVerifiedSsoDomainOf } from "../queries";
 import { scimIdentityResolver, scimMembershipProjection } from "../scim-membership";
 
 /**
@@ -18,11 +17,12 @@ export type ScimPluginWithoutDiscoveryTypes = Omit<SCIMPlugin, "endpoints"> & {
 // Exported for `scripts/check-scim-seats.ts`, which runs the real seat check against
 // Postgres under concurrent provisioning.
 export function scimMembershipDepsOf(
+  deps: Pick<AuthDeps, "queries">,
   helpers: Pick<AuthHelpers, "seatCapFor" | "hasSsoEntitlement">,
 ) {
   return {
     seatCapFor: helpers.seatCapFor,
-    isVerifiedSsoDomainOf,
+    isVerifiedSsoDomainOf: deps.queries.isVerifiedSsoDomainOf,
     hasSsoEntitlement: helpers.hasSsoEntitlement,
   };
 }
@@ -33,10 +33,10 @@ export function scimMembershipDepsOf(
 // provisioning domain, and the projection is what turns a directory's users into
 // members of it (the plugin itself knows nothing of organizations).
 export function scimPlugin(
-  deps: Pick<AuthDeps, "settings">,
+  deps: Pick<AuthDeps, "queries" | "settings">,
   helpers: Pick<AuthHelpers, "seatCapFor" | "hasSsoEntitlement">,
 ): ScimPluginWithoutDiscoveryTypes {
-  const membershipDeps = scimMembershipDepsOf(helpers);
+  const membershipDeps = scimMembershipDepsOf(deps, helpers);
 
   return scim({
     connections: [],

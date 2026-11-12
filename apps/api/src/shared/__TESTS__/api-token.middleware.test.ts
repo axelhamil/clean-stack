@@ -34,6 +34,7 @@ const ownerRow = () => ({
   lastExportRequestedAt: null as Date | null,
   pendingEmail: null as string | null,
   stripeCustomerId: null as string | null,
+  locale: null as string | null,
   role: null as string | null,
   banned: false as boolean | null,
   banReason: null as string | null,
@@ -41,12 +42,6 @@ const ownerRow = () => ({
 });
 
 const findUserByIdSpy = mock(async (_id: string) => ownerRow());
-
-const realAuthQueries = await import("../../auth/queries");
-mock.module("../../auth/queries", () => ({
-  ...realAuthQueries,
-  findUserById: findUserByIdSpy,
-}));
 
 const { requireApiToken } = await import("../middleware/api-token.middleware");
 
@@ -98,6 +93,7 @@ function makeDeps(repoOverride?: ReturnType<typeof makeRepo>["repo"]) {
     uow: mockUnitOfWork().unitOfWork,
     instrumentation: new NoOpInstrumentation(),
     logger: mockPort<ILogger>(),
+    queries: { findUserById: findUserByIdSpy },
     prefix: PREFIX,
     pepper: PEPPER,
     pepperVersion: PEPPER_VERSION,
@@ -240,6 +236,7 @@ describe("requireApiToken", () => {
       lastExportRequestedAt: null as Date | null,
       pendingEmail: null as string | null,
       stripeCustomerId: null as string | null,
+      locale: null as string | null,
       role: null as string | null,
       banned: true as boolean | null,
       banReason: "policy violation" as string | null,
@@ -290,6 +287,7 @@ describe("requireApiToken", () => {
       lastExportRequestedAt: null as Date | null,
       pendingEmail: null as string | null,
       stripeCustomerId: null as string | null,
+      locale: null as string | null,
       role: null as string | null,
       banned: true as boolean | null,
       banReason: null as string | null,

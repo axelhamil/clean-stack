@@ -30,7 +30,7 @@ export function createAuthHelpers(deps: AuthDeps): AuthHelpers {
   const { seatCapFor } = createSeatCap(deps);
   const { ensurePersonalOrgFor } = createPersonalOrg(deps, emit);
   const snapshots = createSnapshots();
-  const { emitScimUserEvents } = createScimEvents(emit, snapshots);
+  const { emitScimUserEvents } = createScimEvents(emit, deps.queries, snapshots);
   const emailFlows = createEmailFlows(deps, {
     emit,
     dispatchEmail,

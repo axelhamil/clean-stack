@@ -2,7 +2,6 @@ import { lockForTransaction } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
 import type { AuthDeps } from "./deps";
 import type { Emit } from "./emit";
-import { findActiveMemberOrgId, insertPersonalOrgWithOwner } from "./queries";
 
 interface SignupUser {
   email: string;
@@ -10,7 +9,7 @@ interface SignupUser {
 }
 
 export function createPersonalOrg(
-  deps: Pick<AuthDeps, "uow">,
+  deps: Pick<AuthDeps, "uow" | "queries">,
   emit: Emit,
 ): {
   ensurePersonalOrgFor(userId: string, signupUser?: SignupUser): Promise<string>;
@@ -41,7 +40,7 @@ export function createPersonalOrg(
           );
         };
 
-        const existingOrgId = await findActiveMemberOrgId(userId);
+        const existingOrgId = await deps.queries.findActiveMemberOrgId(userId);
         if (existingOrgId) {
           await emitUserCreated();
           return existingOrgId;
@@ -51,7 +50,7 @@ export function createPersonalOrg(
         const memberId = crypto.randomUUID();
         const slug = `personal-${orgId}`;
         const now = new Date();
-        await insertPersonalOrgWithOwner({
+        await deps.queries.insertPersonalOrgWithOwner({
           orgId,
           memberId,
           userId,

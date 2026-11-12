@@ -7,7 +7,6 @@ import type { AuthDeps } from "./deps";
 import { redirectQuery } from "./email-redirect";
 import type { Emit } from "./emit";
 import { markPasswordResetDelivered } from "./password-reset-delivery";
-import { setPendingEmail } from "./queries";
 import { requestClientIp } from "./visitor";
 
 /**
@@ -109,7 +108,7 @@ export interface EmailFlows {
 }
 
 export function createEmailFlows(
-  deps: Pick<AuthDeps, "uow" | "profiles" | "settings">,
+  deps: Pick<AuthDeps, "uow" | "profiles" | "queries" | "settings">,
   parts: {
     emit: Emit;
     dispatchEmail: DispatchEmail;
@@ -122,7 +121,7 @@ export function createEmailFlows(
   return {
     sendChangeEmailConfirmation: async ({ user, newEmail, url, token }) => {
       await deps.uow.run(async () => {
-        await setPendingEmail(user.id, newEmail);
+        await deps.queries.setPendingEmail(user.id, newEmail);
         await emit(
           EventTypes.USER_EMAIL_CHANGE_REQUESTED,
           "user",

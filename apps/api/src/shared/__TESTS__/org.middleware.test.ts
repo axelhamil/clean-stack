@@ -3,12 +3,9 @@ import { Hono } from "hono";
 
 let nextRole: string | null = null;
 
-// The role lookup is the only data access this subject performs; everything else the
-// real module exports stays real (see apps/api/CLAUDE.md, spread the real module).
-const realAuthQueries = await import("../../auth/queries");
-mock.module("../../auth/queries", () => ({
-  ...realAuthQueries,
-  findActiveMemberRole: async () => nextRole,
+// The role lookup is the only data access this subject performs, read from the container.
+mock.module("../../container", () => ({
+  di: { AuthQueries: { findActiveMemberRole: async () => nextRole } },
 }));
 
 const { requireOrg, requireOrgPermission } = await import("../middleware/org.middleware");

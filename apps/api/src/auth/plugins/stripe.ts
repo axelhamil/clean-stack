@@ -15,7 +15,7 @@ import type Stripe from "stripe";
 import type { AuthDeps } from "../deps";
 import type { Emit } from "../emit";
 import type { AuthHelpers } from "../helpers";
-import { findActiveMemberRole, findOrgOwnerUserId } from "../queries";
+import type { AuthQueries } from "../queries";
 
 /**
  * Stripe is the caller, so a failed invoice names no user. Bookkeeping aside, this is all
@@ -52,6 +52,7 @@ async function recordStripeDelivery(
  */
 async function emitSubscriptionEvent(
   emit: Emit,
+  queries: Pick<AuthQueries, "findOrgOwnerUserId">,
   eventType: EventType,
   subscription: {
     id: string;
@@ -63,7 +64,7 @@ async function emitSubscriptionEvent(
   tier: string,
   stripeEventId: string,
 ): Promise<void> {
-  const actorUserId = await findOrgOwnerUserId(subscription.referenceId);
+  const actorUserId = await queries.findOrgOwnerUserId(subscription.referenceId);
   await emit(
     eventType,
     "subscription",
@@ -89,7 +90,10 @@ async function emitSubscriptionEvent(
 }
 
 export function stripePlugin(
-  deps: Pick<AuthDeps, "stripeClient" | "stripeEvents" | "plans" | "stripeSync" | "settings">,
+  deps: Pick<
+    AuthDeps,
+    "stripeClient" | "stripeEvents" | "plans" | "stripeSync" | "queries" | "settings"
+  >,
   helpers: Pick<AuthHelpers, "emit">,
 ) {
   const { emit } = helpers;
@@ -109,7 +113,7 @@ export function stripePlugin(
       authorizeReference: async ({ user, referenceId, action }) => {
         if (referenceId === user.id) return true;
 
-        const role = await findActiveMemberRole(user.id, referenceId);
+        const role = await deps.queries.findActiveMemberRole(user.id, referenceId);
         const orgRole = ORG_ROLES.find((candidate) => candidate === role);
 
         return authorizeSubscriptionAction(action, orgRole);
@@ -117,6 +121,7 @@ export function stripePlugin(
       onSubscriptionComplete: async ({ event, subscription, plan }) => {
         await emitSubscriptionEvent(
           emit,
+          deps.queries,
           EventTypes.BILLING_SUBSCRIPTION_CREATED,
           subscription,
           plan.name,
@@ -126,6 +131,7 @@ export function stripePlugin(
       onSubscriptionCreated: async ({ event, subscription, plan }) => {
         await emitSubscriptionEvent(
           emit,
+          deps.queries,
           EventTypes.BILLING_SUBSCRIPTION_CREATED,
           subscription,
           plan.name,
@@ -135,6 +141,7 @@ export function stripePlugin(
       onSubscriptionDeleted: async ({ event, subscription }) => {
         await emitSubscriptionEvent(
           emit,
+          deps.queries,
           EventTypes.BILLING_SUBSCRIPTION_CANCELLED,
           subscription,
           subscription.plan,
@@ -144,6 +151,7 @@ export function stripePlugin(
       onSubscriptionUpdate: async ({ event, subscription }) => {
         await emitSubscriptionEvent(
           emit,
+          deps.queries,
           subscriptionEventType(subscription.status),
           subscription,
           subscription.plan,

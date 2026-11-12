@@ -3,11 +3,6 @@ import { EventTypes } from "@packages/events";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import type { AuthDeps } from "../deps";
 import type { AuthHelpers } from "../helpers";
-import {
-  findLatestLinkedAccount,
-  findLatestPasskey,
-  findSsoProviderByProviderId,
-} from "../queries";
 import { isSamlCallbackPath, isSsoCallbackPath, SCIM_PATHS, SSO_PATHS } from "../sso-paths";
 import { requestClientIp } from "../visitor";
 
@@ -24,7 +19,7 @@ function readCookieFromHeaders(headers: Headers | undefined, name: string): stri
 }
 
 export function createAfterHook(
-  deps: Pick<AuthDeps, "totp" | "consents" | "logger">,
+  deps: Pick<AuthDeps, "totp" | "consents" | "logger" | "queries">,
   helpers: Pick<AuthHelpers, "emit" | "emitScimUserEvents" | "snapshots">,
 ) {
   const { emit, emitScimUserEvents } = helpers;
@@ -43,7 +38,9 @@ export function createAfterHook(
     // must run before the early-return below, every other branch only sees success.
     if (ctx.context.returned instanceof APIError && isSsoCallbackPath(path)) {
       const providerId = (ctx.params as Record<string, string> | undefined)?.providerId ?? null;
-      const provider = providerId ? await findSsoProviderByProviderId(providerId) : undefined;
+      const provider = providerId
+        ? await deps.queries.findSsoProviderByProviderId(providerId)
+        : undefined;
       // `organizationId` is what makes a public event deliverable: WebhookFanoutSubscriber
       // drops every event whose organizationId is none before it even reads the
       // visibility map, so a public `sso.login.failure` without it is undeliverable
@@ -98,7 +95,7 @@ export function createAfterHook(
         const isSaml = isSamlCallbackPath(path);
         let providerId = params?.providerId;
         if (!providerId) {
-          const latest = await findLatestLinkedAccount(session.user.id);
+          const latest = await deps.queries.findLatestLinkedAccount(session.user.id);
           providerId = latest?.providerId;
         }
         await emit(
@@ -153,7 +150,7 @@ export function createAfterHook(
       return;
     }
     if (path === "/passkey/verify-registration") {
-      const latest = await findLatestPasskey(userId);
+      const latest = await deps.queries.findLatestPasskey(userId);
       if (latest) {
         await emit(EventTypes.USER_PASSKEY_ADDED, "user", userId, {
           userId,
@@ -182,7 +179,7 @@ export function createAfterHook(
       return;
     }
     if (path === "/link-social") {
-      const latest = await findLatestLinkedAccount(userId);
+      const latest = await deps.queries.findLatestLinkedAccount(userId);
       const recentEnough = latest?.createdAt && Date.now() - latest.createdAt.getTime() < 5_000;
       if (latest && latest.providerId !== "credential" && recentEnough) {
         await emit(EventTypes.USER_ACCOUNT_LINKED, "account", latest.id, {
@@ -263,7 +260,7 @@ export function createAfterHook(
     if (path === SSO_PATHS.verifyDomain) {
       const providerId = body?.providerId as string | undefined;
       if (providerId) {
-        const provider = await findSsoProviderByProviderId(providerId);
+        const provider = await deps.queries.findSsoProviderByProviderId(providerId);
         if (provider?.organizationId) {
           await emit(
             EventTypes.SSO_DOMAIN_VERIFIED,

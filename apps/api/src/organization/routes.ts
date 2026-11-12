@@ -14,6 +14,7 @@ const scimSvc = new ScimConnectionService(
   di.IOutboxRepository,
   di.ITransactionService,
   di.IInstrumentation,
+  di.AuthQueries,
 );
 
 // Only the owner manages the directory connection: a token that provisions members

@@ -6,13 +6,12 @@ import { IMPERSONATE_PATH } from "../../shared/middleware/impersonation-blocklis
 import { getVisitorGeo } from "../../shared/request-context";
 import type { AuthDeps } from "../deps";
 import type { AuthHelpers } from "../helpers";
-import { clearConfirmedPendingEmail, emailFor, enforcedProviderForDomain } from "../queries";
 import { isSsoEnforcedFor } from "../sso-enforcement";
 import { isSsoCallbackPath } from "../sso-paths";
 import { provisionsForSomeoneElse, renewsOwnSession, requestClientIp } from "../visitor";
 
 export function createDatabaseHooks(
-  deps: Pick<AuthDeps, "uow" | "securitySignals" | "staffSessions" | "logger">,
+  deps: Pick<AuthDeps, "uow" | "securitySignals" | "staffSessions" | "logger" | "queries">,
   helpers: Pick<AuthHelpers, "emit" | "refuseDeniedVisitor" | "ensurePersonalOrgFor">,
 ) {
   const { emit, refuseDeniedVisitor, ensurePersonalOrgFor } = helpers;
@@ -37,7 +36,7 @@ export function createDatabaseHooks(
       update: {
         after: async (user) => {
           await deps.uow.run(async () => {
-            const cleared = await clearConfirmedPendingEmail(user.id, user.email);
+            const cleared = await deps.queries.clearConfirmedPendingEmail(user.id, user.email);
             if (!cleared) return;
             await emit(
               EventTypes.USER_PROFILE_UPDATED,
@@ -77,9 +76,12 @@ export function createDatabaseHooks(
           const createdBySso =
             isSsoCallbackPath(context?.path) || context?.path === IMPERSONATE_PATH;
           if (!createdBySso) {
-            const email = await emailFor(session.userId);
+            const email = await deps.queries.emailFor(session.userId);
             if (email) {
-              const enforced = await isSsoEnforcedFor(email, enforcedProviderForDomain);
+              const enforced = await isSsoEnforcedFor(
+                email,
+                deps.queries.enforcedProviderForDomain,
+              );
               if (enforced.isSome()) {
                 throw new APIError("FORBIDDEN", {
                   message: "SSO_REQUIRED",

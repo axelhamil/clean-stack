@@ -155,6 +155,7 @@ async function main(): Promise<void> {
     di.IOutboxRepository,
     di.ITransactionService,
     di.IInstrumentation,
+    di.AuthQueries,
   );
 
   const firstIssues = await issueConcurrently(service);

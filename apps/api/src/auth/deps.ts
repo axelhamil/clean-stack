@@ -18,6 +18,7 @@ import type {
   IStaffSessionEnder,
   IStripeSyncCheck,
 } from "./ports";
+import type { AuthQueries } from "./queries";
 import type { OutermostUnitOfWork } from "./unit-of-work-adapter";
 
 export interface AuthSettings {
@@ -55,5 +56,6 @@ export interface AuthDeps {
   staffSessions: IStaffSessionEnder;
   securitySignals: ISecuritySignals;
   logger: ILogger;
+  queries: AuthQueries;
   settings: AuthSettings;
 }

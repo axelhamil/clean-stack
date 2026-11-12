@@ -1,11 +1,10 @@
 import { hasSeatAvailable } from "@modules/billing/domain/entitlements";
 import { ambientTransaction } from "@packages/drizzle";
 import type { AuthDeps } from "./deps";
-import { countActiveMembers, lockSeatsOf } from "./queries";
 
 export type SeatCap = { available: boolean; activeMembers: number; maxMembers: number | null };
 
-export function createSeatCap(deps: Pick<AuthDeps, "entitlements">): {
+export function createSeatCap(deps: Pick<AuthDeps, "entitlements" | "queries">): {
   seatCapFor(orgId: string): Promise<SeatCap>;
 } {
   return {
@@ -21,8 +20,8 @@ export function createSeatCap(deps: Pick<AuthDeps, "entitlements">): {
      */
     async seatCapFor(orgId) {
       const view = await deps.entitlements.getEntitlements(orgId);
-      if (ambientTransaction().isSome()) await lockSeatsOf(orgId);
-      const activeMembers = await countActiveMembers(orgId);
+      if (ambientTransaction().isSome()) await deps.queries.lockSeatsOf(orgId);
+      const activeMembers = await deps.queries.countActiveMembers(orgId);
       return {
         available: hasSeatAvailable(activeMembers, view.maxMembers),
         activeMembers,

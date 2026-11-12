@@ -20,6 +20,7 @@ import type {
   IStaffSessionEnder,
   IStripeSyncCheck,
 } from "../../auth/ports";
+import type { AuthQueries } from "../../auth/queries";
 import type { OutermostUnitOfWork } from "../../auth/unit-of-work-adapter";
 import type { IDisposableEmailService } from "../../shared/ports/disposable-email.port";
 import type { IPasswordBreachService } from "../../shared/ports/password-breach.port";
@@ -40,6 +41,7 @@ export interface AuthSourcesPrerequisites {
   IStripeEventStore: IStripeEventStore;
   StripeClient: Stripe;
   ILogger: ILogger;
+  AuthQueries: AuthQueries;
   authSettings: AuthSettings;
   SecuritySignalsService: SecuritySignalsService;
   StaffService: StaffService;
@@ -78,6 +80,7 @@ export const authSources = defineModule<AuthSourcesPrerequisites>()((b) =>
         staffSessions: c.IStaffSessionEnder,
         securitySignals: c.ISecuritySignals,
         logger: c.ILogger,
+        queries: c.AuthQueries,
         settings: c.authSettings,
       }),
     ),

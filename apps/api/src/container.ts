@@ -31,6 +31,7 @@ import { OutboxRelay } from "@packages/outbox/outbox-relay";
 import { container } from "inwire";
 import { Resend } from "resend";
 import { authSecretKey } from "./auth/auth-secrets";
+import { type AuthQueries, createAuthQueries } from "./auth/queries";
 import type { OutermostUnitOfWork } from "./auth/unit-of-work-adapter";
 import { apiSettings } from "./composition/settings";
 import { adminSources } from "./composition/sources/admin";
@@ -77,6 +78,7 @@ declare module "inwire" {
     IOutboxRepository: IOutboxRepository;
     ISweepRunStore: ISweepRunStore;
     IInstrumentation: IInstrumentation;
+    AuthQueries: AuthQueries;
     ILogger: ILogger;
     IPasswordBreachService: IPasswordBreachService;
     IDisposableEmailService: IDisposableEmailService;
@@ -101,6 +103,7 @@ export const di = container()
       env.SENTRY_DSN ? new SentryInstrumentation() : new LoggingInstrumentation(logger),
   )
   .add("ILogger", (): ILogger => logger)
+  .add("AuthQueries", (c): AuthQueries => createAuthQueries(c.IInstrumentation))
   .add("ISweepRunStore", (c): ISweepRunStore => new DrizzleSweepRunStore(c.IInstrumentation))
   .add(
     "IOutboxRepository",
@@ -195,7 +198,13 @@ export const di = container()
   )
   .add(
     "AdminActionService",
-    (c) => new AdminActionService(c.IOutboxRepository, c.ITransactionService, c.IInstrumentation),
+    (c) =>
+      new AdminActionService(
+        c.IOutboxRepository,
+        c.ITransactionService,
+        c.IInstrumentation,
+        c.AuthQueries,
+      ),
   )
   .addModule(apiTokenModule)
   .addModule(healthModule)

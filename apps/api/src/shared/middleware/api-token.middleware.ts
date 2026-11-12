@@ -10,7 +10,7 @@ import type { MiddlewareHandler } from "hono";
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import type { SessionUser } from "../../auth";
-import { findUserById } from "../../auth/queries";
+import type { AuthQueries } from "../../auth/queries";
 import { getRequestId } from "../request-context";
 
 export interface ApiTokenVariables {
@@ -26,6 +26,7 @@ export interface ApiTokenDeps {
   uow: IUnitOfWork;
   instrumentation: IInstrumentation;
   logger: ILogger;
+  queries: Pick<AuthQueries, "findUserById">;
   prefix: string;
   pepper: string;
   pepperVersion: number;
@@ -92,7 +93,7 @@ export function requireApiToken(
       throw new HTTPException(403, { message: "Forbidden" });
     }
 
-    const userRow = await findUserById(record.userId);
+    const userRow = await deps.queries.findUserById(record.userId);
     if (!userRow || userRow.deletedAt !== null) {
       throw new HTTPException(401, { message: "Unauthorized" });
     }

@@ -10,7 +10,7 @@ import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";
 import type { ISecuritySignals } from "../auth/ports";
 import type { IDisposableEmailService } from "../shared/ports/disposable-email.port";
 import type { IPasswordBreachService } from "../shared/ports/password-breach.port";
-import { fakeAuthDeps, outermostUnitOfWork } from "./fake-auth-deps";
+import { fakeAuthDeps, fakeAuthQueries, outermostUnitOfWork } from "./fake-auth-deps";
 
 const outbox = mockPort<IOutboxRepository>();
 const breach = mockPort<IPasswordBreachService>();
@@ -19,13 +19,6 @@ const { unitOfWork } = mockUnitOfWork();
 let entitledFeatures: Feature[] = [];
 
 const clearExpiredBan = mock(async () => false);
-
-const realAuthQueries = await import("../auth/queries");
-mock.module("../auth/queries", () => ({
-  ...realAuthQueries,
-  clearExpiredBan,
-  enforcedProviderForDomain: async () => Option.none(),
-}));
 
 const { createAuth } = await import("../auth/create-auth");
 const securitySignals = mockPort<ISecuritySignals>();
@@ -40,6 +33,10 @@ entitlements.getEntitlements.mockImplementation(async () => ({
 }));
 const auth = createAuth(
   fakeAuthDeps({
+    queries: fakeAuthQueries({
+      clearExpiredBan,
+      enforcedProviderForDomain: async () => Option.none(),
+    }),
     outbox,
     uow: outermostUnitOfWork(unitOfWork),
     passwordBreach: breach,
