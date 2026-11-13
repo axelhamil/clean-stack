@@ -63,6 +63,7 @@
         "**/*.test.ts",
         "**/*.test.tsx",
         "**/__TESTS__/**",
+        "**/__tests__/**",
         "package.json",
         "tsconfig*.json",
         "vitest.config.*"
