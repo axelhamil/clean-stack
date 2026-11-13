@@ -944,7 +944,7 @@ Updated in the PR that delivers each line.
 | 0 | `api-token` | business | `ApiToken` | M | done 2026-11-13 | | yes |
 | 1 | `billing` + `quotas` | technical | no | M | to do | | |
 | 1 | `profile` | technical | no | S | done 2026-11-13 | | yes |
-| 1 | `policies` | technical | no | S to M | to do | | |
+| 1 | `policies` | technical | no | S to M | done 2026-11-13 | | yes |
 | 1 | `consents` | technical | no | M | to do | | |
 | 1 | `audit-log` | technical | no | M | to do | | |
 | 2 | `webhooks` | technical | no | L | to do | | |

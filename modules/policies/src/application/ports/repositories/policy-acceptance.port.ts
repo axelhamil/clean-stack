@@ -11,9 +11,6 @@ export interface PolicyAcceptanceRecord {
   ipAddress: Option<string>;
 }
 
-export interface IPolicyAcceptanceStore {
+export interface IPolicyAcceptanceRepository {
   insert(row: PolicyAcceptanceRecord): Promise<Result<void, PolicyError>>;
-  findLatestVersions(
-    userId: string,
-  ): Promise<Result<Partial<Record<PolicyType, string>>, PolicyError>>;
 }

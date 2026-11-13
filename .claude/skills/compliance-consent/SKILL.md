@@ -12,7 +12,7 @@ Both are **compliance infra, not DDD**. They mirror each other's shape.
 Records which policy version each user accepted and when.
 
 - **`@packages/policies`** is the SSOT (`POLICY_VERSIONS`, `POLICY_TYPES`, `POLICY_CHANGELOG`, `POLICY_URLS`). Bump the version string → every consumer sees the change at compile time. `POLICY_URLS` is the swap point for hosting policy text externally.
-- **`PolicyAcceptanceService.accept(userId, types, ipAddress?)`** writes N rows + emits N `user.policy.accepted` events in one `uow.run` TX, any failure throws (no partial acceptance). `getStaleTypes(userId)` drives the gate. `DrizzlePolicyAcceptanceStore` is fully §8-instrumented.
+- **`PolicyAcceptanceService.accept(userId, types, ipAddress?)`** writes N rows + emits N `user.policy.accepted` events in one `uow.run` TX, any failure throws (no partial acceptance). `getStaleTypes(userId)` drives the gate. `DrizzlePolicyAcceptanceRepository` and `DrizzlePolicyStatusQuery` are fully §8-instrumented.
 - **`requireCurrentPolicies`** (`shared/middleware/policy.middleware.ts`): composable, **not mounted globally**, 409 when any policy is stale. `_shell` `beforeLoad` redirect is the UX gate; this middleware is defense-in-depth.
 - **Sign-up acceptance via `/verify-email` hook**: called from BetterAuth `/verify-email` after-hook AND from `POST /me/policies/accept`. Not at `/sign-up/email` (no session yet; returns synthetic user on duplicate-email).
 

@@ -1,23 +1,14 @@
-import { type IInstrumentation, type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
-import { EventTypes } from "@packages/events";
-import { emitEvent } from "@packages/outbox/event-emitter";
-import type { IOutboxRepository } from "@packages/outbox/outbox.port";
-import { POLICY_TYPES, POLICY_VERSIONS, type PolicyType } from "@packages/policies";
-import type { IPolicyAcceptanceStore, PolicyError } from "../ports/policy-acceptance.port";
-
-export interface PolicyTypeStatus {
-  current: boolean;
-  acceptedVersion: string | null;
-}
-
-export type PolicyAcceptanceStatus = Record<PolicyType, PolicyTypeStatus>;
+import { Option, type Result } from "@packages/ddd-kit";
+import type { PolicyType } from "@packages/policies";
+import type { PolicyError } from "../ports/repositories/policy-acceptance.port";
+import type { IPolicyStatusQuery } from "../queries/policy-status.query";
+import type { AcceptPoliciesUseCase } from "../usecases/accept-policies/accept-policies.usecase";
+import { staleTypesOf } from "./policy-status.service";
 
 export class PolicyAcceptanceService {
   constructor(
-    private readonly store: IPolicyAcceptanceStore,
-    private readonly outbox: IOutboxRepository,
-    private readonly uow: IUnitOfWork,
-    private readonly instrumentation: IInstrumentation,
+    private readonly acceptPolicies: AcceptPoliciesUseCase,
+    private readonly policyStatus: IPolicyStatusQuery,
   ) {}
 
   async accept(
@@ -25,70 +16,24 @@ export class PolicyAcceptanceService {
     types: PolicyType[],
     ipAddress?: string,
   ): Promise<Result<void, PolicyError>> {
-    if (types.length === 0) return Result.ok();
+    const accepted = await this.acceptPolicies.execute({
+      userId,
+      types: Option.some(types),
+      ipAddress: Option.fromNullable(ipAddress),
+    });
 
-    try {
-      return await this.uow.run(async () => {
-        for (const policyType of types) {
-          const policyVersion = POLICY_VERSIONS[policyType];
-
-          const inserted = await this.store.insert({
-            id: crypto.randomUUID(),
-            userId,
-            policyType,
-            policyVersion,
-            ipAddress: Option.fromNullable(ipAddress),
-          });
-          if (inserted.isFailure) return inserted;
-
-          await emitEvent(
-            this.outbox,
-            EventTypes.USER_POLICY_ACCEPTED,
-            "user",
-            userId,
-            { userId, policyType, policyVersion, ipAddress },
-            {},
-          );
-        }
-
-        return Result.ok<PolicyError>();
-      });
-    } catch (err) {
-      this.instrumentation.capture(err);
-      return Result.fail({
-        code: "POLICY_ACCEPTANCE_PROVIDER_FAILURE",
-        message: "policy acceptance failed",
-      });
-    }
-  }
-
-  async getStatus(userId: string): Promise<Result<PolicyAcceptanceStatus, PolicyError>> {
-    const r = await this.store.findLatestVersions(userId);
-    if (r.isFailure) return Result.fail(r.getError());
-
-    const latest = r.getValue();
-    const status = {} as PolicyAcceptanceStatus;
-    for (const t of POLICY_TYPES) {
-      const acceptedVersion = latest[t] ?? null;
-      status[t] = { current: acceptedVersion === POLICY_VERSIONS[t], acceptedVersion };
-    }
-
-    return Result.ok(status);
+    return accepted.map(() => undefined);
   }
 
   async getStaleTypes(userId: string): Promise<Result<PolicyType[], PolicyError>> {
-    const r = await this.getStatus(userId);
-    if (r.isFailure) return Result.fail(r.getError());
+    const status = await this.policyStatus.execute({ userId });
 
-    const status = r.getValue();
-
-    return Result.ok(POLICY_TYPES.filter((t) => !status[t].current));
+    return status.map(staleTypesOf);
   }
 
   async hasAcceptedCurrent(userId: string): Promise<Result<boolean, PolicyError>> {
-    const r = await this.getStaleTypes(userId);
-    if (r.isFailure) return Result.fail(r.getError());
+    const stale = await this.getStaleTypes(userId);
 
-    return Result.ok(r.getValue().length === 0);
+    return stale.map((types) => types.length === 0);
   }
 }

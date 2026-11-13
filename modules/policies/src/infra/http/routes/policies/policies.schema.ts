@@ -1,6 +1,6 @@
 import { POLICY_TYPES } from "@packages/policies";
 import { z } from "zod";
 
-export const acceptPoliciesDto = z.object({
+export const acceptPoliciesBodySchema = z.object({
   types: z.array(z.enum(POLICY_TYPES)).optional(),
 });
