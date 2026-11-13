@@ -1,11 +1,9 @@
-// `visibleTokensFilter` (drizzle-api-token.repository.ts) builds the
-// confinement WHERE clause with `and`/`or`/`eq`/`isNull`, a mocked `tx`
-// never evaluates a `WHERE`. The unit suite
-// (`drizzle-api-token.repository.test.ts`) replaces those Drizzle builders
-// with opaque stand-ins, so a green run there proves only that the method was
-// called, never that the predicate excludes/includes the right rows. This
-// runs the real repository against a real Postgres and checks exactly which
-// rows each owner scope returns. See `apps/api/CLAUDE.md` ("write
+// `visibleTokensFilter` (infra/repos/drizzle/api-token.repository.ts) builds
+// the confinement WHERE clause with `and`/`or`/`eq`/`isNull`, a mocked `tx`
+// never evaluates a `WHERE`, and the list query re-applies `ownerReaches` in
+// TypeScript, which would hide a leaky predicate. This runs the predicate alone,
+// the real list query and the real repository against a real Postgres and
+// checks exactly which rows each owner scope returns. See `apps/api/CLAUDE.md` ("write
 // an executable check against a real database and wire it to a script") and
 // `check-fanout-preferences.ts` for the reference shape.
 //
@@ -20,8 +18,13 @@ import { authSchema, db, multiTenantSchema, sql } from "@packages/drizzle";
 import { checkRecorder, findSeededUserId } from "@packages/test/check-harness";
 import { requireLocalDatabase } from "@packages/test/require-local-database";
 import * as apiTokenSchema from "../schemas/api-token";
-import type { TokenOwner } from "../src/application/ports/api-token.port";
-import { DrizzleApiTokenRepository } from "../src/infrastructure/repositories/drizzle-api-token.repository";
+import { ApiTokenId } from "../src/domain/api-token/api-token-id";
+import type { TokenOwner } from "../src/domain/api-token/services/token-visibility.service";
+import { DrizzleListApiTokensQuery } from "../src/infra/queries/list-api-tokens.query";
+import {
+  DrizzleApiTokenRepository,
+  visibleTokensFilter,
+} from "../src/infra/repos/drizzle/api-token.repository";
 
 requireLocalDatabase("check-api-token-visibility");
 
@@ -70,7 +73,7 @@ const token = (id: string, userId: string, organizationId: string | null) => ({
   userId,
   organizationId,
   name: id,
-  scopes: ["read"],
+  scopes: ["read:profile"],
   tokenHmac: `${id}-hmac`,
   pepperVersion: 1,
   tokenStart: id.slice(0, 8),
@@ -87,14 +90,38 @@ await db
   ]);
 
 const repo = new DrizzleApiTokenRepository(new NoOpInstrumentation());
+const listQuery = new DrizzleListApiTokensQuery(new NoOpInstrumentation());
+
+async function predicateIdsFor(owner: TokenOwner): Promise<string[]> {
+  const rows = await db
+    .select({ id: apiTokenSchema.apiToken.id })
+    .from(apiTokenSchema.apiToken)
+    .where(visibleTokensFilter(owner));
+  return rows.map((r) => r.id).sort();
+}
+
+async function listedIdsFor(owner: TokenOwner): Promise<string[]> {
+  const listed = await listQuery.execute({ owner });
+  if (listed.isFailure) throw new Error(listed.getError().message);
+
+  return listed
+    .getValue()
+    .map((t) => t.id.value)
+    .sort();
+}
 
 async function idsFor(owner: TokenOwner): Promise<string[]> {
-  const result = await repo.listByOwner(owner);
-  if (result.isFailure) throw new Error(result.getError().message);
-  return result
-    .getValue()
-    .map((r) => r.id)
-    .sort();
+  const [predicate, listed] = await Promise.all([predicateIdsFor(owner), listedIdsFor(owner)]);
+  check(
+    "the list query returns exactly what the predicate alone selects",
+    predicate.join(",") === listed.join(","),
+    {
+      predicate,
+      listed,
+    },
+  );
+
+  return listed;
 }
 
 console.log("[1] a personal scope sees only the owner's org-less token");
@@ -127,7 +154,7 @@ check(
 check("another user's personal token never leaks in", !scopedIds.includes(otherPersonal));
 
 console.log("[3] findByIdForOwner: a row outside the visible set is absent, never a leaked 403");
-const outOfScope = await repo.findByIdForOwner(ownUnreachableOrg, {
+const outOfScope = await repo.findByIdForOwner(new ApiTokenId(ownUnreachableOrg), {
   kind: "orgAndPersonal",
   userId: ownerId,
   organizationId: orgReachableId,
@@ -137,7 +164,7 @@ check(
   outOfScope.isSuccess && outOfScope.getValue().isNone(),
 );
 
-const otherOwnersToken = await repo.findByIdForOwner(otherReachableOrg, {
+const otherOwnersToken = await repo.findByIdForOwner(new ApiTokenId(otherReachableOrg), {
   kind: "orgAndPersonal",
   userId: ownerId,
   organizationId: orgReachableId,
@@ -147,7 +174,7 @@ check(
   otherOwnersToken.isSuccess && otherOwnersToken.getValue().isNone(),
 );
 
-const inScope = await repo.findByIdForOwner(ownReachableOrg, {
+const inScope = await repo.findByIdForOwner(new ApiTokenId(ownReachableOrg), {
   kind: "orgAndPersonal",
   userId: ownerId,
   organizationId: orgReachableId,

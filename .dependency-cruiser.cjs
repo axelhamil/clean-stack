@@ -9,7 +9,7 @@ const FRAMEWORKS = `node_modules/(hono|hono-pino|@hono/[^/]+|${ORM_PACKAGES}|bet
 const INFRA = "(?:infrastructure|infra)";
 const TESTS = "(?:__TESTS__|__tests__|testing)";
 const TEST_PATH = `/${TESTS}/`;
-const MIGRATED_MODULES = ["uploads"];
+const MIGRATED_MODULES = ["uploads", "api-token"];
 const MIGRATED =
   MIGRATED_MODULES.length > 0 ? `${MODULES}/(${MIGRATED_MODULES.join("|")})/src/` : "^$";
 

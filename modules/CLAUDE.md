@@ -102,7 +102,7 @@ const parsePayload = payloadParser(PayloadByEventType[EventTypes.ORG_MEMBER_REMO
 export const revokeOnMembershipLost = onEvent(
   EventTypes.ORG_MEMBER_REMOVED,
   "revoke-api-tokens-on-membership-lost",
-  (c: Deps) => async (_event, payload) => c.ITransactionService.run(async () => /* write + emitEvent */),
+  (c: Deps) => dispatchTo(c.RevokeMembershipTokensUseCase, ({ userId, organizationId, actorUserId }) => ({ userId, organizationId, actorUserId })),
   { payload: parsePayload },
 );
 ```

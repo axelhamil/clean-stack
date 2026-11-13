@@ -1,19 +1,26 @@
 import type { EventHandler, IInstrumentation, IUnitOfWork } from "@packages/ddd-kit";
 import type { IEmailService } from "@packages/email/email.port";
-import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { defineModule } from "inwire";
 import type { ApiTokenSettings } from "./application/config/api-token-settings";
 import { revokeTokensOnMembershipLost } from "./application/event-handlers/revoke-on-membership-lost";
-import type { IApiTokenRepository } from "./application/ports/api-token.port";
-import type { IUserContactReader } from "./application/ports/user-contact.port";
+import type { IApiTokenRepository } from "./application/ports/repositories/api-token.port";
+import type { IGithubKeyVerifier } from "./application/ports/services/github-key-verifier.port";
+import type { ITokenHasher } from "./application/ports/services/token-hasher.port";
+import type { IUserContactReader } from "./application/ports/services/user-contact.port";
+import type { IListApiTokensQuery } from "./application/queries/list-api-tokens.query";
 import { ApiTokenService } from "./application/services/api-token.service";
-import { TokenLeakService } from "./application/services/token-leak.service";
-import { DrizzleApiTokenRepository } from "./infrastructure/repositories/drizzle-api-token.repository";
-import { GithubKeyVerifier } from "./infrastructure/services/github-key-verifier";
+import { CreateApiTokenUseCase } from "./application/usecases/create-api-token/create-api-token.usecase";
+import { HandleLeakReportUseCase } from "./application/usecases/handle-leak-report/handle-leak-report.usecase";
+import { RevokeAllUserTokensUseCase } from "./application/usecases/revoke-all-user-tokens/revoke-all-user-tokens.usecase";
+import { RevokeApiTokenUseCase } from "./application/usecases/revoke-api-token/revoke-api-token.usecase";
+import { RevokeMembershipTokensUseCase } from "./application/usecases/revoke-membership-tokens/revoke-membership-tokens.usecase";
+import { cryptoTokenHasher } from "./infra/adapters/crypto-token-hasher.adapter";
+import { GithubKeyVerifier } from "./infra/adapters/github-key-verifier.adapter";
+import { DrizzleListApiTokensQuery } from "./infra/queries/list-api-tokens.query";
+import { DrizzleApiTokenRepository } from "./infra/repos/drizzle/api-token.repository";
 
 export interface ApiTokenPrerequisites {
   IInstrumentation: IInstrumentation;
-  IOutboxRepository: IOutboxRepository;
   ITransactionService: IUnitOfWork;
   IEmailService: IEmailService;
   IUserAccountStore: IUserContactReader;
@@ -26,24 +33,39 @@ export const apiTokenModule = defineModule<ApiTokenPrerequisites>()((b) =>
       "IApiTokenRepository",
       (c): IApiTokenRepository => new DrizzleApiTokenRepository(c.IInstrumentation),
     )
-    .add("GithubKeyVerifier", (c) => new GithubKeyVerifier(c.IInstrumentation))
+    .add("ITokenHasher", (): ITokenHasher => cryptoTokenHasher)
+    .add("IGithubKeyVerifier", (c): IGithubKeyVerifier => new GithubKeyVerifier(c.IInstrumentation))
     .add(
-      "ApiTokenService",
+      "IListApiTokensQuery",
+      (c): IListApiTokensQuery => new DrizzleListApiTokensQuery(c.IInstrumentation),
+    )
+    .add(
+      "CreateApiTokenUseCase",
       (c) =>
-        new ApiTokenService(
+        new CreateApiTokenUseCase(
           c.IApiTokenRepository,
-          c.IOutboxRepository,
+          c.ITokenHasher,
           c.ITransactionService,
           c.IInstrumentation,
           c.apiTokenSettings,
         ),
     )
     .add(
-      "TokenLeakService",
+      "RevokeApiTokenUseCase",
       (c) =>
-        new TokenLeakService(
+        new RevokeApiTokenUseCase(c.IApiTokenRepository, c.ITransactionService, c.IInstrumentation),
+    )
+    .add("RevokeAllUserTokensUseCase", (c) => new RevokeAllUserTokensUseCase(c.IApiTokenRepository))
+    .add(
+      "RevokeMembershipTokensUseCase",
+      (c) => new RevokeMembershipTokensUseCase(c.IApiTokenRepository, c.ITransactionService),
+    )
+    .add(
+      "HandleLeakReportUseCase",
+      (c) =>
+        new HandleLeakReportUseCase(
           c.IApiTokenRepository,
-          c.IOutboxRepository,
+          c.ITokenHasher,
           c.ITransactionService,
           c.IEmailService,
           c.IUserAccountStore,
@@ -51,13 +73,12 @@ export const apiTokenModule = defineModule<ApiTokenPrerequisites>()((b) =>
           c.apiTokenSettings,
         ),
     )
+    .add("ApiTokenService", (c) => new ApiTokenService(c.RevokeAllUserTokensUseCase))
     .add(
       "RevokeTokensOnMembershipLost",
       (c): EventHandler =>
         revokeTokensOnMembershipLost({
-          IApiTokenRepository: c.IApiTokenRepository,
-          IOutboxRepository: c.IOutboxRepository,
-          ITransactionService: c.ITransactionService,
+          RevokeMembershipTokensUseCase: c.RevokeMembershipTokensUseCase,
         }),
     ),
 );

@@ -137,7 +137,7 @@ A handler factory in the module's `src/application/event-handlers/`, bound in it
 
 ```ts
 // modules/api-token/src/application/event-handlers/revoke-on-membership-lost.ts (excerpt)
-import { type EventHandler, onEvent } from "@packages/ddd-kit";
+import { dispatchTo, type EventHandler, onEvent } from "@packages/ddd-kit";
 import { EventTypes, PayloadByEventType } from "@packages/events";
 import { payloadParser } from "@packages/outbox/payload-parser";
 
@@ -146,9 +146,12 @@ const parsePayload = payloadParser(PayloadByEventType[EventTypes.ORG_MEMBER_REMO
 export const revokeTokensOnMembershipLost: (deps: Deps) => EventHandler = onEvent(
   EventTypes.ORG_MEMBER_REMOVED,
   "revoke-api-tokens-on-membership-lost",
-  (c: Deps) => async (_event, payload) => {
-    // revokes the member's tokens and emits api_token.revoked in one c.ITransactionService.run
-  },
+  (c: Deps) =>
+    dispatchTo(c.RevokeMembershipTokensUseCase, ({ userId, organizationId, actorUserId }) => ({
+      userId,
+      organizationId,
+      actorUserId,
+    })),
   { payload: parsePayload },
 );
 ```
@@ -162,9 +165,7 @@ export const apiTokenModule = defineModule<ApiTokenPrerequisites>()((b) =>
       "RevokeTokensOnMembershipLost",
       (c): EventHandler =>
         revokeTokensOnMembershipLost({
-          IApiTokenRepository: c.IApiTokenRepository,
-          IOutboxRepository: c.IOutboxRepository,
-          ITransactionService: c.ITransactionService,
+          RevokeMembershipTokensUseCase: c.RevokeMembershipTokensUseCase,
         }),
     ),
 );

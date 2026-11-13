@@ -342,7 +342,7 @@ verification, token revocation in the same transaction, and an email to the
 owner (via the `api_token_leaked` Resend template).
 
 **What the boilerplate ships**: the receiving endpoint `POST /api/token-scanning/github`
-in `modules/api-token/src/infrastructure/http/scanning.routes.ts`, ready to deploy. The
+in `modules/api-token/src/infra/http/routes/scanning/scanning.ts`, ready to deploy. The
 endpoint verifies the `GITHUB-PUBLIC-KEY-SIGNATURE` + `GITHUB-PUBLIC-KEY-IDENTIFIER`
 headers against GitHub's live public keys (`https://api.github.com/meta/public_keys/secret_scanning`),
 revokes the matched token, and sends the owner an email. No extra env var is
