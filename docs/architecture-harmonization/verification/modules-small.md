@@ -1,0 +1,40 @@
+# Fact check: uploads, api-token, audit-log, consents, policies, profile (+ table 4.1 rows)
+
+Table 4.1 rows: counts consistent with the code (uploads 4, api-token 5+2, audit-log 3, consents 4, policies 4, profile 2). No error found there.
+
+## uploads
+Everything checked is correct (UploadService 4 actions, IStorageService 10 methods at storage.port.ts:39-59, rgpd.module.ts:23 maps IStorageService -> IExportStorage, check-wipe-rollback.ts:42 imports NoOpStorageService, deleteUploadBodySchema is z.union at delete-upload.dto.ts:4, routes all zV-validated).
+- Missing in "Do not break": `StorageHealthProbe` is an inwire OnInit (storage-health-probe.ts:12) that registers `storage:s3` in the host `IHealthCheckRegistry`; moving it must keep it registered as container key `StorageHealthProbe` (uploads.module.ts:41) or it never runs.
+- Missing: host also imports `@modules/uploads/application/config/upload-settings` (composition/settings.ts:13) and the routes factory (app.ts:20); package.json exports keys must stay until D13.
+
+## api-token
+- "Revocation, expiry and usability re-implemented in 4 places": confirmed (api-token.service.ts:136, token-leak.service.ts:77, api-token.middleware.ts:79-82, repository SQL isNull(revokedAt) drizzle-api-token.repository.ts:171,199,226). OK.
+- Imprecise "Do not break": the host middleware also does pepper rotation (rehash when found via `pepperPrevious`, api-token.middleware.ts:70-77,91-93) and a `record.scopes as ApiScope[]` cast (line 96). Add "pepper rotation / rehash path" to Do not break and "the cast at middleware:96" to Today.
+- Missing consumers: `IApiTokenRepository` is read directly by the host (app.ts:236 `repo: di.IApiTokenRepository`); `ApiTokenService` is bound as rgpd `IApiTokenRevoker` (composition/sources/rgpd.ts:44, uses `revokeAllOfUser`); `ApiScope`/`API_SCOPES` DTO is imported by public-api (`require-scope.ts`, `me.routes.ts`). The use case list must keep `revokeAllOfUser` reachable with the same signature for rgpd.
+- Scanning route: body already Zod-validated (scanning.routes.ts:12-14, 40); only the two GitHub headers are checked by hand (lines 23-29). "header validation on the scanning route" is right, but Today does not say the body is already validated.
+
+## audit-log
+- WRONG: "The chain write exists twice: `IAuditPort.record` is never called in production." `DrizzleAuditRepository.record` (drizzle-audit.service.ts:72-107) does NOT write a chain: no advisory lock, no hash, `prevHash`/`hash` are None. It is a plain insert, dead in production (the container exposes `IAuditTrail = Pick<IAuditPort,"list"|"verifyChain">`, audit-trail.port.ts:3, so `record` is not even reachable). Correct wording: "The module has two insert paths: the subscriber's chained insert (audit-event-subscriber.ts:55-86) and a dead, unchained `DrizzleAuditRepository.record`, which no caller can reach."
+- WRONG: "remove the duplicate insert path and its `as string`". The only `as string` is `prev = r.hash as string` in `verifyChain` (drizzle-audit.service.ts:194), not in the `record` insert path. It is removable by filtering with `isNotNull` typed rows or a guard in `verifyChain`, which stays. Correct: "remove the dead `record` insert; drop the `as string` in verifyChain separately".
+- Imprecise: "The route emits `audit_accessed`": the event is `SECURITY_OPERATOR_AUDIT_ACCESSED` and only on the first page (`if (!filters.cursor)`, audit-log.routes.ts:30). The `/verify` route emits nothing. Keep this in "Do not break" (emit condition) when moving it to the list use case.
+- Imprecise: "Add a real-database check for the chain under the advisory lock: none exists." A partial one exists: apps/api/scripts/check-outbox-lease.ts:373-399 runs two concurrent `AuditEventSubscriber.handle` on the same event with tamperEvidence=true and asserts a single chain link. What is missing is a check of concurrent distinct events and of `verifyChain` over real rows. Reword accordingly.
+- Missing in "Do not break": `AuditEventSubscriber` is used by check-outbox-lease.ts:20,373 by deep path and by container.ts:236 (builtin subscriber list); the `tamperEvidence` flag (`AUDIT_TAMPER_EVIDENCE`, settings.ts:143) switches the whole chain branch off (rows with null hash, skipped by verifyChain `isNotNull(hash)`); retention "none" early return and `audit-${eventId}` id with `onConflictDoNothing` are the idempotency contract; check-admin-approval.ts:830 calls `di.AuditQueryService.listForPlatform`.
+- Host sweep: confirmed (shared/internal-routes/sweep-audit-log.route.ts, imports schemas/audit-log).
+
+## consents
+- Imprecise: "The route mints the subject id, sets the cookie and reads the cookie value without Zod": minting and setCookie are only on POST (consents.routes.ts:30-34); GET/DELETE only read the cookie (lines 51, 66). The header read is `user-agent` (line 36). Accurate otherwise.
+- Imprecise "4 actions": `record`, `withdraw`, `getActive`, `reconcile` (consent.service.ts:41,76,97,114). `reconcile` is the one the host binds (auth.ts:60) and it is NOT reachable from any route; the 4 use cases should explicitly include `reconcile-consent` kept behind `IConsentReconciler`. Doc does not name the 4.
+- Missing: the service also builds the ConsentRecordRow (TTL constants, "necessary" injection, policy version) at lines 49-52; that logic belongs in the use case, not the route. The 3 `Pick`ed methods in the route exclude `reconcile`.
+- "Do not break": host sweep reads `schemas/consent` confirmed (sweep-consents.route.ts:4).
+
+## policies
+- Imprecise: "one route chains 3 service calls": `getStaleTypes` is conditional (only when `body.types` is absent, policies.routes.ts:30-35), then `accept`, then `getStatus`. 2 or 3 calls.
+- Casts: 2 `as` confirmed, but the code ones are `{} as PolicyAcceptanceStatus` (policy-acceptance.service.ts:70) and `row.policyType as PolicyType` in the store (drizzle-policy-acceptance.store.ts:70); `as const` at store:12 is not a cast to remove. State which two.
+- Missing in "Do not break": besides `IPolicyAcceptance` (auth/ports.ts:37, methods `getStaleTypes` and `accept` only) and `policy.middleware.ts:18` (`hasAcceptedCurrent`, hot path on every guarded route), the dev scripts `apps/api/scripts/seed-dev-user.ts:38-40` and `seed-staff.ts:51-53` call `di.PolicyAcceptanceService.getStaleTypes/accept`. They break if the service key disappears.
+- The 4 use cases: service has `accept`, `getStatus`, `getStaleTypes`, `hasAcceptedCurrent`; `getStaleTypes` and `hasAcceptedCurrent` are built on `getStatus` (service-internal calls), which is the "one use case calling another" case (Step 2 rule) to flag.
+
+## profile
+- Imprecise: "`IProfileStore` is imported by 6 host files". Count: 5 non-test importers (shared/services/backup-code-used-notifier.ts:1, shared/locale-for-user.ts:1, composition/sources/admin.ts:5, composition/sources/auth.ts:8, auth/deps.ts:3) plus container.ts:260 which reads the key `c.IProfileStore` without importing it; 3 more test files (backup-code-used-notifier.test, locale-for-email.test, __TESTS__/fake-auth-deps.ts). Say "5 importers plus the container wiring".
+- Missing: port has 3 methods, not 2: `findLocale`, `findLocaleByEmail`, `setLocale` (profile.port.ts:8-10). `findLocaleByEmail` is used by auth email via `localeForEmail` (auth/email.ts:181, locale-for-user.ts:30). "get-locale and set-locale" use cases omit the by-email lookup.
+- WRONG/misleading: "`PATCH /api/v1/me` of the host calls a profile use case too". That route (public-api/v1/me.routes.ts:20-47) changes `name` through `IUserAccountStore.setName` and emits `USER_PROFILE_UPDATED`, not locale; it does not touch `IProfileStore`. The profile module has no name concept, so either extend the module (new `update-profile-name` use case + port) or drop the item. Also the module's own route is `PUT /me/locale` (profile.routes.ts:21; mounted at app.ts:260 on `/me`, shared with rgpd).
+- Today "the route opens the transaction, calls the store and emits": confirmed (routes.ts:30-53), including the `findLocale` read of `previousLocale` inside the unit.
