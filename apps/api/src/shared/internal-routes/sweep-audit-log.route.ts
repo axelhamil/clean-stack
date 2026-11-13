@@ -17,7 +17,7 @@ type HonoEnv = { Variables: { logger: PinoLogger } };
 const { auditLog } = auditLogSchema;
 const LABEL = "sweep-audit-log";
 
-// AuditEventSubscriber skips retention="none" rows (returns early), so "none" is never
+// RecordAuditEntryUseCase skips retention="none" rows (returns early), so "none" is never
 // inserted in DB. We only iterate operational + compliance (the two AUDIT_RETENTIONS values).
 const BUCKETS = ["operational", "compliance"] as const satisfies readonly AuditRetention[];
 

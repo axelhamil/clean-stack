@@ -17,6 +17,7 @@ const MIGRATED_MODULES = [
   "consents",
   "billing",
   "quotas",
+  "audit-log",
 ];
 const MIGRATED =
   MIGRATED_MODULES.length > 0 ? `${MODULES}/(${MIGRATED_MODULES.join("|")})/src/` : "^$";

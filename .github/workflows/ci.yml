@@ -144,6 +144,11 @@ jobs:
         # Needs the seed too.
         run: pnpm --filter @modules/api-token check:api-token-visibility
 
+      - name: Check the audit hash chain against a real database
+        # Only real concurrent transactions prove the advisory lock keeps one
+        # chain when distinct events land at once, and verifyChain reads real rows.
+        run: pnpm --filter @modules/audit-log check:audit-chain
+
       - name: Check the account-wipe rollback against a real database
         # Only a real db.transaction can prove Postgres rolled the wipe back when
         # the confirmation enqueue fails. Creates and removes its own probe user.

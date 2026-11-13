@@ -114,7 +114,7 @@ export class DrizzleFooRepository implements IFooRepository {
 - **Why logs without `SENTRY_DSN`**: `IInstrumentation` resolves to `LoggingInstrumentation`, a `NoOpInstrumentation` (callback passthrough, no allocation) whose `capture` writes to the process log, because a `catch` in a repository logs nothing itself and a driver error must never vanish.
 - **Tracing dormant**: `SENTRY_TRACES_SAMPLE_RATE=0` (default) means even when `SENTRY_DSN` is set, spans aren't exported, they're recorded in memory by the SDK and dropped. Set > 0 only when a tracing backend consumes them.
 
-Applied to: `DrizzleOutboxRepository`, `DrizzleAuditRepository`, `ResendEmailService`, `DrizzleRgpdRepository`, `S3StorageService`, `DrizzleWebhookEndpointRepository`, `DrizzleWebhookDeliveryRepository`, `AuditQueryService`. Use-case / application services are not wrapped, they orchestrate repos that already are.
+Applied to: `DrizzleOutboxRepository`, `DrizzleAuditLogRepository`, `DrizzleListAuditEventsQuery`, `DrizzleVerifyAuditChainQuery`, `ResendEmailService`, `DrizzleRgpdRepository`, `S3StorageService`, `DrizzleWebhookEndpointRepository`, `DrizzleWebhookDeliveryRepository`. Use-case / application services are not wrapped, they orchestrate repos that already are.
 
 ## Manual error reporting
 

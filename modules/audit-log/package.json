@@ -6,10 +6,16 @@
   "exports": {
     "./module": "./src/audit-log.module.ts",
     "./config": "./src/application/config/audit-log-settings.ts",
-    "./routes/audit-log": "./src/infrastructure/http/audit-log.routes.ts",
-    "./ports/*": "./src/application/ports/*.port.ts",
+    "./routes/audit-log": "./src/infra/http/routes/audit-log/audit-log.ts",
+    "./ports/audit-log": "./src/application/ports/repositories/audit-log.port.ts",
+    "./ports/*": "./src/application/ports/services/*.port.ts",
     "./services/audit-query": "./src/application/services/audit-query.service.ts",
-    "./handlers/audit-event-subscriber": "./src/infrastructure/services/audit-event-subscriber.ts",
+    "./usecases/record-audit-entry": "./src/application/usecases/record-audit-entry/record-audit-entry.usecase.ts",
+    "./usecases/list-audit-events": "./src/application/usecases/list-audit-events/list-audit-events.usecase.ts",
+    "./queries/*": "./src/application/queries/*.query.ts",
+    "./handlers/audit-event-subscriber": "./src/infra/adapters/audit-event-subscriber.adapter.ts",
+    "./adapters/drizzle-audit-log-repository": "./src/infra/repos/drizzle/audit-log.repository.ts",
+    "./adapters/sha256-audit-hasher": "./src/infra/adapters/sha256-audit-hasher.adapter.ts",
     "./schemas/*": "./schemas/*.ts"
   },
   "scripts": {
@@ -18,7 +24,8 @@
     "check": "biome check .",
     "fix": "biome check --write .",
     "type-check": "tsc --noEmit",
-    "test": "bun test --isolate"
+    "test": "bun test --isolate",
+    "check:audit-chain": "bun scripts/check-audit-chain.ts"
   },
   "dependencies": {
     "@packages/ddd-kit": "workspace:*",

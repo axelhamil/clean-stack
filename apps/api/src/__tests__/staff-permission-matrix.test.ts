@@ -1,6 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
 import type { AuditLogRoutesDeps } from "@modules/audit-log/routes/audit-log";
-import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { mockPort } from "@packages/test/bun";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -36,8 +35,8 @@ const app = new Hono().route("/", mountAdminRoutes(routeGuards)).route(
   "/admin/audit-log",
   createAuditLogRoutes({
     routeGuards,
-    IOutboxRepository: mockPort<IOutboxRepository>(),
-    AuditQueryService: mockPort<AuditLogRoutesDeps["AuditQueryService"]>(),
+    ListAuditEventsUseCase: mockPort<AuditLogRoutesDeps["ListAuditEventsUseCase"]>(),
+    IVerifyAuditChainQuery: mockPort<AuditLogRoutesDeps["IVerifyAuditChainQuery"]>(),
   }),
 );
 app.onError((err, c) =>

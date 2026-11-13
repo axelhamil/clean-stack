@@ -871,7 +871,7 @@ numbers, what you could not verify, what the integrator must change in shared fi
 | `organization` | `check:scim-connection`, `check:scim-seats` |
 | `uploads` | `check:wipe-rollback` |
 | `notifications` | `check:fanout`, `check:digest`, `check:sweep-lock`, `check:admin-approval`, `check:admin-workspace` |
-| `audit-log` | `check:outbox-lease` (one link per redelivered event), `check:sweep-lock`, `check:admin-approval`; partial: a check of concurrent distinct events and of `verifyChain` over real rows is to add |
+| `audit-log` | `check:outbox-lease` (one link per redelivered event), `check:sweep-lock`, `check:admin-approval`, `check:audit-chain` (concurrent distinct events form one chain, `verifyChain` over real rows) |
 | `consents` | `check:sweep-lock` |
 | `policies`, `profile`, `quotas` | none |
 | kit, rerun only when the package changes | `check:enqueue`, `check:marksent`, `check:email-lease` (email), `check:uow-rollback` (drizzle, outbox) |
@@ -946,7 +946,7 @@ Updated in the PR that delivers each line.
 | 1 | `profile` | technical | no | S | done 2026-11-13 | | yes |
 | 1 | `policies` | technical | no | S to M | done 2026-11-13 | | yes |
 | 1 | `consents` | technical | no | M | done 2026-11-13 | | yes |
-| 1 | `audit-log` | technical | no | M | to do | | |
+| 1 | `audit-log` | technical | no | M | done 2026-11-13 | | yes |
 | 2 | `webhooks` | technical | no | L | to do | | |
 | 2 | `notifications` | technical | no | L | to do | | |
 | 2 | `admin` | business | `ApprovalRequest`; staff domain service file | XL | to do | | |
