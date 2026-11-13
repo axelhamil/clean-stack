@@ -497,7 +497,7 @@ One block per module: nature, what to do, what must not break. The ordered corre
 
 - **Today**: `ScimConnectionService` (`find`, `issueToken`, `disconnect`) with real rules (one active connection per organization, rotation revokes the other credentials, token lifetime, per-organization lock), instantiated at module scope in the routes file, importing the auth singleton (12 `auth.api.*SCIMManaged*` calls). Also: users-only scopes, the disconnect that emits `ORG_MEMBER_REMOVED` per membership removed, the post-commit emit with swallow-and-capture, and reads through `AuthQueries.findMemberOf` and `scimProvisionedMembers`. `AdminActionService.setSsoEnforcement` is shared with `admin` routes, and the routes file imports `setSsoEnforcementBodySchema` from `@modules/admin`.
 - **Do**: a module with its use cases (`set-sso-enforcement` among them) and queries (the connection `find`), a port over the library's SCIM calls and the auth queries bound by the host, its routes, its `layering.test.ts`; the module exposes the SSO enforcement the host binds to admin's `ISsoEnforcement`; the body schema moves out of `admin` (a module never imports another).
-- **Do not break**: `check:scim-connection`, `check:scim-seats`, the tests `organization/__TESTS__/{routes,scim-connection.service}.test.ts`; the emit after the library committed on its own connection (documented residual window); the host layering test scans `organization/` today, the module needs the equivalent guard.
+- **Do not break**: `check:scim-connection`, `check:scim-seats`, the tests `organization/__tests__/{routes,scim-connection.service}.test.ts`; the emit after the library committed on its own connection (documented residual window); the host layering test scans `organization/` today, the module needs the equivalent guard.
 
 ### Host `auth` → `modules/auth`: technical, no domain. Effort XL. Last wave (D9).
 
@@ -560,11 +560,11 @@ Several module migrations would touch the same files. One owner each.
 | `packages/test/src/source-scan.ts` and its fixtures | `isRouteFile` matches `*.routes.ts` only; guards to add | Step 3 |
 | `apps/api/tsconfig.build.json` | excludes `**/__TESTS__/**`: a missed rename ships the tests in the build, silently | Step 3 |
 | `.jscpd.json` | ignores `**/__TESTS__/**`: a missed rename fails loudly (duplication) | Step 3 |
-| `apps/api/bunfig.toml`, `packages/email/bunfig.toml` | preload path `./src/__TESTS__/preload.ts`: loud, only if the host test folder is renamed | Step 3, with D10 |
+| `apps/api/bunfig.toml`, `packages/email/bunfig.toml` | preload path `./src/__tests__/preload.ts` since the rename | Step 3, with D10 |
 | `turbo.json` | lists `**/__TESTS__/**` in `test.inputs`, already covered by `src/**` | no change |
 | `packages/drizzle/drizzle.config.ts` | globs `modules/*/schemas/*.ts`: a module schema in a subfolder is silently not migrated | nobody, `schemas/` stays flat at the package root (D1) |
-| `apps/api/src/__TESTS__/event-catalog-parity.test.ts` | regex over `onEvent(EventTypes.X` and emit literals in `modules/*/src`; the `dispatchTo` helper of D6 changes what it strips | Step 3, with D6 |
-| `apps/api/src/__TESTS__/layering.test.ts` | reads `sourceFiles("organization")`, throws once the folder is extracted | wave 4 |
+| `apps/api/src/__tests__/event-catalog-parity.test.ts` | regex over `onEvent(EventTypes.X` and emit literals in `modules/*/src`; the `dispatchTo` helper of D6 changes what it strips | Step 3, with D6 |
+| `apps/api/src/__tests__/layering.test.ts` | reads `sourceFiles("organization")`, throws once the folder is extracted | wave 4 |
 | 16 host tests importing module internals by deep path | same specifiers as the host | Step 3 for the specifiers |
 | `knip.json` | `modules/*` entries come from `exports`; `rules.exports` is `warn`, so a leftover facade is not caught by `check:unused` | Step 3; facades listed and removed by the integrator |
 | 12 module `package.json` `exports` | path-mirroring keys | Step 3 for the keys (D13), then each module agent for the targets |
@@ -932,7 +932,7 @@ Updated in the PR that delivers each line.
 |---|---|---|---|---|
 | 1. Audit and map | done | 2026-11-13 | #211 | static audit; green baseline on `3bec6dba`: pre-push chain (62 of 62 turbo tasks) and the 22 real-database checks |
 | 2. Documentation and conventions | done | 2026-11-13 | #211 | 17 decisions taken, conventions written in section 2 |
-| 3. Foundation | to do | | | 5 PRs, in series: #212 to #216 |
+| 3. Foundation | done | 2026-11-13 | #218, #220, #219, #223, #216 | tooling accepts both spellings and holds the layering rules (`MIGRATED_MODULES`); opt-in `targetShape` guards; `IUseCase`, `IQuery`, `dispatchTo`, `idParamSchema`; 111 stable module export keys, folder renames proven host-free on `uploads` and `billing`; `__tests__` in apps and packages |
 | 4. Module by module | to do | | | see below, waves 0 to 5 |
 | 5. Global verification | to do | | | |
 | 6. Final documentation | to do | | | |
