@@ -106,7 +106,7 @@ async function gatesOpen(orgId: string): Promise<boolean> {
 }
 
 async function tierOf(orgId: string): Promise<string> {
-  return (await di.EntitlementsService.getEntitlements(orgId)).tier;
+  return (await di.IGetEntitlementsQuery.execute({ organizationId: orgId })).getValue().tier;
 }
 
 async function openRows(orgId: string) {
@@ -243,7 +243,7 @@ async function proveSubscriptionFallback(): Promise<void> {
     note: "Pilot",
   });
 
-  const during = await di.EntitlementsService.getEntitlements(org);
+  const during = (await di.IGetEntitlementsQuery.execute({ organizationId: org })).getValue();
   check(
     "the override wins over the subscription and keeps its status",
     during.tier === "business" && during.status === "active" && during.maxMembers === null,
@@ -254,7 +254,7 @@ async function proveSubscriptionFallback(): Promise<void> {
     .update(planOverride)
     .set({ expiresAt: new Date(Date.now() - 1000) })
     .where(eq(planOverride.id, overrideId));
-  const after = await di.EntitlementsService.getEntitlements(org);
+  const after = (await di.IGetEntitlementsQuery.execute({ organizationId: org })).getValue();
   check(
     "past its end the subscription is back",
     after.tier === "pro" && after.status === "active",

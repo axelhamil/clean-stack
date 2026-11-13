@@ -1,11 +1,11 @@
 import type { StaffService } from "@modules/admin/services/staff";
-import type { StripeSyncVerifier } from "@modules/billing/adapters/stripe-sync-verifier";
-import type { IEntitlementsReader } from "@modules/billing/ports/entitlements-reader";
 import type { IStripeEventStore } from "@modules/billing/ports/stripe-event";
-import type { BillingCatalogService } from "@modules/billing/services/billing-catalog";
+import type { IGetEntitlementsQuery } from "@modules/billing/queries/get-entitlements";
+import type { IGetPlanCatalogQuery } from "@modules/billing/queries/get-plan-catalog";
+import type { VerifyStripeSyncUseCase } from "@modules/billing/usecases/verify-stripe-sync";
 import type { ConsentService } from "@modules/consents/services/consent";
 import type { PolicyAcceptanceService } from "@modules/policies/services/policy-acceptance";
-import type { IProfileStore } from "@modules/profile/ports/profile";
+import type { IGetLocaleByEmailQuery } from "@modules/profile/queries/get-locale-by-email";
 import type { ILogger, IUnitOfWork } from "@packages/ddd-kit";
 import type { IEmailService } from "@packages/email/email.port";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
@@ -14,11 +14,9 @@ import type Stripe from "stripe";
 import type { AuthDeps, AuthSettings } from "../../auth/deps";
 import type {
   IConsentReconciler,
-  IPlanCatalog,
   IPolicyAcceptance,
   ISecuritySignals,
   IStaffSessionEnder,
-  IStripeSyncCheck,
 } from "../../auth/ports";
 import type { AuthQueries } from "../../auth/queries";
 import type { OutermostUnitOfWork } from "../../auth/unit-of-work-adapter";
@@ -32,12 +30,12 @@ export interface AuthSourcesPrerequisites {
   ITransactionService: IUnitOfWork & OutermostUnitOfWork;
   IOutboxRepository: IOutboxRepository;
   IEmailService: IEmailService;
-  IProfileStore: IProfileStore;
+  IGetLocaleByEmailQuery: IGetLocaleByEmailQuery;
   IRateLimiter: IRateLimiter;
   IDisposableEmailService: IDisposableEmailService;
   IPasswordBreachService: IPasswordBreachService;
   ITotpVerifier: ITotpVerifier;
-  EntitlementsService: IEntitlementsReader;
+  IGetEntitlementsQuery: IGetEntitlementsQuery;
   IStripeEventStore: IStripeEventStore;
   StripeClient: Stripe;
   ILogger: ILogger;
@@ -47,15 +45,13 @@ export interface AuthSourcesPrerequisites {
   StaffService: StaffService;
   PolicyAcceptanceService: PolicyAcceptanceService;
   ConsentService: ConsentService;
-  BillingCatalogService: BillingCatalogService;
-  StripeSyncVerifier: StripeSyncVerifier;
+  IGetPlanCatalogQuery: IGetPlanCatalogQuery;
+  VerifyStripeSyncUseCase: VerifyStripeSyncUseCase;
 }
 
 export const authSources = defineModule<AuthSourcesPrerequisites>()((b) =>
   b
     .add("ISecuritySignals", (c): ISecuritySignals => c.SecuritySignalsService)
-    .add("IPlanCatalog", (c): IPlanCatalog => c.BillingCatalogService)
-    .add("IStripeSyncCheck", (c): IStripeSyncCheck => c.StripeSyncVerifier)
     .add("IPolicyAcceptance", (c): IPolicyAcceptance => c.PolicyAcceptanceService)
     .add("IConsentReconciler", (c): IConsentReconciler => c.ConsentService)
     .add("IStaffSessionEnder", (c): IStaffSessionEnder => c.StaffService)
@@ -65,16 +61,16 @@ export const authSources = defineModule<AuthSourcesPrerequisites>()((b) =>
         uow: c.ITransactionService,
         outbox: c.IOutboxRepository,
         email: c.IEmailService,
-        profiles: c.IProfileStore,
+        profiles: c.IGetLocaleByEmailQuery,
         rateLimiter: c.IRateLimiter,
         disposableEmail: c.IDisposableEmailService,
         passwordBreach: c.IPasswordBreachService,
         totp: c.ITotpVerifier,
-        entitlements: c.EntitlementsService,
+        entitlements: c.IGetEntitlementsQuery,
         stripeEvents: c.IStripeEventStore,
         stripeClient: c.StripeClient,
-        plans: c.IPlanCatalog,
-        stripeSync: c.IStripeSyncCheck,
+        plans: c.IGetPlanCatalogQuery,
+        stripeSync: c.VerifyStripeSyncUseCase,
         policies: c.IPolicyAcceptance,
         consents: c.IConsentReconciler,
         staffSessions: c.IStaffSessionEnder,

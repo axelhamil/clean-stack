@@ -13,15 +13,12 @@ import type { IGetEntitlementsQuery } from "./application/queries/get-entitlemen
 import type { IGetPlanCatalogQuery } from "./application/queries/get-plan-catalog.query";
 import type { IListConfiguredPriceIdsQuery } from "./application/queries/list-configured-price-ids.query";
 import type { IReadEntitlementsQuery } from "./application/queries/read-entitlements.query";
-import { BillingCatalogService } from "./application/services/billing-catalog.service";
-import { EntitlementsService } from "./application/services/entitlements.service";
 import { OpenBillingPortalUseCase } from "./application/usecases/open-billing-portal/open-billing-portal.usecase";
 import { VerifyStripeSyncUseCase } from "./application/usecases/verify-stripe-sync/verify-stripe-sync.usecase";
 import { StripeBillingPortalGateway } from "./infra/adapters/stripe-billing-portal.adapter";
 import { StripeCatalogSource } from "./infra/adapters/stripe-catalog.adapter";
 import { createStripeClient } from "./infra/adapters/stripe-client.adapter";
 import { StripeEventGateway } from "./infra/adapters/stripe-event-gateway.adapter";
-import { StripeSyncVerifier } from "./infra/adapters/stripe-sync-verifier.adapter";
 import { CachedPlanCatalogQuery } from "./infra/queries/cached-plan-catalog.query";
 import { CatalogConfiguredPriceIdsQuery } from "./infra/queries/configured-price-ids.query";
 import { FailClosedEntitlementsQuery } from "./infra/queries/get-entitlements.query";
@@ -120,11 +117,5 @@ export const billingModule = defineModule<BillingPrerequisites>()((b) =>
           c.IStripeEventGateway,
           c.IListConfiguredPriceIdsQuery,
         ),
-    )
-    .add("BillingCatalogService", (c) => new BillingCatalogService(c.IGetPlanCatalogQuery))
-    .add("StripeSyncVerifier", (c) => new StripeSyncVerifier(c.VerifyStripeSyncUseCase))
-    .add(
-      "EntitlementsService",
-      (c) => new EntitlementsService(c.IGetEntitlementsQuery, c.IReadEntitlementsQuery),
     ),
 );

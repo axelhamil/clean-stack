@@ -265,6 +265,6 @@ export const di = container()
       ),
   )
   .add("BackupCodeUsedNotifier", (c) =>
-    backupCodeUsedNotifier({ IEmailService: c.IEmailService, IProfileStore: c.IProfileStore }),
+    backupCodeUsedNotifier({ IEmailService: c.IEmailService, IGetLocaleQuery: c.IGetLocaleQuery }),
   )
   .build();

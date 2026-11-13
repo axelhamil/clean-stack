@@ -1,9 +1,11 @@
 import { type IInstrumentation, Result } from "@packages/ddd-kit";
 import type { IPlanOverrideReader } from "../../application/ports/repositories/plan-override.port";
 import type { ISubscriptionReadStore } from "../../application/ports/repositories/subscription-read.port";
-import type { EntitlementsReadError } from "../../application/ports/services/entitlements-reader.port";
 import type { EntitlementsInput } from "../../application/queries/get-entitlements.query";
-import type { IReadEntitlementsQuery } from "../../application/queries/read-entitlements.query";
+import type {
+  EntitlementsReadError,
+  IReadEntitlementsQuery,
+} from "../../application/queries/read-entitlements.query";
 import {
   type EntitlementsView,
   viewOf,

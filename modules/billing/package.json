@@ -12,8 +12,6 @@
     "./ports/subscription-read": "./src/application/ports/repositories/subscription-read.port.ts",
     "./ports/subscription-sync": "./src/application/ports/repositories/subscription-sync.port.ts",
     "./ports/*": "./src/application/ports/services/*.port.ts",
-    "./services/billing-catalog": "./src/application/services/billing-catalog.service.ts",
-    "./services/entitlements": "./src/application/services/entitlements.service.ts",
     "./usecases/open-billing-portal": "./src/application/usecases/open-billing-portal/open-billing-portal.usecase.ts",
     "./usecases/verify-stripe-sync": "./src/application/usecases/verify-stripe-sync/verify-stripe-sync.usecase.ts",
     "./queries/*": "./src/application/queries/*.query.ts",
@@ -21,7 +19,7 @@
     "./rules/subscription-events": "./src/application/services/subscription-policy.service.ts",
     "./adapters/stripe-event-gateway": "./src/infra/adapters/stripe-event-gateway.adapter.ts",
     "./adapters/stripe-payment-failure": "./src/infra/adapters/stripe-payment-failure.mapper.ts",
-    "./adapters/stripe-sync-verifier": "./src/infra/adapters/stripe-sync-verifier.adapter.ts",
+    "./adapters/stripe-sync-event": "./src/infra/adapters/stripe-sync-event.adapter.ts",
     "./schemas/*": "./schemas/*.ts"
   },
   "scripts": {

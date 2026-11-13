@@ -1,4 +1,6 @@
-import type { IProfileStore, ProfileError } from "@modules/profile/ports/profile";
+import type { ProfileError } from "@modules/profile/ports/profile";
+import type { IGetLocaleQuery } from "@modules/profile/queries/get-locale";
+import type { IGetLocaleByEmailQuery } from "@modules/profile/queries/get-locale-by-email";
 import type { Option, Result } from "@packages/ddd-kit";
 import { DEFAULT_LOCALE, type Locale } from "@packages/i18n";
 
@@ -17,8 +19,8 @@ function collapse(found: Result<Option<Locale>, ProfileError>): Locale {
  * behaviour (throwing, or sending nothing) for a locale lookup that was never
  * essential to the message.
  */
-export async function localeForUser(store: IProfileStore, userId: string): Promise<Locale> {
-  return collapse(await store.findLocale(userId));
+export async function localeForUser(query: IGetLocaleQuery, userId: string): Promise<Locale> {
+  return collapse(await query.execute({ userId }));
 }
 
 /**
@@ -27,6 +29,9 @@ export async function localeForUser(store: IProfileStore, userId: string): Promi
  * scope; an address with no account yet legitimately falls back to the
  * default rather than failing the send.
  */
-export async function localeForEmail(store: IProfileStore, email: string): Promise<Locale> {
-  return collapse(await store.findLocaleByEmail(email));
+export async function localeForEmail(
+  query: IGetLocaleByEmailQuery,
+  email: string,
+): Promise<Locale> {
+  return collapse(await query.execute({ email }));
 }

@@ -116,7 +116,7 @@ export interface AdminPrerequisites {
   ISweepRunStore: ISweepRunStore;
   ILocaleReader: ILocaleReader;
   WebhooksService: IDeadWebhookReader;
-  EntitlementsService: IEntitlementsReader;
+  IEntitlementsReader: IEntitlementsReader;
   IPlanOverrideStore: IPlanOverrideStore;
   IStripeEventStore: IStripeEventStore;
   IStripeEventGateway: IStripeEventGateway<(request: Request) => Promise<Response>>;
@@ -153,7 +153,7 @@ export const adminModule = defineModule<AdminPrerequisites>()((b) =>
       (c): IGetOrgQuery =>
         new AdminOrgDetailQuery(
           c.IAdminOrgStore,
-          c.EntitlementsService,
+          c.IEntitlementsReader,
           c.IPlanOverrideStore,
           c.IInstrumentation,
         ),

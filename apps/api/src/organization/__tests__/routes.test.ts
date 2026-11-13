@@ -19,8 +19,8 @@ mock.module("../../container", () => ({
   di: {
     AuthQueries: { findActiveMemberRole: async () => "owner" },
     PolicyAcceptanceService: { hasAcceptedCurrent: async () => Result.ok(true) },
-    EntitlementsService: {
-      getEntitlements: async () => ({ tier, status: "active", ...entitlementsForTier(tier) }),
+    IGetEntitlementsQuery: {
+      execute: async () => Result.ok({ tier, status: "active", ...entitlementsForTier(tier) }),
     },
   },
 }));

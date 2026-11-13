@@ -1,5 +1,6 @@
 import { stripe } from "@better-auth/stripe";
 import { paymentFailureOf } from "@modules/billing/adapters/stripe-payment-failure";
+import { syncMismatchOf } from "@modules/billing/adapters/stripe-sync-event";
 import type { IStripeEventStore } from "@modules/billing/ports/stripe-event";
 import {
   authorizeSubscriptionAction,
@@ -105,7 +106,7 @@ export function stripePlugin(
     subscription: {
       enabled: true,
       plans: async () => {
-        const catalog = await deps.plans.getCatalog();
+        const catalog = (await deps.plans.execute()).getValue();
         return catalog
           .filter((p) => p.priceId !== null)
           .map((p) => ({ name: p.tier, priceId: p.priceId as string }));
@@ -167,7 +168,11 @@ export function stripePlugin(
         throw err;
       }
 
-      await recordStripeDelivery(deps.stripeEvents, event, await deps.stripeSync.check(event));
+      await recordStripeDelivery(
+        deps.stripeEvents,
+        event,
+        await syncMismatchOf(deps.stripeSync, event),
+      );
     },
   });
 }

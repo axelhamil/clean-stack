@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import type { IEntitlementsReader } from "@modules/billing/ports/entitlements-reader";
+import type { IGetEntitlementsQuery } from "@modules/billing/queries/get-entitlements";
 import { ENTITLEMENTS } from "@modules/billing/rules/entitlements";
+import { Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";
@@ -18,14 +19,16 @@ const deleteOrgIfEmpty = mock(async () => false);
 const countActiveMembers = mock(async () => 0);
 
 const { createAuth } = await import("../auth/create-auth");
-const entitlements = mockPort<IEntitlementsReader>();
-entitlements.getEntitlements.mockImplementation(async () => ({
-  ...ENTITLEMENTS.free,
-  tier: "free",
-  status: "free",
-  hasSubscription: false,
-  maxMembers: MAX_MEMBERS,
-}));
+const entitlements = mockPort<IGetEntitlementsQuery>();
+entitlements.execute.mockImplementation(async () =>
+  Result.ok({
+    ...ENTITLEMENTS.free,
+    tier: "free",
+    status: "free",
+    hasSubscription: false,
+    maxMembers: MAX_MEMBERS,
+  }),
+);
 const auth = createAuth(
   fakeAuthDeps({
     outbox,

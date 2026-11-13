@@ -20,14 +20,14 @@ export function createSsoEntitlements(deps: Pick<AuthDeps, "entitlements">): {
       if (!organizationId) {
         throw new APIError("FORBIDDEN", { message: "SSO_ORGANIZATION_REQUIRED" });
       }
-      const entitlements = await deps.entitlements.getEntitlements(organizationId);
+      const entitlements = (await deps.entitlements.execute({ organizationId })).getValue();
       if (!hasFeature(entitlements, "sso")) {
         throw new APIError("FORBIDDEN", { message: "SSO_PLAN_REQUIRED" });
       }
     },
 
     async hasSsoEntitlement(organizationId) {
-      const entitlements = await deps.entitlements.getEntitlements(organizationId);
+      const entitlements = (await deps.entitlements.execute({ organizationId })).getValue();
       return hasFeature(entitlements, "sso");
     },
   };

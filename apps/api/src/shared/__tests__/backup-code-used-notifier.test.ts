@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
-import type { IProfileStore } from "@modules/profile/ports/profile";
+import type { IGetLocaleQuery } from "@modules/profile/queries/get-locale";
 import { Option, Result } from "@packages/ddd-kit";
 import type { IEmailService } from "@packages/email/email.port";
 import { EventTypes } from "@packages/events";
@@ -11,12 +11,9 @@ function makeEmailService() {
   return { service: { sendTemplate } as unknown as IEmailService, sendTemplate };
 }
 
-function makeProfileStore(locale?: Locale): IProfileStore {
+function makeLocaleQuery(locale?: Locale): IGetLocaleQuery {
   return {
-    findLocale: async () =>
-      Result.ok(locale ? Option.some(locale) : Option.none<Locale>()) as never,
-    findLocaleByEmail: async () => Result.ok(Option.none<Locale>()) as never,
-    setLocale: async () => Result.ok() as never,
+    execute: async () => Result.ok(Option.fromNullable(locale)),
   };
 }
 
@@ -25,7 +22,7 @@ describe("backupCodeUsedNotifier", () => {
     const { service, sendTemplate } = makeEmailService();
     const handler = backupCodeUsedNotifier({
       IEmailService: service,
-      IProfileStore: makeProfileStore("fr"),
+      IGetLocaleQuery: makeLocaleQuery("fr"),
     });
 
     await handler.handle({
@@ -52,7 +49,7 @@ describe("backupCodeUsedNotifier", () => {
     const { service, sendTemplate } = makeEmailService();
     const handler = backupCodeUsedNotifier({
       IEmailService: service,
-      IProfileStore: makeProfileStore(),
+      IGetLocaleQuery: makeLocaleQuery(),
     });
 
     await handler.handle({
@@ -75,7 +72,7 @@ describe("backupCodeUsedNotifier", () => {
     const { service, sendTemplate } = makeEmailService();
     const handler = backupCodeUsedNotifier({
       IEmailService: service,
-      IProfileStore: makeProfileStore(),
+      IGetLocaleQuery: makeLocaleQuery(),
     });
 
     await expect(
@@ -101,7 +98,7 @@ describe("backupCodeUsedNotifier", () => {
     );
     const handler = backupCodeUsedNotifier({
       IEmailService: { sendTemplate } as unknown as IEmailService,
-      IProfileStore: makeProfileStore(),
+      IGetLocaleQuery: makeLocaleQuery(),
     });
 
     await expect(
@@ -118,7 +115,7 @@ describe("backupCodeUsedNotifier", () => {
     const { service, sendTemplate } = makeEmailService();
     const handler = backupCodeUsedNotifier({
       IEmailService: service,
-      IProfileStore: makeProfileStore("fr"),
+      IGetLocaleQuery: makeLocaleQuery("fr"),
     });
     const event = {
       eventId: "evt-7",
