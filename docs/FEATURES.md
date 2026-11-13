@@ -26,7 +26,7 @@ CNIL/RGPD Art. 7 ePrivacy: dual-layer: server-side `consent_record` (timestamped
 
 **SSOT** `@packages/cookie-consent`: `CONSENT_CATEGORIES`, `CONSENT_COOKIE_NAME="cc_sid"`, `CONSENT_GRANT_TTL_DAYS=180`. **DB** `modules/consents/schemas/consent.ts`: `consent_record` (append-only; most-recent wins).
 
-**Backend** `modules/consents/` (`@modules/consents`): `ConsentService`: `record` / `withdraw` / `getActive` (with `subjectId` fallback) / `reconcile` (links device→account at login via `auth/hooks/after.ts` on `newSession`, zero client round-trip). Routes: `POST /consents`, `GET /consents`, `DELETE /consents` (public, `optionalAuth`). Guest sweep: `shared/internal-routes/sweep-consents.route.ts` (HMAC-gated, `CONSENT_RETENTION_DAYS=365`).
+**Backend** `modules/consents/` (`@modules/consents`): use cases `RecordConsentUseCase` / `WithdrawConsentUseCase` / `ReconcileConsentUseCase` (links device→account at login via `auth/hooks/after.ts` on `newSession`, zero client round-trip, reached through the `ConsentService.reconcile` facade), query `IGetActiveConsentQuery` (with `subjectId` fallback), repository `DrizzleConsentRepository`. Routes: `POST /consents`, `GET /consents`, `DELETE /consents` (public, `optionalAuth`). Guest sweep: `shared/internal-routes/sweep-consents.route.ts` (HMAC-gated, `CONSENT_RETENTION_DAYS=365`).
 
 **Frontend** `apps/app/src/shared/`: `<CookieBanner>` (Reject/Accept same prominence, auto-mounted) · `<ConsentSettings>` (per-category toggles) · `<ConsentGate category>` (declarative gate) · `useConsent(category): boolean` · `<AnalyticsScripts>` (loads `VITE_ANALYTICS_SRC` env only if `analytics` consented: template for gated scripts) · `/legal/cookies` (per-category cookie inventory).
 

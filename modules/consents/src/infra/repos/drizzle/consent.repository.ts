@@ -9,32 +9,18 @@ import {
   resolveExecutor,
   type SQL,
 } from "@packages/drizzle";
-import * as consentSchema from "../../../schemas/consent";
+import * as consentSchema from "../../../../schemas/consent";
 import type {
   ConsentError,
-  ConsentRecordRow,
-  IConsentStore,
-} from "../../application/ports/consent.port";
+  ConsentRecord,
+  IConsentRepository,
+} from "../../../application/ports/repositories/consent.port";
+import { toConsentRecord, toConsentRow } from "./consent.mapper";
 
 const cr = consentSchema.consentRecord;
 const dbAttrs = { "db.system.name": "postgresql" } as const;
 
 const storeFailure = dbOperationFailure("CONSENT_PROVIDER_FAILURE");
-
-function toRow(r: typeof cr.$inferSelect): ConsentRecordRow {
-  return {
-    id: r.id,
-    subjectId: r.subjectId,
-    userId: Option.fromNullable(r.userId),
-    categories: r.categories,
-    policyVersion: r.policyVersion,
-    grantedAt: r.grantedAt,
-    withdrawnAt: Option.fromNullable(r.withdrawnAt),
-    expiresAt: r.expiresAt,
-    ipAddress: Option.fromNullable(r.ipAddress),
-    userAgent: Option.fromNullable(r.userAgent),
-  };
-}
 
 function latestActive(exec: ReturnType<typeof resolveExecutor>, owner: SQL, policyVersion: string) {
   return exec
@@ -52,48 +38,40 @@ function latestActive(exec: ReturnType<typeof resolveExecutor>, owner: SQL, poli
     .limit(1);
 }
 
-export class DrizzleConsentStore implements IConsentStore {
+export class DrizzleConsentRepository implements IConsentRepository {
   constructor(private readonly instrumentation: IInstrumentation) {}
 
-  async insert(row: ConsentRecordRow): Promise<Result<void, ConsentError>> {
+  async insert(record: ConsentRecord): Promise<Result<void, ConsentError>> {
     const exec = resolveExecutor();
 
-    return this.instrumentation.startSpan({ name: "DrizzleConsentStore > insert" }, async () => {
-      try {
-        const query = exec.insert(cr).values({
-          id: row.id,
-          subjectId: row.subjectId,
-          userId: row.userId.toNull(),
-          categories: row.categories,
-          policyVersion: row.policyVersion,
-          grantedAt: row.grantedAt,
-          withdrawnAt: row.withdrawnAt.toNull(),
-          expiresAt: row.expiresAt,
-          ipAddress: row.ipAddress.toNull(),
-          userAgent: row.userAgent.toNull(),
-        });
+    return this.instrumentation.startSpan(
+      { name: "DrizzleConsentRepository > insert" },
+      async () => {
+        try {
+          const query = exec.insert(cr).values(toConsentRow(record));
 
-        await this.instrumentation.startSpan(
-          { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
-          () => query.execute(),
-        );
+          await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
 
-        return Result.ok();
-      } catch (err) {
-        this.instrumentation.capture(err);
-        return Result.fail(storeFailure("insert"));
-      }
-    });
+          return Result.ok();
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail(storeFailure("insert"));
+        }
+      },
+    );
   }
 
   async findActiveBySubject(
     subjectId: string,
     policyVersion: string,
-  ): Promise<Result<Option<ConsentRecordRow>, ConsentError>> {
+  ): Promise<Result<Option<ConsentRecord>, ConsentError>> {
     const exec = resolveExecutor();
 
     return this.instrumentation.startSpan(
-      { name: "DrizzleConsentStore > findActiveBySubject" },
+      { name: "DrizzleConsentRepository > findActiveBySubject" },
       async () => {
         try {
           const query = latestActive(exec, eq(cr.subjectId, subjectId), policyVersion);
@@ -103,7 +81,7 @@ export class DrizzleConsentStore implements IConsentStore {
             () => query.execute(),
           );
 
-          return Result.ok(Option.fromNullable(row).map(toRow));
+          return Result.ok(Option.fromNullable(row).map(toConsentRecord));
         } catch (err) {
           this.instrumentation.capture(err);
           return Result.fail(storeFailure("findActiveBySubject"));
@@ -115,11 +93,11 @@ export class DrizzleConsentStore implements IConsentStore {
   async findActiveByUser(
     userId: string,
     policyVersion: string,
-  ): Promise<Result<Option<ConsentRecordRow>, ConsentError>> {
+  ): Promise<Result<Option<ConsentRecord>, ConsentError>> {
     const exec = resolveExecutor();
 
     return this.instrumentation.startSpan(
-      { name: "DrizzleConsentStore > findActiveByUser" },
+      { name: "DrizzleConsentRepository > findActiveByUser" },
       async () => {
         try {
           const query = latestActive(exec, eq(cr.userId, userId), policyVersion);
@@ -129,7 +107,7 @@ export class DrizzleConsentStore implements IConsentStore {
             () => query.execute(),
           );
 
-          return Result.ok(Option.fromNullable(row).map(toRow));
+          return Result.ok(Option.fromNullable(row).map(toConsentRecord));
         } catch (err) {
           this.instrumentation.capture(err);
           return Result.fail(storeFailure("findActiveByUser"));
@@ -145,7 +123,7 @@ export class DrizzleConsentStore implements IConsentStore {
     const exec = resolveExecutor();
 
     return this.instrumentation.startSpan(
-      { name: "DrizzleConsentStore > linkSubjectToUser" },
+      { name: "DrizzleConsentRepository > linkSubjectToUser" },
       async () => {
         try {
           const query = exec
