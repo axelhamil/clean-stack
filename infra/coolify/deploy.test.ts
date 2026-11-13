@@ -302,7 +302,10 @@ describe("deploy", () => {
   );
 
   it.each([
-    ["an older execution still marked running", [execution("success"), execution("running", 1)]],
+    [
+      "an older execution still marked running",
+      [execution("success"), execution("running", 60_000)],
+    ],
     [
       "a latest execution running past its timeout",
       [execution("running", (SWEEP_TIMEOUT_SECONDS + 6 * 60) * 1_000)],
