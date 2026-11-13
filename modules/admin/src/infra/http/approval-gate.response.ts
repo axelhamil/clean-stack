@@ -1,10 +1,11 @@
-import { type AppError, AppErrorException, type Option, type Result } from "@packages/ddd-kit";
+import { type AppError, AppErrorException, type Result } from "@packages/ddd-kit";
 import type { Context } from "hono";
+import type { GatedOutcome } from "../../application/services/gated-outcome";
 
-export function gateOr202(c: Context, gated: Result<Option<string>, AppError>) {
-  if (gated.isFailure) throw new AppErrorException(gated.getError());
+export function gatedResponse(c: Context, outcome: Result<GatedOutcome, AppError>) {
+  if (outcome.isFailure) throw new AppErrorException(outcome.getError());
 
-  const pending = gated.getValue();
+  const pending = outcome.getValue().pendingApprovalId;
 
-  return pending.isSome() ? c.json({ approvalId: pending.unwrap() }, 202) : null;
+  return pending.isSome() ? c.json({ approvalId: pending.unwrap() }, 202) : c.json({ ok: true });
 }

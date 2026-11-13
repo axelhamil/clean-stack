@@ -10,14 +10,14 @@ import type { ApprovalRecord } from "./ports/repositories/approval-store.port";
 
 const MAX_TIMED_BAN_SECONDS = 90 * 24 * 60 * 60;
 
-export const banUserBodySchema = z.object({
+export const banParamsSchema = z.object({
   reason: z.string().trim().min(1).max(500),
   expiresIn: z.number().int().positive().max(MAX_TIMED_BAN_SECONDS).optional(),
 });
 
-export const setStaffRoleBodySchema = z.object({ role: z.enum(STAFF_ROLES) });
+export const roleChangeParamsSchema = z.object({ role: z.enum(STAFF_ROLES) });
 
-export const setStaffOverrideBodySchema = z.object({
+export const overrideParamsSchema = z.object({
   permission: z.enum(STAFF_PERMISSIONS),
   effect: z.enum(["grant", "deny"]),
   expiresAt: z.iso
@@ -26,14 +26,20 @@ export const setStaffOverrideBodySchema = z.object({
     .nullable(),
 });
 
-const storedRoleChangeSchema = setStaffRoleBodySchema.extend({
+export type BanParams = z.infer<typeof banParamsSchema>;
+
+export type RoleChangeParams = z.infer<typeof roleChangeParamsSchema>;
+
+export type OverrideParams = z.infer<typeof overrideParamsSchema>;
+
+const storedRoleChangeSchema = roleChangeParamsSchema.extend({
   fromRole: z.enum(STAFF_ROLES).nullable(),
 });
 
 const emptyParamsSchema = z.object({});
 
 const requestedOverrideSchema = z.discriminatedUnion("op", [
-  setStaffOverrideBodySchema.extend({ op: z.literal("set") }),
+  overrideParamsSchema.extend({ op: z.literal("set") }),
   z.object({ op: z.literal("revoke"), overrideId: z.string().min(1) }),
 ]);
 
@@ -48,15 +54,15 @@ const storedOverrideSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("revoke"), overrideId: z.string().min(1), ...overrideFields }),
 ]);
 
-interface RequestParams {
-  "user.ban_permanent": z.infer<typeof banUserBodySchema>;
-  "staff.role_change": z.infer<typeof setStaffRoleBodySchema>;
+export interface RequestParams {
+  "user.ban_permanent": BanParams;
+  "staff.role_change": RoleChangeParams;
   "staff.revoke": z.infer<typeof emptyParamsSchema>;
   "staff.permission_override": z.infer<typeof requestedOverrideSchema>;
 }
 
-interface StoredParams {
-  "user.ban_permanent": z.infer<typeof banUserBodySchema>;
+export interface StoredParams {
+  "user.ban_permanent": BanParams;
   "staff.role_change": z.infer<typeof storedRoleChangeSchema>;
   "staff.revoke": z.infer<typeof emptyParamsSchema>;
   "staff.permission_override": z.infer<typeof storedOverrideSchema>;
@@ -113,7 +119,7 @@ export function readApprovedAction(
 
   switch (record.action) {
     case "user.ban_permanent": {
-      const parsed = banUserBodySchema.safeParse(params);
+      const parsed = banParamsSchema.safeParse(params);
       if (!parsed.success) return Result.fail(invalidParams);
 
       return Result.ok({ action: record.action, subjectId, params: parsed.data });

@@ -4,16 +4,22 @@ import type { RouteEnv, RouteGuards } from "@packages/http/route-guards";
 import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
 import type { StripeReplayRule } from "../../../../application/ports/repositories/stripe-event.port";
-import type { OpsService } from "../../../../application/services/ops.service";
-import type { StripeReplayService } from "../../../../application/services/stripe-replay.service";
-import type { AuthRequestHandler } from "../../auth-request-handler";
+import type { IListDeadLettersQuery } from "../../../../application/queries/list-dead-letters.query";
+import type { IListStripeEventsQuery } from "../../../../application/queries/list-stripe-events.query";
+import type { IListSweepRunsQuery } from "../../../../application/queries/list-sweep-runs.query";
+import type { ReplayStripeEventUseCase } from "../../../../application/usecases/replay-stripe-event/replay-stripe-event.usecase";
+import type { RequeueOutboxUseCase } from "../../../../application/usecases/requeue-outbox/requeue-outbox.usecase";
+import type { AuthRequestHandler, StripeWebhookHandler } from "../../auth-request-handler";
 import { requeueOutboxBodySchema } from "./ops.schema";
 
 export interface AdminOpsRoutesDeps {
   routeGuards: RouteGuards;
   IAuthProvider: AuthRequestHandler;
-  OpsService: Pick<OpsService, "deadLetters" | "requeue" | "sweeps">;
-  StripeReplayService: Pick<StripeReplayService, "list" | "replay">;
+  IListDeadLettersQuery: IListDeadLettersQuery;
+  IListSweepRunsQuery: IListSweepRunsQuery;
+  IListStripeEventsQuery: IListStripeEventsQuery;
+  RequeueOutboxUseCase: Pick<RequeueOutboxUseCase, "execute">;
+  ReplayStripeEventUseCase: Pick<ReplayStripeEventUseCase<StripeWebhookHandler>, "execute">;
   isReplayableStripeEvent: StripeReplayRule;
 }
 
@@ -22,7 +28,7 @@ export function createAdminOpsRoutes(deps: AdminOpsRoutesDeps) {
 
   return new Hono<RouteEnv>()
     .get("/dead-letters", g.requireAuth, g.requireStaffPermission("ops.read"), async (c) => {
-      const result = await deps.OpsService.deadLetters();
+      const result = await deps.IListDeadLettersQuery.execute();
       if (result.isFailure) throw new AppErrorException(result.getError());
 
       const { outbox, queues } = result.getValue();
@@ -48,7 +54,7 @@ export function createAdminOpsRoutes(deps: AdminOpsRoutesDeps) {
       g.requireStepUp,
       zV("json", requeueOutboxBodySchema),
       async (c) => {
-        const result = await deps.OpsService.requeue({
+        const result = await deps.RequeueOutboxUseCase.execute({
           actorUserId: g.currentUserId(c),
           ids: c.req.valid("json").ids,
         });
@@ -58,7 +64,7 @@ export function createAdminOpsRoutes(deps: AdminOpsRoutesDeps) {
       },
     )
     .get("/sweeps", g.requireAuth, g.requireStaffPermission("ops.read"), async (c) => {
-      const result = await deps.OpsService.sweeps();
+      const result = await deps.IListSweepRunsQuery.execute();
       if (result.isFailure) throw new AppErrorException(result.getError());
 
       return c.json({
@@ -72,7 +78,7 @@ export function createAdminOpsRoutes(deps: AdminOpsRoutesDeps) {
       });
     })
     .get("/stripe-events", g.requireAuth, g.requireStaffPermission("ops.read"), async (c) => {
-      const result = await deps.StripeReplayService.list();
+      const result = await deps.IListStripeEventsQuery.execute();
       if (result.isFailure) throw new AppErrorException(result.getError());
 
       const { configured, items } = result.getValue();
@@ -97,7 +103,7 @@ export function createAdminOpsRoutes(deps: AdminOpsRoutesDeps) {
       g.requireStepUp,
       zV("param", idParamSchema),
       async (c) => {
-        const result = await deps.StripeReplayService.replay({
+        const result = await deps.ReplayStripeEventUseCase.execute({
           actorUserId: g.currentUserId(c),
           stripeEventId: c.req.valid("param").id,
           handler: (request) => deps.IAuthProvider.handle(request),

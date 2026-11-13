@@ -477,7 +477,7 @@ Emitted via `emitEvent(outbox, ...)` by `AdminModerationService`, inside the `uo
 - `ADMIN_USER_PASSWORD_RESET` (`admin.user.password_reset`): emitted by `AdminModerationService.resetPassword` (triggers a BetterAuth reset email). Payload: `{ actorUserId: string, userId: string }`.
 - `ADMIN_USER_SESSIONS_REVOKED` (`admin.user.sessions_revoked`): emitted by `AdminModerationService.revokeSessions`, along with one `user.signed_out` per ended session. Payload: `{ actorUserId: string, userId: string, count: number }`. `count` is the number of sessions deleted.
 
-### Via `StepUpService` (Phase K)
+### Via `VerifyStepUpUseCase` (Phase K)
 
 Internal, compliance retention. The subject is the actor, so `userId` stands for it.
 
@@ -503,12 +503,12 @@ Internal, compliance retention, forced notifications to whoever holds `approvals
 - `ADMIN_STAFF_OVERRIDE_SET` (`admin.staff.override_set`): payload `{ actorUserId: string, userId: string, overrideId: string, permission: string, effect: "grant" | "deny", expiresAt: string | null }`. It replaces a live override of the same permission.
 - `ADMIN_STAFF_OVERRIDE_REVOKED` (`admin.staff.override_revoked`): payload `{ actorUserId: string, userId: string, overrideId: string, permission: string, effect: "grant" | "deny" }`.
 
-### Via `OpsService` (Phase K)
+### Via `RequeueOutboxUseCase` and `ReplayStripeEventUseCase` (Phase K)
 
 - `ADMIN_OPS_OUTBOX_REQUEUED` (`admin.ops.outbox_requeued`): `POST /admin/ops/outbox/requeue` sent dead events back to delivery. One event per staff action, not per row, and none when no row moved. Payload `{ actorUserId: string, requeued: number, eventIds: string[] }`.
 - `ADMIN_OPS_STRIPE_EVENT_REPLAYED` (`admin.ops.stripe_event_replayed`): `POST /admin/ops/stripe-events/:id/replay` delivered a received Stripe event again. Payload `{ actorUserId: string, stripeEventId: string, stripeEventType: string }`. Rolled back with a refused delivery.
 
-### Via `PlanOverrideService`, `StaffNoteService` and `SavedViewService` (Phase K)
+### Via the plan override, staff note and saved view use cases (Phase K)
 
 - `ADMIN_PLAN_OVERRIDE_SET` (`admin.plan_override.set`): `POST /admin/orgs/:id/plan-override` set a plan until an end date. Payload `{ actorUserId: string, overrideId: string, organizationId: string, tier: string, expiresAt: string, replacedOverrideId: string | null }`. The reason stays on the row.
 - `ADMIN_PLAN_OVERRIDE_REVOKED` (`admin.plan_override.revoked`): `DELETE /admin/orgs/:id/plan-override` ended it early. Payload `{ actorUserId: string, overrideId: string, organizationId: string, tier: string }`. Reaching the end date announces nothing: expiry is a read filter, not a write.

@@ -1,10 +1,4 @@
-import {
-  type IInstrumentation,
-  type ILogger,
-  type IUnitOfWork,
-  Option,
-  Result,
-} from "@packages/ddd-kit";
+import type { IInstrumentation, ILogger, IUnitOfWork } from "@packages/ddd-kit";
 import type { IEmailService } from "@packages/email/email.port";
 import type { ISweepRunStore } from "@packages/http/sweep-run.port";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
@@ -31,22 +25,60 @@ import type { IEntitlementsReader } from "./application/ports/services/entitleme
 import type { ILocaleReader } from "./application/ports/services/locale-reader.port";
 import type { IStripeEventGateway } from "./application/ports/services/stripe-event-gateway.port";
 import type { ITotpVerifier } from "./application/ports/services/totp-verifier.port";
+import type { IGetOrgQuery } from "./application/queries/get-org.query";
+import type { IGetUserQuery } from "./application/queries/get-user.query";
+import type { IListDeadLettersQuery } from "./application/queries/list-dead-letters.query";
+import type { IListOrgsQuery } from "./application/queries/list-orgs.query";
+import type { IListSavedViewsQuery } from "./application/queries/list-saved-views.query";
+import type { IListStaffNotesQuery } from "./application/queries/list-staff-notes.query";
+import type { IListStripeEventsQuery } from "./application/queries/list-stripe-events.query";
+import type { IListSweepRunsQuery } from "./application/queries/list-sweep-runs.query";
+import type { IListUsersQuery } from "./application/queries/list-users.query";
+import type { IStaffInboxQuery } from "./application/queries/staff-inbox.query";
+import type { IStepUpValidityQuery } from "./application/queries/step-up-validity.query";
 import { AdminModerationService } from "./application/services/admin-moderation.service";
 import { AdminQueryService } from "./application/services/admin-query.service";
 import { ApprovalService } from "./application/services/approval.service";
-import { InboxService } from "./application/services/inbox.service";
-import { OpsService } from "./application/services/ops.service";
+import { BanPermanentApprovalHandler } from "./application/services/approval-handlers/ban-permanent.handler";
+import { PermissionOverrideApprovalHandler } from "./application/services/approval-handlers/permission-override.handler";
+import { RoleChangeApprovalHandler } from "./application/services/approval-handlers/role-change.handler";
+import { StaffRevokeApprovalHandler } from "./application/services/approval-handlers/staff-revoke.handler";
 import { PlanOverrideService } from "./application/services/plan-override.service";
-import { SavedViewService } from "./application/services/saved-view.service";
 import { StaffService } from "./application/services/staff.service";
 import type { StaffEnv } from "./application/services/staff-access";
 import {
   StaffAccessService,
   type StaffLookupOnce,
 } from "./application/services/staff-access.service";
-import { StaffNoteService } from "./application/services/staff-note.service";
 import { StepUpService } from "./application/services/step-up.service";
-import { StripeReplayService } from "./application/services/stripe-replay.service";
+import { AddStaffNoteUseCase } from "./application/usecases/add-staff-note/add-staff-note.usecase";
+import { BanUserUseCase } from "./application/usecases/ban-user/ban-user.usecase";
+import { ChangeStaffRoleUseCase } from "./application/usecases/change-staff-role/change-staff-role.usecase";
+import { DeleteViewUseCase } from "./application/usecases/delete-view/delete-view.usecase";
+import { RemoveStaffOverrideUseCase } from "./application/usecases/remove-staff-override/remove-staff-override.usecase";
+import { ReplayStripeEventUseCase } from "./application/usecases/replay-stripe-event/replay-stripe-event.usecase";
+import { RequeueOutboxUseCase } from "./application/usecases/requeue-outbox/requeue-outbox.usecase";
+import { ResetUserPasswordUseCase } from "./application/usecases/reset-user-password/reset-user-password.usecase";
+import { RevokePlanOverrideUseCase } from "./application/usecases/revoke-plan-override/revoke-plan-override.usecase";
+import { RevokeStaffUseCase } from "./application/usecases/revoke-staff/revoke-staff.usecase";
+import { RevokeUserSessionsUseCase } from "./application/usecases/revoke-user-sessions/revoke-user-sessions.usecase";
+import { SaveViewUseCase } from "./application/usecases/save-view/save-view.usecase";
+import { SetPlanOverrideUseCase } from "./application/usecases/set-plan-override/set-plan-override.usecase";
+import { SetStaffOverrideUseCase } from "./application/usecases/set-staff-override/set-staff-override.usecase";
+import { StartImpersonationUseCase } from "./application/usecases/start-impersonation/start-impersonation.usecase";
+import { UnbanUserUseCase } from "./application/usecases/unban-user/unban-user.usecase";
+import { VerifyStepUpUseCase } from "./application/usecases/verify-step-up/verify-step-up.usecase";
+import { AdminOrgDetailQuery } from "./infra/queries/get-org.query";
+import { AdminUserDetailQuery } from "./infra/queries/get-user.query";
+import { DeadLettersQuery } from "./infra/queries/list-dead-letters.query";
+import { AdminOrgListQuery } from "./infra/queries/list-orgs.query";
+import { SavedViewListQuery } from "./infra/queries/list-saved-views.query";
+import { StaffNoteListQuery } from "./infra/queries/list-staff-notes.query";
+import { StripeEventListQuery } from "./infra/queries/list-stripe-events.query";
+import { SweepRunsQuery } from "./infra/queries/list-sweep-runs.query";
+import { AdminUserListQuery } from "./infra/queries/list-users.query";
+import { StaffInboxQuery } from "./infra/queries/staff-inbox.query";
+import { StepUpValidityQuery } from "./infra/queries/step-up-validity.query";
 import { DrizzleAdminOrgRepository } from "./infra/repos/drizzle/admin-org.repository";
 import { DrizzleAdminUserRepository } from "./infra/repos/drizzle/admin-user.repository";
 import { DrizzleApprovalRepository } from "./infra/repos/drizzle/approval.repository";
@@ -69,7 +101,7 @@ export interface AdminPrerequisites {
   EntitlementsService: IEntitlementsReader;
   IPlanOverrideStore: IPlanOverrideStore;
   IStripeEventStore: IStripeEventStore;
-  IStripeEventGateway: IStripeEventGateway;
+  IStripeEventGateway: IStripeEventGateway<(request: Request) => Promise<Response>>;
   isReplayableStripeEvent: StripeReplayRule;
   staffLookupOnce: StaffLookupOnce;
   staffSettings: StaffEnv;
@@ -87,15 +119,31 @@ export const adminModule = defineModule<AdminPrerequisites>()((b) =>
       (c): IAdminOrgStore => new DrizzleAdminOrgRepository(c.IInstrumentation, c.ILogger),
     )
     .add(
-      "AdminQueryService",
-      (c) =>
-        new AdminQueryService(
-          c.IAdminUserStore,
-          c.IInstrumentation,
+      "IListUsersQuery",
+      (c): IListUsersQuery => new AdminUserListQuery(c.IAdminUserStore, c.IInstrumentation),
+    )
+    .add(
+      "IListOrgsQuery",
+      (c): IListOrgsQuery => new AdminOrgListQuery(c.IAdminOrgStore, c.IInstrumentation),
+    )
+    .add(
+      "IGetUserQuery",
+      (c): IGetUserQuery => new AdminUserDetailQuery(c.IAdminUserStore, c.IInstrumentation),
+    )
+    .add(
+      "IGetOrgQuery",
+      (c): IGetOrgQuery =>
+        new AdminOrgDetailQuery(
           c.IAdminOrgStore,
           c.EntitlementsService,
           c.IPlanOverrideStore,
+          c.IInstrumentation,
         ),
+    )
+    .add(
+      "AdminQueryService",
+      (c) =>
+        new AdminQueryService(c.IListUsersQuery, c.IListOrgsQuery, c.IGetOrgQuery, c.IGetUserQuery),
     )
     .add(
       "IStaffStore",
@@ -134,9 +182,18 @@ export const adminModule = defineModule<AdminPrerequisites>()((b) =>
       (c): IStepUpStore => new DrizzleStepUpRepository(c.IInstrumentation, c.ILogger),
     )
     .add(
-      "StepUpService",
+      "IStepUpValidityQuery",
+      (c): IStepUpValidityQuery =>
+        new StepUpValidityQuery(
+          c.IStepUpStore,
+          { ADMIN_STEP_UP_TTL_SECONDS: c.adminSettings.stepUpTtlSeconds },
+          c.IInstrumentation,
+        ),
+    )
+    .add(
+      "VerifyStepUpUseCase",
       (c) =>
-        new StepUpService(
+        new VerifyStepUpUseCase(
           c.IStepUpStore,
           c.ITotpVerifier,
           c.IOutboxRepository,
@@ -145,6 +202,7 @@ export const adminModule = defineModule<AdminPrerequisites>()((b) =>
           c.ILogger,
         ),
     )
+    .add("StepUpService", (c) => new StepUpService(c.IStepUpValidityQuery, c.VerifyStepUpUseCase))
     .add(
       "IApprovalStore",
       (c): IApprovalStore =>
@@ -153,141 +211,13 @@ export const adminModule = defineModule<AdminPrerequisites>()((b) =>
     .add(
       "ApprovalHandlers",
       (c): ApprovalHandlers => ({
-        "user.ban_permanent": {
-          prepare: async ({ subjectId, params }, actor) => {
-            const refused = await c.StaffService.refuseBan({
-              actorPermissions: actor.permissions,
-              targetUserId: subjectId,
-            });
-
-            return refused.isFailure ? Result.fail(refused.getError()) : Result.ok(params);
-          },
-          authorize: async ({ subjectId }, actor) =>
-            c.StaffService.refuseTarget({
-              actorPermissions: actor.permissions,
-              targetUserId: subjectId,
-            }),
-          run: ({ subjectId, params }, actor) =>
-            c.StaffService.moderateBan(
-              { actorPermissions: actor.permissions, targetUserId: subjectId },
-              () =>
-                c.AdminModerationService.ban({
-                  actorUserId: actor.userId,
-                  userId: subjectId,
-                  reason: params.reason,
-                  expiresIn: params.expiresIn,
-                }),
-            ),
-        },
-        "staff.role_change": {
-          prepare: async ({ subjectId, params }, actor) => {
-            const from = await c.StaffService.refuseRoleChange({
-              actorUserId: actor.userId,
-              actorPermissions: actor.permissions,
-              targetUserId: subjectId,
-              role: params.role,
-            });
-
-            return from.isFailure
-              ? Result.fail(from.getError())
-              : Result.ok({ role: params.role, fromRole: from.getValue().toNull() });
-          },
-          authorize: async ({ subjectId, params }, actor) =>
-            c.StaffService.refusedRoleGrant({
-              actorUserId: actor.userId,
-              actorPermissions: actor.permissions,
-              targetUserId: subjectId,
-              role: params.role,
-            }),
-          run: ({ subjectId, params }, actor) =>
-            c.StaffService.assignRole({
-              actorUserId: actor.userId,
-              actorPermissions: actor.permissions,
-              targetUserId: subjectId,
-              role: params.role,
-              expectedRole: params.fromRole,
-            }),
-        },
-        "staff.revoke": {
-          prepare: async ({ subjectId, params }, actor) => {
-            const refused = await c.StaffService.refuseRevoke({
-              actorUserId: actor.userId,
-              targetUserId: subjectId,
-            });
-
-            return refused.isFailure ? Result.fail(refused.getError()) : Result.ok(params);
-          },
-          authorize: async () => Result.ok(),
-          run: ({ subjectId }, actor) =>
-            c.StaffService.revoke({ actorUserId: actor.userId, targetUserId: subjectId }),
-        },
-        "staff.permission_override": {
-          prepare: async ({ subjectId, params }, actor) => {
-            const change = {
-              actorUserId: actor.userId,
-              actorPermissions: actor.permissions,
-              targetUserId: subjectId,
-            };
-
-            if (params.op === "set") {
-              const expiresAt = params.expiresAt ?? null;
-              const refused = await c.StaffService.refuseOverride({
-                ...change,
-                permission: params.permission,
-                effect: params.effect,
-                expiresAt: Option.fromNullable(expiresAt).map((iso) => new Date(iso)),
-              });
-
-              return refused.isFailure
-                ? Result.fail(refused.getError())
-                : Result.ok({
-                    op: "set" as const,
-                    permission: params.permission,
-                    effect: params.effect,
-                    expiresAt,
-                  });
-            }
-
-            const live = await c.StaffService.refuseOverrideRemoval({
-              ...change,
-              overrideId: params.overrideId,
-            });
-            if (live.isFailure) return Result.fail(live.getError());
-
-            const row = live.getValue();
-
-            return Result.ok({
-              op: "revoke" as const,
-              overrideId: params.overrideId,
-              permission: row.permission,
-              effect: row.effect,
-              expiresAt: row.expiresAt.map((at) => at.toISOString()).toNull(),
-            });
-          },
-          authorize: async ({ params }, actor) =>
-            c.StaffService.refusedOverrideGrant({
-              actorPermissions: actor.permissions,
-              permission: params.permission,
-              effect: params.effect,
-              liftsOverride: params.op === "revoke",
-            }),
-          run: ({ subjectId, params }, actor) => {
-            const change = {
-              actorUserId: actor.userId,
-              actorPermissions: actor.permissions,
-              targetUserId: subjectId,
-            };
-
-            return params.op === "set"
-              ? c.StaffService.setOverride({
-                  ...change,
-                  permission: params.permission,
-                  effect: params.effect,
-                  expiresAt: Option.fromNullable(params.expiresAt).map((iso) => new Date(iso)),
-                })
-              : c.StaffService.removeOverride({ ...change, overrideId: params.overrideId });
-          },
-        },
+        "user.ban_permanent": new BanPermanentApprovalHandler(
+          c.StaffService,
+          c.AdminModerationService,
+        ),
+        "staff.role_change": new RoleChangeApprovalHandler(c.StaffService),
+        "staff.revoke": new StaffRevokeApprovalHandler(c.StaffService),
+        "staff.permission_override": new PermissionOverrideApprovalHandler(c.StaffService),
       }),
     )
     .add(
@@ -306,20 +236,63 @@ export const adminModule = defineModule<AdminPrerequisites>()((b) =>
         ),
     )
     .add(
+      "BanUserUseCase",
+      (c) => new BanUserUseCase(c.StaffService, c.ApprovalService, c.AdminModerationService),
+    )
+    .add("UnbanUserUseCase", (c) => new UnbanUserUseCase(c.StaffService, c.AdminModerationService))
+    .add(
+      "RevokeUserSessionsUseCase",
+      (c) => new RevokeUserSessionsUseCase(c.StaffService, c.AdminModerationService),
+    )
+    .add(
+      "ResetUserPasswordUseCase",
+      (c) => new ResetUserPasswordUseCase(c.StaffService, c.AdminModerationService),
+    )
+    .add(
+      "StartImpersonationUseCase",
+      (c) => new StartImpersonationUseCase(c.AdminModerationService),
+    )
+    .add(
+      "ChangeStaffRoleUseCase",
+      (c) => new ChangeStaffRoleUseCase(c.ApprovalService, c.StaffService),
+    )
+    .add("RevokeStaffUseCase", (c) => new RevokeStaffUseCase(c.ApprovalService, c.StaffService))
+    .add(
+      "SetStaffOverrideUseCase",
+      (c) => new SetStaffOverrideUseCase(c.ApprovalService, c.StaffService),
+    )
+    .add(
+      "RemoveStaffOverrideUseCase",
+      (c) => new RemoveStaffOverrideUseCase(c.ApprovalService, c.StaffService),
+    )
+    .add(
       "IOpsStore",
       (c): IOpsStore => new DrizzleOpsRepository(c.IInstrumentation, c.WebhooksService),
     )
     .add(
-      "OpsService",
+      "IListDeadLettersQuery",
+      (c): IListDeadLettersQuery => new DeadLettersQuery(c.IOpsStore, c.IInstrumentation),
+    )
+    .add(
+      "IListSweepRunsQuery",
+      (c): IListSweepRunsQuery => new SweepRunsQuery(c.ISweepRunStore, c.IInstrumentation),
+    )
+    .add(
+      "RequeueOutboxUseCase",
       (c) =>
-        new OpsService(c.IOpsStore, c.ISweepRunStore, c.IOutboxRepository, c.ITransactionService, {
+        new RequeueOutboxUseCase(c.IOutboxRepository, c.ITransactionService, {
           OUTBOX_LEASE_SECONDS: c.adminSettings.outboxLeaseSeconds,
         }),
     )
     .add(
-      "StripeReplayService",
+      "IListStripeEventsQuery",
+      (c): IListStripeEventsQuery =>
+        new StripeEventListQuery(c.IStripeEventStore, c.IStripeEventGateway, c.IInstrumentation),
+    )
+    .add(
+      "ReplayStripeEventUseCase",
       (c) =>
-        new StripeReplayService(
+        new ReplayStripeEventUseCase(
           c.IStripeEventStore,
           c.IStripeEventGateway,
           c.IOutboxRepository,
@@ -328,9 +301,9 @@ export const adminModule = defineModule<AdminPrerequisites>()((b) =>
         ),
     )
     .add(
-      "PlanOverrideService",
+      "SetPlanOverrideUseCase",
       (c) =>
-        new PlanOverrideService(
+        new SetPlanOverrideUseCase(
           c.IPlanOverrideStore,
           c.IAdminOrgStore,
           c.IOutboxRepository,
@@ -338,22 +311,51 @@ export const adminModule = defineModule<AdminPrerequisites>()((b) =>
         ),
     )
     .add(
+      "RevokePlanOverrideUseCase",
+      (c) =>
+        new RevokePlanOverrideUseCase(
+          c.IPlanOverrideStore,
+          c.IOutboxRepository,
+          c.ITransactionService,
+        ),
+    )
+    .add(
+      "PlanOverrideService",
+      (c) => new PlanOverrideService(c.SetPlanOverrideUseCase, c.RevokePlanOverrideUseCase),
+    )
+    .add(
       "IStaffNoteStore",
       (c): IStaffNoteStore => new DrizzleStaffNoteRepository(c.IInstrumentation),
     )
     .add(
-      "StaffNoteService",
-      (c) => new StaffNoteService(c.IStaffNoteStore, c.IOutboxRepository, c.ITransactionService),
+      "IListStaffNotesQuery",
+      (c): IListStaffNotesQuery => new StaffNoteListQuery(c.IStaffNoteStore, c.IInstrumentation),
+    )
+    .add(
+      "AddStaffNoteUseCase",
+      (c) => new AddStaffNoteUseCase(c.IStaffNoteStore, c.IOutboxRepository, c.ITransactionService),
     )
     .add(
       "ISavedViewStore",
       (c): ISavedViewStore => new DrizzleSavedViewRepository(c.IInstrumentation),
     )
     .add(
-      "SavedViewService",
-      (c) => new SavedViewService(c.ISavedViewStore, c.IOutboxRepository, c.ITransactionService),
+      "IListSavedViewsQuery",
+      (c): IListSavedViewsQuery => new SavedViewListQuery(c.ISavedViewStore, c.IInstrumentation),
     )
-    .add("InboxService", (c) => new InboxService(c.IApprovalStore, c.IOpsStore, c.ISweepRunStore))
+    .add(
+      "SaveViewUseCase",
+      (c) => new SaveViewUseCase(c.ISavedViewStore, c.IOutboxRepository, c.ITransactionService),
+    )
+    .add(
+      "DeleteViewUseCase",
+      (c) => new DeleteViewUseCase(c.ISavedViewStore, c.IOutboxRepository, c.ITransactionService),
+    )
+    .add(
+      "IStaffInboxQuery",
+      (c): IStaffInboxQuery =>
+        new StaffInboxQuery(c.IApprovalStore, c.IOpsStore, c.ISweepRunStore, c.IInstrumentation),
+    )
     .add("CloseApprovalsOfDeletedUser", (c) =>
       closeApprovalsOfDeletedUser({ ApprovalService: c.ApprovalService }),
     )

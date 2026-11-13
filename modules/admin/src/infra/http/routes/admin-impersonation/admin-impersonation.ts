@@ -5,7 +5,7 @@ import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { IAuthProvider } from "../../../../application/ports/services/auth-provider.port";
-import type { AdminModerationService } from "../../../../application/services/admin-moderation.service";
+import type { StartImpersonationUseCase } from "../../../../application/usecases/start-impersonation/start-impersonation.usecase";
 import { impersonateBodySchema } from "./admin-impersonation.schema";
 import { relaySetCookie } from "./relay-set-cookie";
 
@@ -15,7 +15,7 @@ export interface AdminImpersonationRoutesDeps {
     IAuthProvider,
     "impersonationTtlSeconds" | "impersonateUser" | "stopImpersonating"
   >;
-  AdminModerationService: Pick<AdminModerationService, "startImpersonation">;
+  StartImpersonationUseCase: Pick<StartImpersonationUseCase, "execute">;
 }
 
 export function createAdminImpersonationRoutes(deps: AdminImpersonationRoutesDeps) {
@@ -34,17 +34,15 @@ export function createAdminImpersonationRoutes(deps: AdminImpersonationRoutesDep
         const targetId = c.req.valid("param").id;
         const { reason, ticketRef } = c.req.valid("json");
 
-        const started = await deps.AdminModerationService.startImpersonation(
-          {
-            actorUserId: g.currentUserId(c),
-            userId: targetId,
-            reason,
-            ticketRef,
-            ip: g.clientIp(c),
-            expiresAt: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
-          },
-          () => deps.IAuthProvider.impersonateUser(targetId, [...c.req.raw.headers]),
-        );
+        const started = await deps.StartImpersonationUseCase.execute({
+          actorUserId: g.currentUserId(c),
+          userId: targetId,
+          reason,
+          ticketRef,
+          ip: g.clientIp(c),
+          expiresAt: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
+          start: () => deps.IAuthProvider.impersonateUser(targetId, [...c.req.raw.headers]),
+        });
         if (started.isFailure) throw new AppErrorException(started.getError());
 
         return relaySetCookie(started.getValue(), c.json({ ok: true, expiresIn: ttlSeconds }));

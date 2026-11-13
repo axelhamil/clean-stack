@@ -7,7 +7,7 @@
  */
 
 import "./check-admin-ops.env";
-import { StripeReplayService } from "@modules/admin/services/stripe-replay";
+import { ReplayStripeEventUseCase } from "@modules/admin/usecases/replay-stripe-event";
 import { StripeEventGateway } from "@modules/billing/adapters/stripe-event-gateway";
 import * as billingSchema from "@modules/billing/schemas/billing";
 import { NoOpInstrumentation, Result, uuidv7 } from "@packages/ddd-kit";
@@ -289,7 +289,10 @@ async function replayOutcomes(id: string): Promise<unknown[]> {
   );
 }
 
-function replayOver(id: string, invoiceStatus = "open"): StripeReplayService {
+function replayOver(
+  id: string,
+  invoiceStatus = "open",
+): ReplayStripeEventUseCase<(request: Request) => Promise<Response>> {
   const gateway = new StripeEventGateway(
     {
       events: { retrieve: async () => invoiceFailed(id) },
@@ -301,7 +304,7 @@ function replayOver(id: string, invoiceStatus = "open"): StripeReplayService {
     new NoOpInstrumentation(),
   );
 
-  return new StripeReplayService(
+  return new ReplayStripeEventUseCase(
     di.IStripeEventStore,
     gateway,
     di.IOutboxRepository,
@@ -331,7 +334,7 @@ async function proveStripeReplay(actorUserId: string): Promise<void> {
   check("the plugin records the received event", received?.status === "received", received);
   check("the first delivery emits its event", (await paymentFailedCount()) === 1);
 
-  const refused = await replayOver(id).replay({
+  const refused = await replayOver(id).execute({
     actorUserId,
     stripeEventId: id,
     handler: async () => new Response(null, { status: 400 }),
@@ -349,12 +352,12 @@ async function proveStripeReplay(actorUserId: string): Promise<void> {
   );
 
   const [replayed, doubleClick] = await Promise.all([
-    replayOver(id).replay({
+    replayOver(id).execute({
       actorUserId,
       stripeEventId: id,
       handler: (request) => auth.handler(request),
     }),
-    replayOver(id).replay({
+    replayOver(id).execute({
       actorUserId,
       stripeEventId: id,
       handler: (request) => auth.handler(request),
@@ -387,7 +390,7 @@ async function proveStripeReplay(actorUserId: string): Promise<void> {
     type: "invoice.payment_failed",
     status: "failed",
   });
-  const paid = await replayOver(paidId, "paid").replay({
+  const paid = await replayOver(paidId, "paid").execute({
     actorUserId,
     stripeEventId: paidId,
     handler: (request) => auth.handler(request),
@@ -395,7 +398,7 @@ async function proveStripeReplay(actorUserId: string): Promise<void> {
   check("an invoice paid since then replays fine", paid.isSuccess, paid);
   check("an invoice paid since then announces no failure", (await paymentFailedCount()) === 1);
 
-  const unknown = await replayOver(id).replay({
+  const unknown = await replayOver(id).execute({
     actorUserId,
     stripeEventId: `${STRIPE_PREFIX}_unknown`,
     handler: (request) => auth.handler(request),
@@ -594,7 +597,7 @@ async function proveUnprocessedEventRefused(actorUserId: string): Promise<void> 
   const id = `${STRIPE_PREFIX}_invoice_paid`;
   await db.insert(stripeEvent).values({ id, type: "invoice.paid", status: "received" });
 
-  const refused = await replayOver(id).replay({
+  const refused = await replayOver(id).execute({
     actorUserId,
     stripeEventId: id,
     handler: (request) => auth.handler(request),

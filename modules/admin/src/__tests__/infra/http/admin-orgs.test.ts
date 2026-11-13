@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
 import { mockPort } from "@packages/test/bun";
-import type { AdminOrgDetail } from "../../../application/services/admin-query.service";
+import type { AdminOrgDetail } from "../../../application/queries/get-org.query";
 import { ACTOR_ID, adminApp, send, staffGuards } from "../../fixtures/http-app";
 import type { AdminRoutesDeps } from "../../fixtures/mount-admin-routes";
 
@@ -27,28 +27,37 @@ const ORG: AdminOrgDetail = {
   }),
 };
 
-let queries = mockPort<AdminRoutesDeps["AdminQueryService"]>();
-let overrides = mockPort<AdminRoutesDeps["PlanOverrideService"]>();
-let notes = mockPort<AdminRoutesDeps["StaffNoteService"]>();
+let listOrgs = mockPort<AdminRoutesDeps["IListOrgsQuery"]>();
+let getOrg = mockPort<AdminRoutesDeps["IGetOrgQuery"]>();
+let setOverride = mockPort<AdminRoutesDeps["SetPlanOverrideUseCase"]>();
+let revokeOverride = mockPort<AdminRoutesDeps["RevokePlanOverrideUseCase"]>();
+let listNotes = mockPort<AdminRoutesDeps["IListStaffNotesQuery"]>();
+let addNote = mockPort<AdminRoutesDeps["AddStaffNoteUseCase"]>();
 let sso = mockPort<AdminRoutesDeps["AdminActionService"]>();
 let stepUps = 0;
 
 beforeEach(() => {
-  queries = mockPort<AdminRoutesDeps["AdminQueryService"]>();
-  overrides = mockPort<AdminRoutesDeps["PlanOverrideService"]>();
-  notes = mockPort<AdminRoutesDeps["StaffNoteService"]>();
+  listOrgs = mockPort<AdminRoutesDeps["IListOrgsQuery"]>();
+  getOrg = mockPort<AdminRoutesDeps["IGetOrgQuery"]>();
+  setOverride = mockPort<AdminRoutesDeps["SetPlanOverrideUseCase"]>();
+  revokeOverride = mockPort<AdminRoutesDeps["RevokePlanOverrideUseCase"]>();
+  listNotes = mockPort<AdminRoutesDeps["IListStaffNotesQuery"]>();
+  addNote = mockPort<AdminRoutesDeps["AddStaffNoteUseCase"]>();
   sso = mockPort<AdminRoutesDeps["AdminActionService"]>();
   stepUps = 0;
-  overrides.set.mockResolvedValue(Result.ok());
-  overrides.revoke.mockResolvedValue(Result.ok());
+  setOverride.execute.mockResolvedValue(Result.ok());
+  revokeOverride.execute.mockResolvedValue(Result.ok());
   sso.setSsoEnforcement.mockResolvedValue(Result.ok());
 });
 
 const app = () =>
   adminApp({
-    AdminQueryService: queries,
-    PlanOverrideService: overrides,
-    StaffNoteService: notes,
+    IListOrgsQuery: listOrgs,
+    IGetOrgQuery: getOrg,
+    SetPlanOverrideUseCase: setOverride,
+    RevokePlanOverrideUseCase: revokeOverride,
+    IListStaffNotesQuery: listNotes,
+    AddStaffNoteUseCase: addNote,
     AdminActionService: sso,
   });
 
@@ -64,7 +73,7 @@ const countingStepUp = () =>
 
 describe("GET /admin/orgs", () => {
   it("lists organisations without their cursor field", async () => {
-    queries.listOrgs.mockResolvedValue(
+    listOrgs.execute.mockResolvedValue(
       Result.ok({
         items: [
           {
@@ -102,7 +111,7 @@ describe("GET /admin/orgs", () => {
 
 describe("GET /admin/orgs/:id", () => {
   it("answers 404 for an unknown organisation", async () => {
-    queries.getOrg.mockResolvedValue(Result.ok(Option.none()));
+    getOrg.execute.mockResolvedValue(Result.ok(Option.none()));
 
     const res = await send(app(), "GET", "/admin/orgs/ghost");
 
@@ -110,7 +119,7 @@ describe("GET /admin/orgs/:id", () => {
   });
 
   it("returns the organisation with its active plan override", async () => {
-    queries.getOrg.mockResolvedValue(Result.ok(Option.some(ORG)));
+    getOrg.execute.mockResolvedValue(Result.ok(Option.some(ORG)));
 
     const res = await send(app(), "GET", "/admin/orgs/org-1");
 
@@ -131,7 +140,7 @@ describe("plan override", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(overrides.set).toHaveBeenCalledWith({
+    expect(setOverride.execute).toHaveBeenCalledWith({
       actorUserId: ACTOR_ID,
       organizationId: "org-1",
       tier: "pro",
@@ -148,14 +157,14 @@ describe("plan override", () => {
     });
 
     expect(res.status).toBe(400);
-    expect(overrides.set).not.toHaveBeenCalled();
+    expect(setOverride.execute).not.toHaveBeenCalled();
   });
 
   it("revokes the override of the organisation", async () => {
     const res = await send(app(), "DELETE", "/admin/orgs/org-1/plan-override");
 
     expect(res.status).toBe(200);
-    expect(overrides.revoke).toHaveBeenCalledWith({
+    expect(revokeOverride.execute).toHaveBeenCalledWith({
       actorUserId: ACTOR_ID,
       organizationId: "org-1",
     });
@@ -164,16 +173,16 @@ describe("plan override", () => {
 
 describe("staff notes on an organisation", () => {
   it("lists and adds notes on the org subject", async () => {
-    notes.list.mockResolvedValue(Result.ok([]));
-    notes.add.mockResolvedValue(Result.ok());
+    listNotes.execute.mockResolvedValue(Result.ok([]));
+    addNote.execute.mockResolvedValue(Result.ok());
 
     const listed = await send(app(), "GET", "/admin/orgs/org-1/notes");
     const added = await send(app(), "POST", "/admin/orgs/org-1/notes", { body: "call back" });
 
     expect(listed.status).toBe(200);
-    expect(notes.list).toHaveBeenCalledWith({ type: "org", id: "org-1" });
+    expect(listNotes.execute).toHaveBeenCalledWith({ type: "org", id: "org-1" });
     expect(added.status).toBe(200);
-    expect(notes.add).toHaveBeenCalledWith({
+    expect(addNote.execute).toHaveBeenCalledWith({
       actorUserId: ACTOR_ID,
       subject: { type: "org", id: "org-1" },
       body: "call back",

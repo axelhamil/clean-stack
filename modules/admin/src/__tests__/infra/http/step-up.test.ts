@@ -1,10 +1,13 @@
 import { describe, expect, it } from "bun:test";
-import { Option, Result } from "@packages/ddd-kit";
+import { Result } from "@packages/ddd-kit";
 import type { RouteGuard } from "@packages/http/route-guards";
 import { openRouteGuards } from "@packages/http/testing/route-guards";
 import { mockPort } from "@packages/test/bun";
 import { HTTPException } from "hono/http-exception";
-import { type AdminRoutesDeps, mountAdminRoutes } from "../../fixtures/mount-admin-routes";
+import type { AdminModerationService } from "../../../application/services/admin-moderation.service";
+import type { ApprovalService } from "../../../application/services/approval.service";
+import { BanUserUseCase } from "../../../application/usecases/ban-user/ban-user.usecase";
+import { mountAdminRoutes } from "../../fixtures/mount-admin-routes";
 
 const STEP_UP_STATUS = 418;
 const refuseStepUp = () => {
@@ -24,22 +27,15 @@ const app = mountAdminRoutes(
   },
   {
     AdminActionService: { setSsoEnforcement: allowed },
-    StaffService: {
-      ...mockPort<AdminRoutesDeps["StaffService"]>(),
-      moderateBan: async () => Result.ok(),
-      banIsSensitive: async (input: { targetUserId: string; expiresIn?: number }) =>
-        Result.ok(input.expiresIn === undefined || input.targetUserId === "staff-target"),
-      assignRole: allowed,
-      revoke: allowed,
-    },
-    AdminModerationService: {
-      ...mockPort<AdminRoutesDeps["AdminModerationService"]>(),
-      ban: allowed,
-    },
-    StepUpService: {
-      ...mockPort<AdminRoutesDeps["StepUpService"]>(),
-      validUntil: async () => Result.ok(Option.none()),
-    },
+    BanUserUseCase: new BanUserUseCase(
+      {
+        moderateBan: async () => Result.ok(),
+        banIsSensitive: async (input: { targetUserId: string; expiresIn?: number }) =>
+          Result.ok(input.expiresIn === undefined || input.targetUserId === "staff-target"),
+      },
+      mockPort<Pick<ApprovalService, "gate">>(),
+      { ...mockPort<Pick<AdminModerationService, "ban">>(), ban: allowed },
+    ),
   },
 );
 app.onError((err, c) =>

@@ -4,40 +4,39 @@ import type { RouteEnv, RouteGuards } from "@packages/http/route-guards";
 import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { banUserBodySchema } from "../../../../application/approved-action";
 import type { AdminUserRow } from "../../../../application/ports/repositories/admin-user-store.port";
 import type { IAuthProvider } from "../../../../application/ports/services/auth-provider.port";
-import type { AdminModerationService } from "../../../../application/services/admin-moderation.service";
 import type {
-  AdminQueryService,
   AdminUserDetail,
-} from "../../../../application/services/admin-query.service";
-import type { ApprovalService } from "../../../../application/services/approval.service";
-import type { StaffService } from "../../../../application/services/staff.service";
-import type { StaffNoteService } from "../../../../application/services/staff-note.service";
-import { gateOr202 } from "../../approval-gate.response";
+  IGetUserQuery,
+} from "../../../../application/queries/get-user.query";
+import type { IListStaffNotesQuery } from "../../../../application/queries/list-staff-notes.query";
+import type { IListUsersQuery } from "../../../../application/queries/list-users.query";
+import type { AddStaffNoteUseCase } from "../../../../application/usecases/add-staff-note/add-staff-note.usecase";
+import type { BanUserUseCase } from "../../../../application/usecases/ban-user/ban-user.usecase";
+import type { ResetUserPasswordUseCase } from "../../../../application/usecases/reset-user-password/reset-user-password.usecase";
+import type { RevokeUserSessionsUseCase } from "../../../../application/usecases/revoke-user-sessions/revoke-user-sessions.usecase";
+import type { UnbanUserUseCase } from "../../../../application/usecases/unban-user/unban-user.usecase";
+import { gatedResponse } from "../../approval-gate.response";
 import { serializeStaffNote } from "../../staff-note.presenter";
 import { addStaffNoteBodySchema } from "../../staff-note.schema";
-import { listUsersQuerySchema } from "./admin.schema";
+import { banUserBodySchema, listUsersQuerySchema } from "./admin.schema";
 
 export interface AdminUserRoutesDeps {
   routeGuards: RouteGuards;
   IAuthProvider: Pick<IAuthProvider, "requestPasswordReset">;
-  AdminQueryService: Pick<AdminQueryService, "listUsers" | "getUser">;
-  AdminModerationService: Pick<
-    AdminModerationService,
-    "ban" | "unban" | "resetPassword" | "revokeSessions"
-  >;
-  ApprovalService: Pick<ApprovalService, "gate">;
-  StaffService: Pick<StaffService, "banIsSensitive" | "moderate" | "moderateBan">;
-  StaffNoteService: Pick<StaffNoteService, "list" | "add">;
+  IListUsersQuery: IListUsersQuery;
+  IGetUserQuery: IGetUserQuery;
+  IListStaffNotesQuery: IListStaffNotesQuery;
+  BanUserUseCase: Pick<BanUserUseCase, "execute">;
+  UnbanUserUseCase: Pick<UnbanUserUseCase, "execute">;
+  ResetUserPasswordUseCase: Pick<ResetUserPasswordUseCase, "execute">;
+  RevokeUserSessionsUseCase: Pick<RevokeUserSessionsUseCase, "execute">;
+  AddStaffNoteUseCase: Pick<AddStaffNoteUseCase, "execute">;
 }
 
-async function findUserOr404(
-  queries: AdminUserRoutesDeps["AdminQueryService"],
-  userId: string,
-): Promise<AdminUserDetail> {
-  const result = await queries.getUser(userId);
+async function findUserOr404(query: IGetUserQuery, userId: string): Promise<AdminUserDetail> {
+  const result = await query.execute({ userId });
   if (result.isFailure) throw new AppErrorException(result.getError());
 
   const found = result.getValue();
@@ -65,7 +64,7 @@ export function createAdminUserRoutes(deps: AdminUserRoutesDeps) {
       g.requireStaffPermission("users.read"),
       zV("query", listUsersQuerySchema),
       async (c) => {
-        const result = await deps.AdminQueryService.listUsers(c.req.valid("query"));
+        const result = await deps.IListUsersQuery.execute(c.req.valid("query"));
         if (result.isFailure) throw new AppErrorException(result.getError());
         const page = result.getValue();
         return c.json({
@@ -80,7 +79,7 @@ export function createAdminUserRoutes(deps: AdminUserRoutesDeps) {
       g.requireStaffPermission("users.read"),
       zV("param", idParamSchema),
       async (c) => {
-        const u = await findUserOr404(deps.AdminQueryService, c.req.valid("param").id);
+        const u = await findUserOr404(deps.IGetUserQuery, c.req.valid("param").id);
         return c.json({
           ...serializeUser(u),
           sessions: u.sessions.map((s) => ({
@@ -101,45 +100,17 @@ export function createAdminUserRoutes(deps: AdminUserRoutesDeps) {
       g.requireStaffPermission("users.moderate"),
       zV("json", banUserBodySchema),
       zV("param", idParamSchema),
-      async (c) => {
-        const actorId = g.currentUserId(c);
-        const userId = c.req.valid("param").id;
-        const body = c.req.valid("json");
-        const sensitive = await deps.StaffService.banIsSensitive({
-          targetUserId: userId,
-          expiresIn: body.expiresIn,
-        });
-        if (sensitive.isFailure) throw new AppErrorException(sensitive.getError());
-
-        if (sensitive.getValue()) {
-          await g.assertStepUp(c);
-
-          const pending = gateOr202(
-            c,
-            await deps.ApprovalService.gate({
-              action: "user.ban_permanent",
-              subjectId: userId,
-              params: body,
-              requestedBy: actorId,
-              requesterPermissions: g.currentStaff(c).permissions,
-            }),
-          );
-          if (pending) return pending;
-        }
-
-        const result = await deps.StaffService.moderateBan(
-          { actorPermissions: g.currentStaff(c).permissions, targetUserId: userId },
-          () =>
-            deps.AdminModerationService.ban({
-              actorUserId: actorId,
-              userId,
-              reason: body.reason,
-              expiresIn: body.expiresIn,
-            }),
-        );
-        if (result.isFailure) throw new AppErrorException(result.getError());
-        return c.json({ ok: true });
-      },
+      async (c) =>
+        gatedResponse(
+          c,
+          await deps.BanUserUseCase.execute({
+            actorUserId: g.currentUserId(c),
+            actorPermissions: g.currentStaff(c).permissions,
+            userId: c.req.valid("param").id,
+            ban: c.req.valid("json"),
+            confirmStepUp: () => g.assertStepUp(c),
+          }),
+        ),
     )
     .post(
       "/:id/unban",
@@ -147,12 +118,11 @@ export function createAdminUserRoutes(deps: AdminUserRoutesDeps) {
       g.requireStaffPermission("users.moderate"),
       zV("param", idParamSchema),
       async (c) => {
-        const actorId = g.currentUserId(c);
-        const userId = c.req.valid("param").id;
-        const result = await deps.StaffService.moderate(
-          { actorPermissions: g.currentStaff(c).permissions, targetUserId: userId },
-          () => deps.AdminModerationService.unban({ actorUserId: actorId, userId }),
-        );
+        const result = await deps.UnbanUserUseCase.execute({
+          actorUserId: g.currentUserId(c),
+          actorPermissions: g.currentStaff(c).permissions,
+          userId: c.req.valid("param").id,
+        });
         if (result.isFailure) throw new AppErrorException(result.getError());
         return c.json({ ok: true });
       },
@@ -163,16 +133,14 @@ export function createAdminUserRoutes(deps: AdminUserRoutesDeps) {
       g.requireStaffPermission("users.moderate"),
       zV("param", idParamSchema),
       async (c) => {
-        const actorId = g.currentUserId(c);
         const userId = c.req.valid("param").id;
-        const u = await findUserOr404(deps.AdminQueryService, userId);
-        const result = await deps.StaffService.moderate(
-          { actorPermissions: g.currentStaff(c).permissions, targetUserId: userId },
-          () =>
-            deps.AdminModerationService.resetPassword({ actorUserId: actorId, userId }, () =>
-              deps.IAuthProvider.requestPasswordReset(u.email),
-            ),
-        );
+        const u = await findUserOr404(deps.IGetUserQuery, userId);
+        const result = await deps.ResetUserPasswordUseCase.execute({
+          actorUserId: g.currentUserId(c),
+          actorPermissions: g.currentStaff(c).permissions,
+          userId,
+          requestReset: () => deps.IAuthProvider.requestPasswordReset(u.email),
+        });
         if (result.isFailure) throw new AppErrorException(result.getError());
         return c.json({ ok: true });
       },
@@ -183,13 +151,13 @@ export function createAdminUserRoutes(deps: AdminUserRoutesDeps) {
       g.requireStaffPermission("users.moderate"),
       zV("param", idParamSchema),
       async (c) => {
-        const actorId = g.currentUserId(c);
         const userId = c.req.valid("param").id;
-        await findUserOr404(deps.AdminQueryService, userId);
-        const result = await deps.StaffService.moderate(
-          { actorPermissions: g.currentStaff(c).permissions, targetUserId: userId },
-          () => deps.AdminModerationService.revokeSessions({ actorUserId: actorId, userId }),
-        );
+        await findUserOr404(deps.IGetUserQuery, userId);
+        const result = await deps.RevokeUserSessionsUseCase.execute({
+          actorUserId: g.currentUserId(c),
+          actorPermissions: g.currentStaff(c).permissions,
+          userId,
+        });
         if (result.isFailure) throw new AppErrorException(result.getError());
         return c.json({ ok: true });
       },
@@ -200,7 +168,7 @@ export function createAdminUserRoutes(deps: AdminUserRoutesDeps) {
       g.requireStaffPermission("users.read"),
       zV("param", idParamSchema),
       async (c) => {
-        const result = await deps.StaffNoteService.list({
+        const result = await deps.IListStaffNotesQuery.execute({
           type: "user",
           id: c.req.valid("param").id,
         });
@@ -216,7 +184,7 @@ export function createAdminUserRoutes(deps: AdminUserRoutesDeps) {
       zV("json", addStaffNoteBodySchema),
       zV("param", idParamSchema),
       async (c) => {
-        const result = await deps.StaffNoteService.add({
+        const result = await deps.AddStaffNoteUseCase.execute({
           actorUserId: g.currentUserId(c),
           subject: { type: "user", id: c.req.valid("param").id },
           body: c.req.valid("json").body,

@@ -4,13 +4,17 @@ import { idParamSchema } from "@packages/http/id-param";
 import type { RouteEnv, RouteGuards } from "@packages/http/route-guards";
 import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
-import type { InboxService } from "../../../../application/services/inbox.service";
-import type { SavedViewService } from "../../../../application/services/saved-view.service";
+import type { IListSavedViewsQuery } from "../../../../application/queries/list-saved-views.query";
+import type { IStaffInboxQuery } from "../../../../application/queries/staff-inbox.query";
+import type { DeleteViewUseCase } from "../../../../application/usecases/delete-view/delete-view.usecase";
+import type { SaveViewUseCase } from "../../../../application/usecases/save-view/save-view.usecase";
 
 export interface AdminWorkspaceRoutesDeps {
   routeGuards: RouteGuards;
-  InboxService: Pick<InboxService, "forStaff">;
-  SavedViewService: Pick<SavedViewService, "list" | "save" | "remove">;
+  IStaffInboxQuery: IStaffInboxQuery;
+  IListSavedViewsQuery: IListSavedViewsQuery;
+  SaveViewUseCase: Pick<SaveViewUseCase, "execute">;
+  DeleteViewUseCase: Pick<DeleteViewUseCase, "execute">;
 }
 
 const SECTION_FAILED = { status: "failed" as const };
@@ -20,9 +24,12 @@ export function createAdminWorkspaceRoutes(deps: AdminWorkspaceRoutesDeps) {
 
   return new Hono<RouteEnv>()
     .get("/inbox", g.requireAuth, g.requireStaff, async (c) => {
-      const { approvals, queues, sweeps } = await deps.InboxService.forStaff(
-        g.currentStaff(c).permissions,
-      );
+      const inbox = await deps.IStaffInboxQuery.execute({
+        permissions: g.currentStaff(c).permissions,
+      });
+      if (inbox.isFailure) throw new AppErrorException(inbox.getError());
+
+      const { approvals, queues, sweeps } = inbox.getValue();
 
       return c.json({
         approvals: approvals
@@ -66,7 +73,7 @@ export function createAdminWorkspaceRoutes(deps: AdminWorkspaceRoutesDeps) {
       });
     })
     .get("/views", g.requireAuth, g.requireStaff, async (c) => {
-      const result = await deps.SavedViewService.list({
+      const result = await deps.IListSavedViewsQuery.execute({
         ownerId: g.currentUserId(c),
         permissions: g.currentStaff(c).permissions,
       });
@@ -77,7 +84,7 @@ export function createAdminWorkspaceRoutes(deps: AdminWorkspaceRoutesDeps) {
       });
     })
     .post("/views", g.requireAuth, g.requireStaff, zV("json", staffViewSchema), async (c) => {
-      const result = await deps.SavedViewService.save({
+      const result = await deps.SaveViewUseCase.execute({
         actorUserId: g.currentUserId(c),
         permissions: g.currentStaff(c).permissions,
         view: c.req.valid("json"),
@@ -87,7 +94,7 @@ export function createAdminWorkspaceRoutes(deps: AdminWorkspaceRoutesDeps) {
       return c.json(result.getValue());
     })
     .delete("/views/:id", g.requireAuth, g.requireStaff, zV("param", idParamSchema), async (c) => {
-      const result = await deps.SavedViewService.remove({
+      const result = await deps.DeleteViewUseCase.execute({
         actorUserId: g.currentUserId(c),
         viewId: c.req.valid("param").id,
       });
