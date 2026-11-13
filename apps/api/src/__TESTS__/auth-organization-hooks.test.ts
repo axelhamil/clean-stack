@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import type { IEntitlementsReader } from "@modules/billing/application/ports/entitlements-reader.port";
-import { ENTITLEMENTS } from "@modules/billing/domain/entitlements";
+import type { IEntitlementsReader } from "@modules/billing/ports/entitlements-reader";
+import { ENTITLEMENTS } from "@modules/billing/rules/entitlements";
 import { EventTypes } from "@packages/events";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { enqueuedEvents } from "@packages/outbox/testing/enqueued-events";

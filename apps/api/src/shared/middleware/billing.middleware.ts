@@ -4,8 +4,8 @@ import {
   hasFeature,
   meetsPlan,
   type QuotaKey,
-} from "@modules/billing/domain/entitlements";
-import { hasQuotaRemaining, quotaExceededError } from "@modules/quotas/domain/quota-remaining";
+} from "@modules/billing/rules/entitlements";
+import { hasQuotaRemaining, quotaExceededError } from "@modules/quotas/rules/quota-remaining";
 import type { Tier } from "@packages/access-control";
 import { AppErrorException } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";

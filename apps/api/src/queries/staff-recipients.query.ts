@@ -4,7 +4,7 @@ import type {
   StaffAudienceSettings,
   StaffAudienceTarget,
   StaffRecipientsError,
-} from "@modules/notifications/application/ports/staff-recipients.port";
+} from "@modules/notifications/ports/staff-recipients";
 import { rolesWithStaffPermission } from "@packages/access-control";
 import { type IInstrumentation, Result } from "@packages/ddd-kit";
 import {

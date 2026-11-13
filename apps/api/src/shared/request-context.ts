@@ -1,8 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import type {
-  StaffRecord,
-  StaffStoreError,
-} from "@modules/admin/application/ports/staff-store.port";
+import type { StaffRecord, StaffStoreError } from "@modules/admin/ports/staff-store";
 import type { Option, Result } from "@packages/ddd-kit";
 import { UNKNOWN_VISITOR, type VisitorGeo } from "./ports/ip-geo.port";
 

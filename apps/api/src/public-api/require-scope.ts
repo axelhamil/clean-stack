@@ -1,4 +1,4 @@
-import type { ApiScope } from "@modules/api-token/application/dto/create-token.dto";
+import type { ApiScope } from "@modules/api-token/contracts/create-token";
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import type { ApiTokenVariables } from "../shared/middleware/api-token.middleware";

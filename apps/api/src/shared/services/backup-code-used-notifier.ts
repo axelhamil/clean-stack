@@ -1,4 +1,4 @@
-import type { IProfileStore } from "@modules/profile/application/ports/profile.port";
+import type { IProfileStore } from "@modules/profile/ports/profile";
 import { type EventHandler, type IDomainEvent, onEvent } from "@packages/ddd-kit";
 import type { IEmailService } from "@packages/email/email.port";
 import { EventTypes, PayloadByEventType } from "@packages/events";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { IProfileStore } from "@modules/profile/application/ports/profile.port";
+import type { IProfileStore } from "@modules/profile/ports/profile";
 import { Option, Result } from "@packages/ddd-kit";
 import { DEFAULT_LOCALE } from "@packages/i18n";
 import { mockPort } from "@packages/test/bun";

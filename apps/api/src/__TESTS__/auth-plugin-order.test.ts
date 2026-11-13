@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import type { IEntitlementsReader } from "@modules/billing/application/ports/entitlements-reader.port";
-import { ENTITLEMENTS, type Feature } from "@modules/billing/domain/entitlements";
+import type { IEntitlementsReader } from "@modules/billing/ports/entitlements-reader";
+import { ENTITLEMENTS, type Feature } from "@modules/billing/rules/entitlements";
 import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";

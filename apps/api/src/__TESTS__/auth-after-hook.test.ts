@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import type { ConsentError } from "@modules/consents/application/ports/consent.port";
+import type { ConsentError } from "@modules/consents/ports/consent";
 import { CONSENT_COOKIE_NAME } from "@packages/cookie-consent";
 import { Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";

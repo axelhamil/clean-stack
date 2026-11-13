@@ -4,12 +4,12 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./audit-log.module": "./src/audit-log.module.ts",
-    "./application/config/audit-log-settings": "./src/application/config/audit-log-settings.ts",
-    "./application/ports/audit-trail.port": "./src/application/ports/audit-trail.port.ts",
-    "./application/services/audit-query.service": "./src/application/services/audit-query.service.ts",
-    "./infrastructure/services/audit-event-subscriber": "./src/infrastructure/services/audit-event-subscriber.ts",
-    "./infrastructure/http/audit-log.routes": "./src/infrastructure/http/audit-log.routes.ts",
+    "./module": "./src/audit-log.module.ts",
+    "./config": "./src/application/config/audit-log-settings.ts",
+    "./routes/audit-log": "./src/infrastructure/http/audit-log.routes.ts",
+    "./ports/*": "./src/application/ports/*.port.ts",
+    "./services/audit-query": "./src/application/services/audit-query.service.ts",
+    "./handlers/audit-event-subscriber": "./src/infrastructure/services/audit-event-subscriber.ts",
     "./schemas/*": "./schemas/*.ts"
   },
   "scripts": {

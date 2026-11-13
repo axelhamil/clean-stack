@@ -1,7 +1,7 @@
-import type { IEntitlementsReader } from "@modules/billing/application/ports/entitlements-reader.port";
-import type { IStripeEventStore } from "@modules/billing/application/ports/stripe-event.port";
-import { ENTITLEMENTS } from "@modules/billing/domain/entitlements";
-import type { IProfileStore } from "@modules/profile/application/ports/profile.port";
+import type { IEntitlementsReader } from "@modules/billing/ports/entitlements-reader";
+import type { IStripeEventStore } from "@modules/billing/ports/stripe-event";
+import { ENTITLEMENTS } from "@modules/billing/rules/entitlements";
+import type { IProfileStore } from "@modules/profile/ports/profile";
 import { type ILogger, type IUnitOfWork, NoOpInstrumentation } from "@packages/ddd-kit";
 import type { IEmailService } from "@packages/email/email.port";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";

@@ -32,14 +32,14 @@ import { requireLocalDatabase } from "@packages/test/require-local-database";
 
 requireLocalDatabase("check-wipe-rollback");
 
-import { DrizzleStaffStore } from "@modules/admin/infrastructure/repositories/drizzle-staff.store";
+import { DrizzleStaffStore } from "@modules/admin/adapters/drizzle-staff-store";
 import * as staffSchema from "@modules/admin/schemas/staff";
-import { generateToken, hmacToken } from "@modules/api-token/domain/api-token-crypto";
-import { DrizzleApiTokenRepository } from "@modules/api-token/infrastructure/repositories/drizzle-api-token.repository";
+import { DrizzleApiTokenRepository } from "@modules/api-token/adapters/drizzle-api-token-repository";
+import { generateToken, hmacToken } from "@modules/api-token/rules/api-token-crypto";
 import * as apiTokenSchema from "@modules/api-token/schemas/api-token";
-import { RgpdService } from "@modules/rgpd/application/services/rgpd.service";
-import { DrizzleRgpdRepository } from "@modules/rgpd/infrastructure/repositories/drizzle-rgpd.repository";
-import { NoOpStorageService } from "@modules/uploads/infrastructure/services/noop-storage.service";
+import { DrizzleRgpdRepository } from "@modules/rgpd/adapters/drizzle-rgpd-repository";
+import { RgpdService } from "@modules/rgpd/services/rgpd";
+import { NoOpStorageService } from "@modules/uploads/adapters/noop-storage";
 import type { IInstrumentation } from "@packages/ddd-kit";
 import { NoOpInstrumentation } from "@packages/ddd-kit";
 import {

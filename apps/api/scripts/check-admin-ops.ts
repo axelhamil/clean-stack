@@ -7,8 +7,8 @@
  */
 
 import "./check-admin-ops.env";
-import { StripeReplayService } from "@modules/admin/application/services/stripe-replay.service";
-import { StripeEventGateway } from "@modules/billing/infrastructure/adapters/stripe-event.gateway";
+import { StripeReplayService } from "@modules/admin/services/stripe-replay";
+import { StripeEventGateway } from "@modules/billing/adapters/stripe-event-gateway";
 import * as billingSchema from "@modules/billing/schemas/billing";
 import { NoOpInstrumentation, uuidv7 } from "@packages/ddd-kit";
 import {

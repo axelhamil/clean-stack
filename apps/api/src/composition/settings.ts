@@ -1,17 +1,13 @@
-import type { AdminSettings } from "@modules/admin/application/config/admin-settings";
-import type { StaffEnv } from "@modules/admin/application/services/staff-access";
-import type { ApiTokenSettings } from "@modules/api-token/application/config/api-token-settings";
-import type { AuditLogSettings } from "@modules/audit-log/application/config/audit-log-settings";
-import type { BillingSettings } from "@modules/billing/application/config/billing-settings";
-import type { ConsentSettings } from "@modules/consents/application/config/consent-settings";
-import type { NotificationSettings } from "@modules/notifications/application/config/notification-settings";
-import type { RgpdSettings } from "@modules/rgpd/application/config/rgpd-settings";
-import type {
-  S3StorageSettings,
-  StorageSettings,
-  UploadSettings,
-} from "@modules/uploads/application/config/upload-settings";
-import type { WebhookSettings } from "@modules/webhooks/application/config/webhook-settings";
+import type { AdminSettings } from "@modules/admin/config";
+import type { StaffEnv } from "@modules/admin/rules/staff-access";
+import type { ApiTokenSettings } from "@modules/api-token/config";
+import type { AuditLogSettings } from "@modules/audit-log/config";
+import type { BillingSettings } from "@modules/billing/config";
+import type { ConsentSettings } from "@modules/consents/config";
+import type { NotificationSettings } from "@modules/notifications/config";
+import type { RgpdSettings } from "@modules/rgpd/config";
+import type { S3StorageSettings, StorageSettings, UploadSettings } from "@modules/uploads/config";
+import type { WebhookSettings } from "@modules/webhooks/config";
 import { Option } from "@packages/ddd-kit";
 import { defineModule } from "inwire";
 import type { AuthSettings } from "../auth/deps";

@@ -1,6 +1,6 @@
-import type { StaffStoreError } from "@modules/admin/application/ports/staff-store.port";
-import type { StaffUser } from "@modules/admin/application/services/staff-access";
-import type { StaffSessionRef } from "@modules/admin/application/services/staff-access.service";
+import type { StaffStoreError } from "@modules/admin/ports/staff-store";
+import type { StaffUser } from "@modules/admin/rules/staff-access";
+import type { StaffSessionRef } from "@modules/admin/services/staff-access";
 import {
   authorizeStaff,
   STAFF_REFUSAL,

@@ -1,4 +1,4 @@
-import type { IAuthProvider } from "@modules/admin/application/ports/auth-provider.port";
+import type { IAuthProvider } from "@modules/admin/ports/auth-provider";
 import type { IInstrumentation } from "@packages/ddd-kit";
 import { auth } from "../auth";
 import { IMPERSONATION_TTL_SECONDS } from "../auth/impersonation-ttl";

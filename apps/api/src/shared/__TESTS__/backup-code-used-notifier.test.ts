@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
-import type { IProfileStore } from "@modules/profile/application/ports/profile.port";
+import type { IProfileStore } from "@modules/profile/ports/profile";
 import { Option, Result } from "@packages/ddd-kit";
 import type { IEmailService } from "@packages/email/email.port";
 import { EventTypes } from "@packages/events";

@@ -4,14 +4,12 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./notifications.module": "./src/notifications.module.ts",
-    "./application/config/notification-settings": "./src/application/config/notification-settings.ts",
-    "./application/ports/notification.port": "./src/application/ports/notification.port.ts",
-    "./application/ports/notification-digest.port": "./src/application/ports/notification-digest.port.ts",
-    "./application/ports/staff-recipients.port": "./src/application/ports/staff-recipients.port.ts",
-    "./infrastructure/services/notification-fanout-subscriber": "./src/infrastructure/services/notification-fanout-subscriber.ts",
-    "./infrastructure/services/notification-stream-hub": "./src/infrastructure/services/notification-stream-hub.ts",
-    "./infrastructure/http/notifications.routes": "./src/infrastructure/http/notifications.routes.ts",
+    "./module": "./src/notifications.module.ts",
+    "./config": "./src/application/config/notification-settings.ts",
+    "./routes/notifications": "./src/infrastructure/http/notifications.routes.ts",
+    "./ports/*": "./src/application/ports/*.port.ts",
+    "./handlers/notification-fanout-subscriber": "./src/infrastructure/services/notification-fanout-subscriber.ts",
+    "./adapters/notification-stream-hub": "./src/infrastructure/services/notification-stream-hub.ts",
     "./schemas/*": "./schemas/*.ts"
   },
   "scripts": {

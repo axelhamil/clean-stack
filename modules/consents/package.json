@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./consents.module": "./src/consents.module.ts",
-    "./application/ports/consent.port": "./src/application/ports/consent.port.ts",
-    "./application/services/consent.service": "./src/application/services/consent.service.ts",
-    "./application/config/consent-settings": "./src/application/config/consent-settings.ts",
-    "./infrastructure/http/consents.routes": "./src/infrastructure/http/consents.routes.ts",
+    "./module": "./src/consents.module.ts",
+    "./config": "./src/application/config/consent-settings.ts",
+    "./routes/consents": "./src/infrastructure/http/consents.routes.ts",
+    "./ports/*": "./src/application/ports/*.port.ts",
+    "./services/consent": "./src/application/services/consent.service.ts",
     "./schemas/*": "./schemas/*.ts"
   },
   "scripts": {

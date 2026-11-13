@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import type { IStaffStore, StaffRecord } from "@modules/admin/application/ports/staff-store.port";
-import { StaffAccessService } from "@modules/admin/application/services/staff-access.service";
+import type { IStaffStore, StaffRecord } from "@modules/admin/ports/staff-store";
+import { StaffAccessService } from "@modules/admin/services/staff-access";
 import { Option, Result } from "@packages/ddd-kit";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { mockPort } from "@packages/test/bun";

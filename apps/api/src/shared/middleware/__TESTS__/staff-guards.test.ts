@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { StaffStoreError } from "@modules/admin/application/ports/staff-store.port";
+import type { StaffStoreError } from "@modules/admin/ports/staff-store";
 import type { StaffAccess } from "@packages/access-control";
 import { NoOpInstrumentation, Option, Result } from "@packages/ddd-kit";
 import { Hono } from "hono";

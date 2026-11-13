@@ -5,8 +5,8 @@
  * the decision, and who the notification reaches. Creates and removes its own probe users.
  */
 
-import { staffAccessOf } from "@modules/admin/application/services/staff-access";
-import { createAdminInternalRoutes } from "@modules/admin/infrastructure/http/admin-internal.routes";
+import { createAdminInternalRoutes } from "@modules/admin/routes/admin-internal";
+import { staffAccessOf } from "@modules/admin/rules/staff-access";
 import * as staffSchema from "@modules/admin/schemas/staff";
 import * as auditLogSchema from "@modules/audit-log/schemas/audit-log";
 import * as notificationSchema from "@modules/notifications/schemas/notification";

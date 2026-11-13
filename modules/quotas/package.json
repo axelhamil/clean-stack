@@ -4,10 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./quotas.module": "./src/quotas.module.ts",
-    "./application/ports/quota-usage.port": "./src/application/ports/quota-usage.port.ts",
-    "./domain/quota-remaining": "./src/domain/quota-remaining.ts",
-    "./infrastructure/quota-reservation": "./src/infrastructure/quota-reservation.ts",
+    "./module": "./src/quotas.module.ts",
+    "./ports/*": "./src/application/ports/*.port.ts",
+    "./rules/quota-remaining": "./src/domain/quota-remaining.ts",
     "./schemas/*": "./schemas/*.ts"
   },
   "scripts": {

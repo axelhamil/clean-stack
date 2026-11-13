@@ -1,9 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
-import type {
-  ApiTokenRecord,
-  IApiTokenRepository,
-} from "@modules/api-token/application/ports/api-token.port";
-import { generateToken, hmacToken } from "@modules/api-token/domain/api-token-crypto";
+import type { ApiTokenRecord, IApiTokenRepository } from "@modules/api-token/ports/api-token";
+import { generateToken, hmacToken } from "@modules/api-token/rules/api-token-crypto";
 import { type ILogger, NoOpInstrumentation, Option, Result } from "@packages/ddd-kit";
 import { mockPort } from "@packages/test/bun";
 import { mockUnitOfWork } from "@packages/test/bun/unit-of-work";

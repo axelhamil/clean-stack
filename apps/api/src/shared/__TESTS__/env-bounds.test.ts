@@ -3,7 +3,7 @@ import {
   WEBHOOK_DNS_TIMEOUT_SECONDS,
   WEBHOOK_FETCH_TIMEOUT_SECONDS,
   WEBHOOK_SETTLE_MARGIN_SECONDS,
-} from "@modules/webhooks/application/config/webhook-settings";
+} from "@modules/webhooks/config";
 import {
   EMAIL_SEND_TIMEOUT_SECONDS,
   EMAIL_SETTLE_MARGIN_SECONDS,

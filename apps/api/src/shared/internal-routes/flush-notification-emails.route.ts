@@ -3,7 +3,7 @@
 import type {
   DueNotification,
   NotificationDigestError,
-} from "@modules/notifications/application/ports/notification-digest.port";
+} from "@modules/notifications/ports/notification-digest";
 import { type Option, Result } from "@packages/ddd-kit";
 import { type SweepSpans, sweepSpans } from "@packages/drizzle/sweep-span";
 import type { EmailError } from "@packages/email/email.port";

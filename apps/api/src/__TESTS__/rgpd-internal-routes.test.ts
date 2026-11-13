@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import type { RgpdError } from "@modules/rgpd/application/ports/rgpd.port";
+import type { RgpdError } from "@modules/rgpd/ports/rgpd";
+import { createRgpdInternalRoutes } from "@modules/rgpd/routes/rgpd-internal";
 import type {
   ProcessPendingDeletionsInput,
   ProcessPendingDeletionsOutput,
-} from "@modules/rgpd/application/services/rgpd.service";
-import { createRgpdInternalRoutes } from "@modules/rgpd/infrastructure/http/rgpd-internal.routes";
+} from "@modules/rgpd/services/rgpd";
 import { NoOpInstrumentation, Result } from "@packages/ddd-kit";
 import {
   buildSignatureHeader,

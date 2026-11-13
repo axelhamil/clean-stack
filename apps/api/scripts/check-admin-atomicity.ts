@@ -7,8 +7,8 @@ import { setTimeout as sleep } from "node:timers/promises";
  * written directly. Creates and removes its own probe users.
  */
 
-import { AdminModerationService } from "@modules/admin/application/services/admin-moderation.service";
-import { StaffService } from "@modules/admin/application/services/staff.service";
+import { AdminModerationService } from "@modules/admin/services/admin-moderation";
+import { StaffService } from "@modules/admin/services/staff";
 import { Result } from "@packages/ddd-kit";
 import { authSchema, db, eq } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";

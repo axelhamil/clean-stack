@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import type { INotificationDigestStore } from "@modules/notifications/application/ports/notification-digest.port";
+import type { INotificationDigestStore } from "@modules/notifications/ports/notification-digest";
 import { NoOpInstrumentation, Option, Result } from "@packages/ddd-kit";
 import { sweepSpans } from "@packages/drizzle/sweep-span";
 import type { IEmailService } from "@packages/email/email.port";
