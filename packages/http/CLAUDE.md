@@ -7,6 +7,7 @@ The HTTP kit a module's routes are written against: the zod request validator, t
 ```
 src/
   validator.ts                 `zV`: a failed parse throws `REQUEST_INVALID` (fields in `metadata`) to the host error handler, so the RPC response type stays clean
+  id-param.ts                  `idSchema`, `idParamSchema`: the shared path id, any id the repo issues (uuid, auth library id, Stripe id), nothing else
   error-handler.ts             `createErrorHandler({ instrumentation, logger, isProduction })`: the one `onError` envelope, the host binds its telemetry, logger and environment
   time-id-cursor.ts            keyset cursor on `(time, id)`: `timeIdCursorSchema` (decode), `encodeTimeIdCursor`, `afterTimeIdCursor` (`WHERE`), `exactInstant`
   route-guards.ts              `RouteGuards` contract, `RouteGuard`, `RouteEnv`

@@ -8,8 +8,8 @@ Domain primitives and the ports every backend package shares. Where and when a m
 src/
   primitives/    result, option, uuid (uuidv7 monotonic, UUID, randomUuidV4), canonical-json (`canonicalize`, key-order independent JSON for hashes and idempotency keys)
   domain/        entity, aggregate, value-object, watched-list, domain-event
-  application/   repository (Base + Scoped), scope (RepoScope), transaction (IUnitOfWork), unit-of-work-context (the one ambient scope: tx + collected events), error-code (AppError), health-check (`HealthStatus`, `HealthCheckResult`, `HealthCheckFn`: the probe contract every registry and probe shares), db-failure (`createDbFailure(code, logger)`: logs the raw error, returns a failed `Result`), instrumentation (IInstrumentation), noop-instrumentation (`NoOpInstrumentation`, the null object of the port, base of the host logging impl and default of tests and checks), logger (ILogger), pagination
-  events/        event-collector, event-dispatcher, in-memory-event-dispatcher, event-handler, on-event, outbox-mapping
+  application/   repository (Base + Scoped), scope (RepoScope), transaction (IUnitOfWork), unit-of-work-context (the one ambient scope: tx + collected events), error-code (AppError), health-check (`HealthStatus`, `HealthCheckResult`, `HealthCheckFn`: the probe contract every registry and probe shares), db-failure (`createDbFailure(code, logger)`: logs the raw error, returns a failed `Result`), instrumentation (IInstrumentation), noop-instrumentation (`NoOpInstrumentation`, the null object of the port, base of the host logging impl and default of tests and checks), logger (ILogger), pagination, use-case (`IUseCase<I, O, E>`: one `execute(input)` returning a `Result`), query (`IQuery<I, O, E>`: the read port a route calls directly, same shape)
+  events/        event-collector, event-dispatcher, in-memory-event-dispatcher, event-handler, on-event, dispatch-to (`dispatchTo(useCase, mapPayload)`: the `onEvent` body that maps the parsed payload to one use case and fails the delivery with its failed `Result`), outbox-mapping
   __TESTS__/     one file per primitive
 ```
 
