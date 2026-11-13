@@ -9,6 +9,7 @@
     "**/pnpm-lock.yaml",
     "**/*.d.ts",
     "**/__TESTS__/**",
+    "**/__tests__/**",
     "**/*.test.ts",
     "**/*.spec.ts",
     "**/routeTree.gen.ts"

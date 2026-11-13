@@ -1,7 +1,17 @@
 const MODULES = "^modules";
 const LIBS = "^packages/";
-const FRAMEWORKS =
-  "node_modules/(hono|hono-pino|@hono/[^/]+|drizzle-orm|pg|better-auth|@aws-sdk|resend|stripe|@sentry)(/|$)";
+const MODULE_SRC = `${MODULES}/[^/]+/src/`;
+const ANY_SCHEMAS = `${MODULES}/[^/]+/schemas/`;
+const DB_KIT = "^packages/drizzle/";
+const ORM_PACKAGES = "drizzle-orm|pg";
+const ORM = `(^|node_modules/)(${ORM_PACKAGES})(/|$)`;
+const FRAMEWORKS = `node_modules/(hono|hono-pino|@hono/[^/]+|${ORM_PACKAGES}|better-auth|@aws-sdk|resend|stripe|@sentry)(/|$)`;
+const INFRA = "(?:infrastructure|infra)";
+const TESTS = "(?:__TESTS__|__tests__|testing)";
+const TEST_PATH = `/${TESTS}/`;
+const MIGRATED_MODULES = [];
+const MIGRATED =
+  MIGRATED_MODULES.length > 0 ? `${MODULES}/(${MIGRATED_MODULES.join("|")})/src/` : "^$";
 
 module.exports = {
   forbidden: [
@@ -10,7 +20,7 @@ module.exports = {
       comment:
         "A business module never reaches into another one: it declares the port it needs and the host binds it.",
       severity: "error",
-      from: { path: `${MODULES}/([^/]+)/src/`, pathNot: "(/__TESTS__/|/src/testing/)" },
+      from: { path: `${MODULES}/([^/]+)/src/`, pathNot: TEST_PATH },
       to: { path: `${MODULES}/([^/]+)/`, pathNot: `${MODULES}/$1/` },
     },
     {
@@ -18,10 +28,10 @@ module.exports = {
       comment:
         "A test may seed another module's tables through its schemas, never reach its code: the fixture would couple both modules.",
       severity: "error",
-      from: { path: `${MODULES}/([^/]+)/src/(testing/|__TESTS__/)` },
+      from: { path: `${MODULES}/([^/]+)/src/${TESTS}/` },
       to: {
         path: `${MODULES}/([^/]+)/`,
-        pathNot: [`${MODULES}/$1/`, `${MODULES}/[^/]+/schemas/`],
+        pathNot: [`${MODULES}/$1/`, ANY_SCHEMAS],
       },
     },
     {
@@ -32,7 +42,7 @@ module.exports = {
       from: { path: `${MODULES}/([^/]+)/schemas/` },
       to: {
         path: `${MODULES}/([^/]+)/`,
-        pathNot: [`${MODULES}/$1/`, `${MODULES}/[^/]+/schemas/`],
+        pathNot: [`${MODULES}/$1/`, ANY_SCHEMAS],
       },
     },
     {
@@ -69,14 +79,28 @@ module.exports = {
       comment:
         "A module's domain and application import no framework, no database and no infrastructure.",
       severity: "error",
-      from: { path: `${MODULES}/[^/]+/src/(domain|application)/`, pathNot: "/__TESTS__/" },
+      from: { path: `${MODULE_SRC}(domain|application)/`, pathNot: TEST_PATH },
       to: {
-        path: [
-          `${MODULES}/[^/]+/src/infrastructure/`,
-          `${MODULES}/[^/]+/schemas/`,
-          "^packages/drizzle/",
-          FRAMEWORKS,
-        ],
+        path: [`${MODULE_SRC}${INFRA}/`, ANY_SCHEMAS, DB_KIT, FRAMEWORKS],
+      },
+    },
+    {
+      name: "layered-domain-imports-only-domain",
+      comment:
+        "In a migrated module the domain depends on no other layer: an import of application or infra makes the rules depend on how they are used or stored.",
+      severity: "error",
+      from: { path: `${MIGRATED}domain/`, pathNot: TEST_PATH },
+      to: { path: `${MODULES}/$1/src/`, pathNot: `${MODULES}/$1/src/domain/` },
+    },
+    {
+      name: "layered-routes-read-through-ports",
+      comment:
+        "In a migrated module a route reaches data only through a use case or a query port: a repository, an adapter, a technical service or the ORM imported by a route bypasses the port that keeps the read testable and scoped.",
+      severity: "error",
+      from: { path: `${MIGRATED}${INFRA}/http/`, pathNot: TEST_PATH },
+      to: {
+        path: [`${MODULES}/$1/src/${INFRA}/`, `${MODULES}/$1/schemas/`, DB_KIT, ORM],
+        pathNot: `${MODULES}/$1/src/${INFRA}/http/`,
       },
     },
     {
