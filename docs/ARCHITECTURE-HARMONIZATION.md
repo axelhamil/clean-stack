@@ -948,7 +948,7 @@ Updated in the PR that delivers each line.
 | 1 | `consents` | technical | no | M | done 2026-11-13 | | yes |
 | 1 | `audit-log` | technical | no | M | done 2026-11-13 | | yes |
 | 2 | `webhooks` | technical | no | L | to do | | |
-| 2 | `notifications` | technical | no | L | to do | | |
+| 2 | `notifications` | technical | no | L | done 2026-11-13 | | yes |
 | 2 | `admin` | business | `ApprovalRequest`; staff domain service file | XL | to do | | |
 | 3 | `rgpd` | business | `domain/deletion/` pure rules | L | to do | | |
 | 4 | `organization` (from the host) | business | no | M | to do | | |
