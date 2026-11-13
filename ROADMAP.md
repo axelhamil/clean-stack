@@ -24,12 +24,25 @@ What remains is short on purpose. **Everything not listed here was cut**: a boil
 | 6 | **Phase L** | Delivered | Reference deploy on a VPS with Coolify instead of Railway: desired state in code, deploy by digest after a green CI, health gates, rollback; Postgres backups with PITR and a hardened host | Railway outages took the reference deploy down; a VPS the cloner owns is cheaper, portable and already runs a sister project |
 | 7 | **Release-please** | Delivered | Replace semantic-release with release-please, nixos-forge model: the release PR lives on `develop`, merging it tags and moves `main` to the tag; hotfixes go straight to `main` | One merge ships a release, it is reviewed like any PR, and no `develop` to `main` PR is left to forget |
 | 8 | **CI parity** | Delivered | CI replays the pre-push chain (lint, types, unit tests, build, duplication, unused code) on every PR and push to `develop` and `main` | A fork that skips the local hook must not get a green PR |
+| 9 | **Architecture harmonization** | Planned | One module shape everywhere: Clean Architecture in every module, DDD on `ddd-kit` only where a real business lives, use cases as the only entry point of writes and query ports for reads, Zod on every HTTP input, handlers that only dispatch. Plan: [`docs/ARCHITECTURE-HARMONIZATION.md`](docs/ARCHITECTURE-HARMONIZATION.md) | The cloner copies the modules as the pattern for their own business: 12 modules with 0 use case and routes that reach stores teach the wrong one |
 
 **Cross-cutting, at first consumer**: one-click unsubscribe (RFC 8058: Gmail and Yahoo require it for bulk senders) and SPF, DKIM and DMARC `p=reject` (DNS, doc only).
 
 **Cut and not coming back**: marketing site (E.2), status page and SLO dashboards (D.1), SOC2 checklist (D.4), generated OpenAPI spec and Scalar UI (D.2: the generation is cut, not the documentation, since `/api/v1` is documented by hand in [`docs/PUBLIC-API.md`](docs/PUBLIC-API.md), which a three-route surface keeps honest more cheaply than a generator), Capacitor shell (F.1), feature flags (F.2), GPC (A.7), NIS2 readiness, and the per-phase "deferred" micro-items. Each was a per-clone decision, a third-party service to wire, or an ambition with no substrate to exercise it. Git history has the specs if one becomes real.
 
 **Out of scope**: HIPAA tooling, real-time WebSocket bus, third-party app marketplace, A/B testing framework, IAB TCF v2.2.
+
+---
+
+## Architecture harmonization
+
+- **Status**: planned, prepared on 2026-11-13, decisions taken the same day. Nothing is implemented; the execution plan, the audit and the progress table live in [`docs/ARCHITECTURE-HARMONIZATION.md`](docs/ARCHITECTURE-HARMONIZATION.md), which this entry does not repeat.
+- **Why**: every module follows today's guide, which makes `application/services` the default, lets a route read its tables and open a transaction, and lets a handler write. Measured across the 12 modules: 0 use case, 0 aggregate, 0 value object; 82 routes with 0 validated path param (35 raw reads); 5 of 6 handlers and subscribers holding logic; business rules in host middleware (API token validity, billing gates, notification digest). A cloner adding their own business copies whichever module they open first.
+- **Scope**: the 12 modules and the business code of the API host. Services split from use cases; one folder structure per module (`__tests__/`, `application/`, optional `domain/`, `infra/`, the module file); light CQRS (writes through use cases, reads as query ports called by the route); DDD per business concept only where invariants exist (`api-token`, the `admin` approvals, `rgpd` as pure deletion rules without aggregate), none for the technical modules, `quotas` kept as the dormant B.2 skeleton; domain events and application events; handlers that dispatch to use cases; mappers; ports in `application/`, implementations in `infra/`; Zod on params, query, body and headers; the boundary and layering guards extended to enforce it; every `CLAUDE.md`, skill and doc rewritten at the end.
+- **Method**: the BetterAuth bridge is extracted last as the technical module `modules/auth`, with its own real-database checks. Seven steps (audit, conventions, foundation, module by module, global verification, final documentation, closure). One Opus agent per module in parallel waves, each in its own worktree, shared files owned by one integrator, the kit and tooling moved first so the guards never match nothing.
+- **Out of scope**: new features, a changed HTTP contract beyond added input validation, DDD for billing, quotas or any orchestration module.
+- **Done when**: every module passes the target guards with no allowlist; no route imports a repository, an adapter or the ORM; every route input is validated; the pre-push chain and every real-database check are green; the guides describe one architecture.
+- **References**: [`docs/ARCHITECTURE-HARMONIZATION.md`](docs/ARCHITECTURE-HARMONIZATION.md) with its audit annexes in `docs/architecture-harmonization/audit/` and their fact check in `docs/architecture-harmonization/verification/`, `modules/CLAUDE.md`, `packages/ddd-kit/CLAUDE.md`.
 
 ---
 
