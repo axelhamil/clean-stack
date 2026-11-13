@@ -521,11 +521,11 @@ The rows backfilled by migration `0028` announce nothing: no request and no acto
 ### Via `PolicyAcceptanceService` (Phase A.2)
 - `USER_POLICY_ACCEPTED` (`user.policy.accepted`): payload `{ userId, policyType, policyVersion, ipAddress? }`, retention `compliance`. Self-actor: `userId` resolves as the actor via `AuditEventSubscriber.extractActor`. Emitted from `PolicyAcceptanceService.accept`, which is called from **two sites**: (1) the BetterAuth `/verify-email` after-hook in `auth/hooks/after.ts` (sign-up path, idempotent via `getStaleTypes`) and (2) the `POST /me/policies/accept` route (explicit re-acceptance by already-authenticated users).
 
-### Via `ConsentService` (Phase A.4)
+### Via les use cases de `modules/consents` (Phase A.4)
 
-- `USER_COOKIE_CONSENT_GRANTED` (`user.cookie_consent.granted`) : émis par `ConsentService.record` à chaque sauvegarde. Payload : `{ subjectId: string (device cookie), userId?: string (null pour guests), categories: ConsentCategory[], policyVersion: string, ipAddress?, userAgent? }`, retention `compliance`. L'`actorUserId` résout sur `userId` quand l'utilisateur est connecté (self-actor) ; `null` pour un guest (le `subjectId` est la seule identité disponible). Les guests obtiennent un record réconcilié au login via `ConsentService.reconcile` (hook `hooks.after` + `ctx.context.newSession`).
-- `USER_COOKIE_CONSENT_WITHDRAWN` (`user.cookie_consent.withdrawn`) : émis par `ConsentService.withdraw`. Même shape de payload. Retention `compliance`.
-- `USER_COOKIE_CONSENT_LINKED` (`user.cookie_consent.linked`) : émis par `ConsentService.reconcile` quand au moins un record guest est rattaché au compte au login (rien si tout était déjà rattaché). Payload : `{ userId, subjectId, consentRecordIds: string[] }`, self-actor (`userId`), retention `compliance`, visibilité `internal`.
+- `USER_COOKIE_CONSENT_GRANTED` (`user.cookie_consent.granted`) : émis par `RecordConsentUseCase` à chaque sauvegarde. Payload : `{ subjectId: string (device cookie), userId?: string (null pour guests), categories: ConsentCategory[], policyVersion: string, ipAddress?, userAgent? }`, retention `compliance`. L'`actorUserId` résout sur `userId` quand l'utilisateur est connecté (self-actor) ; `null` pour un guest (le `subjectId` est la seule identité disponible). Les guests obtiennent un record réconcilié au login via `ReconcileConsentUseCase`, appelé par la façade `ConsentService.reconcile` (hook `hooks.after` + `ctx.context.newSession`).
+- `USER_COOKIE_CONSENT_WITHDRAWN` (`user.cookie_consent.withdrawn`) : émis par `WithdrawConsentUseCase`. Même shape de payload. Retention `compliance`.
+- `USER_COOKIE_CONSENT_LINKED` (`user.cookie_consent.linked`) : émis par `ReconcileConsentUseCase` quand au moins un record guest est rattaché au compte au login (rien si tout était déjà rattaché). Payload : `{ userId, subjectId, consentRecordIds: string[] }`, self-actor (`userId`), retention `compliance`, visibilité `internal`.
 
 ### Via security middleware / endpoint (Phase C.1)
 

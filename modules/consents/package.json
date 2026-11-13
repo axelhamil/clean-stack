@@ -6,9 +6,14 @@
   "exports": {
     "./module": "./src/consents.module.ts",
     "./config": "./src/application/config/consent-settings.ts",
-    "./routes/consents": "./src/infrastructure/http/consents.routes.ts",
-    "./ports/*": "./src/application/ports/*.port.ts",
+    "./routes/consents": "./src/infra/http/routes/consents/consents.ts",
+    "./ports/*": "./src/application/ports/repositories/*.port.ts",
     "./services/consent": "./src/application/services/consent.service.ts",
+    "./services/consent-ledger": "./src/application/services/consent-ledger.service.ts",
+    "./usecases/record-consent": "./src/application/usecases/record-consent/record-consent.usecase.ts",
+    "./usecases/withdraw-consent": "./src/application/usecases/withdraw-consent/withdraw-consent.usecase.ts",
+    "./usecases/reconcile-consent": "./src/application/usecases/reconcile-consent/reconcile-consent.usecase.ts",
+    "./queries/*": "./src/application/queries/*.query.ts",
     "./schemas/*": "./schemas/*.ts"
   },
   "scripts": {

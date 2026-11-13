@@ -4,6 +4,6 @@ import { assertModuleLayering } from "@packages/test/source-scan";
 
 describe("layering rules of the consents module", () => {
   it("keeps every layer guard of a module", () => {
-    assertModuleLayering(join(import.meta.dir, ".."));
+    assertModuleLayering(join(import.meta.dir, ".."), { targetShape: true });
   });
 });
