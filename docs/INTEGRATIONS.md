@@ -127,7 +127,7 @@ K8s CronJob, Inngest, BullMQ) are in [`CRON.md`](./CRON.md). Pick by infra:
 
 Each new business job follows the same pattern:
 
-1. Add an internal endpoint in the module's `src/infrastructure/http/<name>-internal.routes.ts` (`create<Name>InternalRoutes(deps)`, gated by the `internalGuards` it receives, as in `modules/rgpd/src/infrastructure/http/rgpd-internal.routes.ts`), mounted under `/internal` by `apps/api/src/app.ts`.
+1. Add an internal endpoint in the module's `src/infra/http/routes/<name>-internal/<name>-internal.ts` (`create<Name>InternalRoutes(deps)`, gated by the `internalGuards` it receives, as in `modules/rgpd/src/infra/http/routes/rgpd-internal/rgpd-internal.ts`), mounted under `/internal` by `apps/api/src/app.ts`.
 2. Document it in [`CRON.md`](./CRON.md) and in the table above.
 3. Wire it in your chosen scheduler.
 
@@ -227,7 +227,7 @@ No `STRIPE_PRICE_*` variables, prices live in the Stripe dashboard, fetched at r
 
 ### RGPD: Stripe customer cleanup on account deletion
 
-`RgpdService.executeAccountWipe` calls Stripe to delete the customer object during the wipe sequence. Failure is captured and logged (non-fatal): account deletion must never be blocked by a Stripe API error.
+The account wipe (`AccountWipeService` of `modules/rgpd`) makes no Stripe call: the Stripe customer object is not deleted by the erasure. A cleanup added later must stay non-fatal (captured and logged): account deletion must never be blocked by a Stripe API error.
 
 ---
 

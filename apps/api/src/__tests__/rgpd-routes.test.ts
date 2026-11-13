@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import type { RgpdError } from "@modules/rgpd/ports/rgpd";
 import { createRgpdRoutes, type RgpdRoutesDeps } from "@modules/rgpd/routes/rgpd";
-import type { RequestAccountDeletionOutput } from "@modules/rgpd/services/rgpd";
 import { Result } from "@packages/ddd-kit";
 import { openRouteGuards } from "@packages/http/testing/route-guards";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
@@ -27,10 +25,8 @@ const consume = mock(async (_key: string) =>
     firstBlock: false,
   }),
 );
-const requestAccountDeletion = mock(async () =>
-  Result.ok<RequestAccountDeletionOutput, RgpdError>({
-    pendingDeletionUntil: "2099-01-01T00:00:00.000Z",
-  }),
+const requestAccountDeletion = mock<RgpdRoutesDeps["RequestAccountDeletionUseCase"]["execute"]>(
+  async () => Result.ok({ pendingDeletionUntil: "2099-01-01T00:00:00.000Z" }),
 );
 
 const accountDeleteRateLimit = requireRateLimit(
@@ -41,7 +37,10 @@ const accountDeleteRateLimit = requireRateLimit(
 const routes = createRgpdRoutes({
   routeGuards: openRouteGuards({ userId: "user-1" }),
   accountDeleteRateLimit,
-  RgpdService: { ...mockPort<RgpdRoutesDeps["RgpdService"]>(), requestAccountDeletion },
+  RequestDataExportUseCase: mockPort<RgpdRoutesDeps["RequestDataExportUseCase"]>(),
+  IPreflightAccountDeletionQuery: mockPort<RgpdRoutesDeps["IPreflightAccountDeletionQuery"]>(),
+  RequestAccountDeletionUseCase: { execute: requestAccountDeletion },
+  CancelAccountDeletionUseCase: mockPort<RgpdRoutesDeps["CancelAccountDeletionUseCase"]>(),
 });
 
 function postDelete() {

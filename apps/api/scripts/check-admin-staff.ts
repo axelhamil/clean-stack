@@ -485,7 +485,7 @@ async function proveWipeRevokes(): Promise<void> {
 
   await openImpersonation(leaver);
 
-  const wiped = await di.RgpdService.executeAccountWipe({ userId: leaver });
+  const wiped = await di.ExecuteAccountWipeUseCase.execute({ userId: leaver });
   console.log("[5] wipe ->", wiped.isFailure ? wiped.getError() : "success");
   check("the wipe of a manager succeeds", wiped.isSuccess);
 
@@ -549,7 +549,7 @@ async function proveDeletionRefused(): Promise<void> {
     password: await hashPassword(PASSWORD),
   });
 
-  const refused = await di.RgpdService.requestAccountDeletion({
+  const refused = await di.RequestAccountDeletionUseCase.execute({
     userId: managerA,
     password: PASSWORD,
   });
@@ -572,7 +572,7 @@ async function proveDeletionRefused(): Promise<void> {
     .update(authSchema.user)
     .set({ pendingDeletionUntil: new Date(Date.now() + 60_000) })
     .where(eq(authSchema.user.id, managerB));
-  const stillRefused = await di.RgpdService.requestAccountDeletion({
+  const stillRefused = await di.RequestAccountDeletionUseCase.execute({
     userId: managerA,
     password: PASSWORD,
   });

@@ -138,7 +138,7 @@ a tz-naive column is silently wrong the moment the app process and the
 database don't agree on a timezone, so don't "fix" it back to match the rest
 of the schema.
 
-`rgpd-sweep` deliberately has no lease and its selection (`findUsersReadyForWipe`)
+`rgpd-sweep` deliberately has no lease and its selection (`IDeletionStateRepository.findReadyForWipe`)
 does not use `SKIP LOCKED`, so two overlapping runs can select the same account.
 What makes that safe is that the wipe itself is idempotent: the anonymizing
 `UPDATE` is guarded by `deletedAt IS NULL`, so a run that loses the race updates

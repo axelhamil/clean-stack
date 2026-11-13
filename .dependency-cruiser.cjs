@@ -21,6 +21,7 @@ const MIGRATED_MODULES = [
   "notifications",
   "webhooks",
   "admin",
+  "rgpd",
 ];
 const MIGRATED =
   MIGRATED_MODULES.length > 0 ? `${MODULES}/(${MIGRATED_MODULES.join("|")})/src/` : "^$";
