@@ -234,7 +234,7 @@ Billing is wired via `@better-auth/stripe` (plugin v1.7+, SDK `stripe@23+`, API 
 | **Packages** | `stripe@23.0.1` + `@better-auth/stripe@1.7.14` |
 | **Webhook endpoint** | auto-mounted at `/api/auth/stripe/webhook` by the plugin |
 | **Subscription SSOT** | plugin-managed `subscription` table (webhook-synced), not `organization.metadata` |
-| **Entitlements** | typed `ENTITLEMENTS[tier]` in `modules/billing/src/domain/entitlements.ts`: edit + deploy to change gates |
+| **Entitlements** | typed `ENTITLEMENTS[tier]` in `modules/billing/src/application/services/entitlement-policy.service.ts`: edit + deploy to change gates |
 | **Tiers** | `free` (3 members) · `pro` (20 members, audit_log + api) · `business` (unlimited members + SSO) |
 | **Unlimited** | `maxMembers: null` (JSON-safe): not `Infinity` |
 | **Org model** | unlimited team orgs per user; each is free or paid independently (seat-only gate) |
@@ -257,7 +257,7 @@ stripe listen --forward-to localhost:3000/api/auth/stripe/webhook
 - `metadata.tier` = the tier key (`pro` or `business`) matching a key in `ENTITLEMENTS`. This is the join key between Stripe and the entitlements config.
 - `marketing_features` (Stripe product field) = array of bullet strings shown in the `/pricing` UI and Stripe Checkout.
 
-Entitlements (features, rank, `maxMembers`) live **exclusively in code** at `modules/billing/src/domain/entitlements.ts`. The Stripe dashboard never controls gates: it only carries the price and display copy. Changing a gate = a code change + deploy (reviewable, version-controlled).
+Entitlements (features, rank, `maxMembers`) live **exclusively in code** at `modules/billing/src/application/services/entitlement-policy.service.ts`. The Stripe dashboard never controls gates: it only carries the price and display copy. Changing a gate = a code change + deploy (reviewable, version-controlled).
 
 ### Containers at a glance
 

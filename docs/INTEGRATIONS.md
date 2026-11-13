@@ -188,11 +188,11 @@ The billing module uses `@better-auth/stripe`. The plugin owns the webhook endpo
 ### Stripe setup checklist
 
 1. **Create a Stripe account** and enable billing features (Stripe Dashboard → Settings → Billing).
-2. **Create Products and Prices** for each paid plan. Each paid Product *must* carry `metadata.tier = <your-tier-key>`: this is the join key to the `ENTITLEMENTS` map in `modules/billing/src/domain/entitlements.ts`. Set `marketing_features` on each Product for the pricing-page bullet list.
+2. **Create Products and Prices** for each paid plan. Each paid Product *must* carry `metadata.tier = <your-tier-key>`: this is the join key to the `ENTITLEMENTS` map in `modules/billing/src/application/services/entitlement-policy.service.ts`. Set `marketing_features` on each Product for the pricing-page bullet list.
 3. **Add a webhook endpoint** in the Stripe Dashboard pointing at `https://<your-api-domain>/api/auth/stripe/webhook`. Subscribe to at minimum: `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`.
 4. **Copy the webhook signing secret** (starts with `whsec_`) into `STRIPE_WEBHOOK_SECRET`.
 
-### Entitlements contract (`modules/billing/src/domain/entitlements.ts`)
+### Entitlements contract (`modules/billing/src/application/services/entitlement-policy.service.ts`)
 
 Each entry in `ENTITLEMENTS` must have a key matching a `metadata.tier` value on a Stripe Product:
 
@@ -207,7 +207,7 @@ export const ENTITLEMENTS: Record<string, { rank: number; maxMembers: number | n
 - `maxMembers: null` = unlimited seats (JSON-safe).
 - `features` = string flags checked by `requireFeature(flag)` / `<FeatureGate flag>`.
 - `rank` = integer used by `requirePlan(minTier)` to compare tiers ordinally.
-- `quotas` (Phase B.2) = per-resource numeric caps (`null` = unlimited), enforced by `requireQuota(key, readUsage)` / `reserveQuota` and surfaced front-side via `useQuota(key, used)` / `<QuotaGate>`. Dormant skeleton, see [`QUOTA-GATING.md`](QUOTA-GATING.md) for how to wire a quota to a resource.
+- `quotas` (Phase B.2) = per-resource numeric caps (`null` = unlimited), enforced by `requireQuota(key, readUsage)` / `ReserveQuotaUseCase` and surfaced front-side via `useQuota(key, used)` / `<QuotaGate>`. Dormant skeleton, see [`QUOTA-GATING.md`](QUOTA-GATING.md) for how to wire a quota to a resource.
 
 The free tier (`rank: 0`) is always available, even when Stripe is unconfigured, the catalog degrades to free-only and the app boots normally.
 
@@ -385,7 +385,7 @@ publicly accessible HTTPS endpoint and a GitHub review of the integration:
 - [ ] DNS records for sending domain (SPF, DKIM, DMARC): green in Resend
 - [ ] S3 bucket provisioned, scoped credentials, CORS configured
 - [ ] Stripe Products created with `metadata.tier` set; `ENTITLEMENTS` in
-      `modules/billing/src/domain/entitlements.ts` matches every tier key
+      `modules/billing/src/application/services/entitlement-policy.service.ts` matches every tier key
 - [ ] Stripe webhook endpoint registered for the 4 required event types;
       `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` set (or omit both for free-only)
 - [ ] `INTERNAL_SIGNING_KEY` generated (≥32 chars); `INTERNAL_AUTH_LAYERS`

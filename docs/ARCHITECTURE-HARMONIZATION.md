@@ -942,7 +942,7 @@ Updated in the PR that delivers each line.
 |---|---|---|---|---|---|---|---|
 | 0 | `uploads` | technical | no | S to M | done 2026-11-13 | | yes |
 | 0 | `api-token` | business | `ApiToken` | M | done 2026-11-13 | | yes |
-| 1 | `billing` + `quotas` | technical | no | M | to do | | |
+| 1 | `billing` + `quotas` | technical | no | M | done 2026-11-13 | | yes |
 | 1 | `profile` | technical | no | S | done 2026-11-13 | | yes |
 | 1 | `policies` | technical | no | S to M | done 2026-11-13 | | yes |
 | 1 | `consents` | technical | no | M | done 2026-11-13 | | yes |

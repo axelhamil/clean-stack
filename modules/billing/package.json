@@ -6,16 +6,22 @@
   "exports": {
     "./module": "./src/billing.module.ts",
     "./config": "./src/application/config/billing-settings.ts",
-    "./routes/billing": "./src/infrastructure/http/billing.routes.ts",
-    "./ports/*": "./src/application/ports/*.port.ts",
+    "./routes/billing": "./src/infra/http/routes/billing/billing.ts",
+    "./ports/plan-override": "./src/application/ports/repositories/plan-override.port.ts",
+    "./ports/stripe-event": "./src/application/ports/repositories/stripe-event.port.ts",
+    "./ports/subscription-read": "./src/application/ports/repositories/subscription-read.port.ts",
+    "./ports/subscription-sync": "./src/application/ports/repositories/subscription-sync.port.ts",
+    "./ports/*": "./src/application/ports/services/*.port.ts",
     "./services/billing-catalog": "./src/application/services/billing-catalog.service.ts",
-    "./services/billing-portal": "./src/application/services/billing-portal.service.ts",
     "./services/entitlements": "./src/application/services/entitlements.service.ts",
-    "./rules/entitlements": "./src/domain/entitlements.ts",
-    "./rules/subscription-events": "./src/application/subscription-events.ts",
-    "./adapters/stripe-event-gateway": "./src/infrastructure/adapters/stripe-event.gateway.ts",
-    "./adapters/stripe-payment-failure": "./src/infrastructure/adapters/stripe-payment-failure.ts",
-    "./adapters/stripe-sync-verifier": "./src/infrastructure/adapters/stripe-sync-verifier.ts",
+    "./usecases/open-billing-portal": "./src/application/usecases/open-billing-portal/open-billing-portal.usecase.ts",
+    "./usecases/verify-stripe-sync": "./src/application/usecases/verify-stripe-sync/verify-stripe-sync.usecase.ts",
+    "./queries/*": "./src/application/queries/*.query.ts",
+    "./rules/entitlements": "./src/application/services/entitlement-policy.service.ts",
+    "./rules/subscription-events": "./src/application/services/subscription-policy.service.ts",
+    "./adapters/stripe-event-gateway": "./src/infra/adapters/stripe-event-gateway.adapter.ts",
+    "./adapters/stripe-payment-failure": "./src/infra/adapters/stripe-payment-failure.mapper.ts",
+    "./adapters/stripe-sync-verifier": "./src/infra/adapters/stripe-sync-verifier.adapter.ts",
     "./schemas/*": "./schemas/*.ts"
   },
   "scripts": {
@@ -35,7 +41,8 @@
     "drizzle-orm": "^0.45.4",
     "hono": "^4.13.14",
     "inwire": "^4.0.1",
-    "stripe": "^23.0.1"
+    "stripe": "^23.0.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@packages/test": "workspace:*",
