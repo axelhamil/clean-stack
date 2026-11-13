@@ -1,10 +1,10 @@
-import { type EventHandler, type IDomainEvent, onEvent } from "@packages/ddd-kit";
+import { dispatchTo, type EventHandler, type IUseCase, onEvent } from "@packages/ddd-kit";
 import { EventTypes, PayloadByEventType } from "@packages/events";
 import { payloadParser } from "@packages/outbox/payload-parser";
-import type { ApprovalService } from "../services/approval.service";
+import type { CloseApprovalsOfDeletedUserInput } from "../usecases/close-approvals-of-deleted-user/close-approvals-of-deleted-user.dto";
 
 interface CloseApprovalsDeps {
-  ApprovalService: ApprovalService;
+  CloseApprovalsOfDeletedUserUseCase: IUseCase<CloseApprovalsOfDeletedUserInput, void, unknown>;
 }
 
 const parsePayload = payloadParser(PayloadByEventType[EventTypes.USER_DELETED]);
@@ -12,7 +12,10 @@ const parsePayload = payloadParser(PayloadByEventType[EventTypes.USER_DELETED]);
 export const closeApprovalsOfDeletedUser: (deps: CloseApprovalsDeps) => EventHandler = onEvent(
   EventTypes.USER_DELETED,
   "close-approvals-of-deleted-user",
-  (c: CloseApprovalsDeps) => async (_event: IDomainEvent, payload) =>
-    c.ApprovalService.closeForDeletedUser(payload.userId),
+  (c: CloseApprovalsDeps) =>
+    dispatchTo(
+      c.CloseApprovalsOfDeletedUserUseCase,
+      ({ userId }: CloseApprovalsOfDeletedUserInput) => ({ userId }),
+    ),
   { payload: parsePayload },
 );

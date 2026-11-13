@@ -1,26 +1,23 @@
 import type { StaffPermission, StaffRole } from "@packages/access-control";
 import type { AppError, Option, Result } from "@packages/ddd-kit";
+import type {
+  StaffGrant,
+  StaffOverrideGrant,
+  StaffSource,
+} from "../../../domain/staff/services/staff-access.service";
 
 export type StaffStoreError = AppError<"ADMIN_STAFF_PROVIDER_FAILURE">;
-export type StaffSource = "env" | "console" | "migration";
+export type { StaffSource };
 
-export interface StaffOverrideRecord {
-  permission: StaffPermission;
-  effect: "grant" | "deny";
-  expiresAt: Option<Date>;
-}
+export type StaffOverrideRecord = StaffOverrideGrant;
 
 export interface StaffOverrideRow extends StaffOverrideRecord {
   id: string;
   createdAt: Date;
 }
 
-export interface StaffRecord {
-  userId: string;
-  role: StaffRole;
-  source: StaffSource;
+export interface StaffRecord extends StaffGrant {
   banned: boolean;
-  overrides: StaffOverrideRecord[];
 }
 
 export interface StaffManagerRecord {

@@ -949,7 +949,7 @@ Updated in the PR that delivers each line.
 | 1 | `audit-log` | technical | no | M | done 2026-11-13 | | yes |
 | 2 | `webhooks` | technical | no | L | done 2026-11-13; HTTP drift: a malformed `:id` or `:deliveryId` answers 400 `REQUEST_INVALID` instead of 404 | | yes |
 | 2 | `notifications` | technical | no | L | done 2026-11-13 | | yes |
-| 2 | `admin` | business | `ApprovalRequest`; staff domain service file | XL | to do | | |
+| 2 | `admin` | business | `ApprovalRequest`; staff domain service file | XL | done 2026-11-13; HTTP drift: a malformed `:id` answers 400 `REQUEST_INVALID` instead of 404 | | yes |
 | 3 | `rgpd` | business | `domain/deletion/` pure rules | L | to do | | |
 | 4 | `organization` (from the host) | business | no | M | to do | | |
 | 4 | host use cases | host | n/a | M | to do | | |

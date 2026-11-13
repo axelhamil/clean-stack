@@ -1,28 +1,37 @@
-import { permissionsOfRole, type StaffPermission, type StaffRole } from "@packages/access-control";
+import type { StaffPermission, StaffRole } from "@packages/access-control";
 import { type AppError, type IUnitOfWork, type Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { emitEvent } from "@packages/outbox/event-emitter";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
+import {
+  grantsStaffAccess,
+  isLastManager,
+  type StaffListing,
+} from "../../domain/staff/services/staff-access.service";
+import {
+  canImpersonate,
+  changeRefusal,
+  deniesOwnManagement,
+  grantNotHeld,
+  isListed,
+  lastManager,
+  moderationRefusal,
+  overrideGrantRefusal,
+  overrideNotFound,
+  roleGrantRefusal,
+  type StaffChange,
+  staffNotFound,
+} from "../../domain/staff/services/staff-rules.service";
 import type { AdminStoreError, IAdminUserStore } from "../ports/repositories/admin-user-store.port";
 import type {
   EndedImpersonation,
   IStaffStore,
-  StaffListRow,
   StaffOverrideRow,
   StaffRecord,
   StaffStoreError,
 } from "../ports/repositories/staff-store.port";
 import { announceImpersonationsEnded } from "./impersonation-end";
 import { announceSessionsEnded } from "./session-end";
-import {
-  grantsStaffAccess,
-  IMPERSONATE_PERMISSION,
-  isLastManager,
-  permissionsOfRecord,
-  type StaffListing,
-} from "./staff-access";
-
-const MANAGE_STAFF_PERMISSION: StaffPermission = "staff.manage";
 
 export type StaffChangeError =
   | StaffStoreError
@@ -43,11 +52,6 @@ export type StaffBanError = StaffModerationError | AppError<"ADMIN_STAFF_LAST_MA
 
 interface StaffModeration {
   actorPermissions: readonly StaffPermission[];
-  targetUserId: string;
-}
-
-interface StaffChange {
-  actorUserId: string;
   targetUserId: string;
 }
 
@@ -101,29 +105,6 @@ export class StaffService {
     private readonly env: StaffListing,
   ) {}
 
-  async list(): Promise<Result<StaffListRow[], StaffStoreError>> {
-    const rows = await this.store.listActive();
-    if (rows.isFailure) return rows;
-
-    return Result.ok(rows.getValue().filter((row) => grantsStaffAccess(row, this.env)));
-  }
-
-  async expireImpersonations(limit: number): Promise<Result<number, StaffStoreError>> {
-    return this.uow.run(async (): Promise<Result<number, StaffStoreError>> => {
-      const ended = await this.store.endExpiredImpersonations(limit);
-      if (ended.isFailure) return Result.fail(ended.getError());
-
-      await announceImpersonationsEnded(this.outbox, ended.getValue(), "expired", new Date());
-      await announceSessionsEnded(this.outbox, ended.getValue(), null);
-
-      return Result.ok(ended.getValue().length);
-    });
-  }
-
-  countExpiredImpersonations(): Promise<Result<number, StaffStoreError>> {
-    return this.store.countExpiredImpersonations();
-  }
-
   async endSession(
     session: MetSession,
     endpointPath?: string,
@@ -147,14 +128,6 @@ export class StaffService {
 
       return Result.ok();
     });
-  }
-
-  async listOverrides(targetUserId: string): Promise<Result<StaffOverrideRow[], StaffChangeError>> {
-    const row = await this.grantingRow(targetUserId);
-    if (row.isFailure) return Result.fail(row.getError());
-    if (row.getValue().isNone()) return Result.fail(notStaff());
-
-    return this.store.listLiveOverrides(targetUserId);
   }
 
   async moderate<E>(
@@ -187,7 +160,9 @@ export class StaffService {
     targetUserId: string;
     expiresIn?: number;
   }): Promise<Result<boolean, StaffStoreError | AdminStoreError>> {
-    if (input.expiresIn === undefined || this.isListed(input.targetUserId)) return Result.ok(true);
+    if (input.expiresIn === undefined || isListed(input.targetUserId, this.env)) {
+      return Result.ok(true);
+    }
 
     const staff = await this.grantingRow(input.targetUserId);
     if (staff.isFailure) return Result.fail(staff.getError());
@@ -284,11 +259,7 @@ export class StaffService {
       });
       if (assigned.isFailure) return Result.fail(assigned.getError());
 
-      const stillImpersonates = permissionsOfRecord(
-        { ...row, role: input.role },
-        new Date(),
-      ).includes(IMPERSONATE_PERMISSION);
-      if (!stillImpersonates) {
+      if (!canImpersonate({ ...row, role: input.role }, new Date())) {
         const ended = await this.store.endImpersonationsBy(input.targetUserId);
         if (ended.isFailure) return Result.fail(ended.getError());
 
@@ -350,7 +321,7 @@ export class StaffService {
     const refused = this.refusedChange(input);
     if (refused.isFailure) return Result.fail(refused.getError());
 
-    const live = await this.listOverrides(input.targetUserId);
+    const live = await this.liveOverrides(input.targetUserId);
     if (live.isFailure) return Result.fail(live.getError());
 
     const row = live.getValue().find((candidate) => candidate.id === input.overrideId);
@@ -460,14 +431,9 @@ export class StaffService {
 
     const found = await this.grantingRow(input.targetUserId);
     if (found.isFailure) return Result.fail(found.getError());
-    if (found.getValue().isNone()) return Result.fail(notStaff());
+    if (found.getValue().isNone()) return Result.fail(staffNotFound());
 
-    const row = found.getValue().unwrap();
-    const losesManagement =
-      input.effect === "deny" &&
-      input.permission === MANAGE_STAFF_PERMISSION &&
-      row.role === "manager" &&
-      permissionsOfRecord(row, new Date()).includes(MANAGE_STAFF_PERMISSION);
+    const losesManagement = deniesOwnManagement(found.getValue().unwrap(), input, new Date());
     if (losesManagement && isLastManager(input.targetUserId, managers.getValue(), this.env)) {
       return Result.fail(lastManager());
     }
@@ -483,7 +449,7 @@ export class StaffService {
 
     const stillImpersonates = row
       .getValue()
-      .map((record) => permissionsOfRecord(record, new Date()).includes(IMPERSONATE_PERMISSION))
+      .map((record) => canImpersonate(record, new Date()))
       .unwrapOr(false);
     if (stillImpersonates) return Result.ok();
 
@@ -511,7 +477,7 @@ export class StaffService {
     if (refused.isFailure) return Result.fail(refused.getError());
 
     const isManager =
-      this.isListed(input.targetUserId) ||
+      isListed(input.targetUserId, this.env) ||
       target
         .getValue()
         .filter((row) => row.role === "manager")
@@ -531,7 +497,7 @@ export class StaffService {
     if (found.isFailure) return Result.fail(found.getError());
 
     if (found.getValue().isNone()) {
-      return Result.fail(notStaff());
+      return Result.fail(staffNotFound());
     }
 
     const { role } = found.getValue().unwrap();
@@ -572,34 +538,17 @@ export class StaffService {
   refusedRoleGrant(
     input: StaffGrantingChange & { role: StaffRole },
   ): Result<void, StaffChangeError> {
-    const refused = this.refusedChange(input);
+    const refused = changeRefusal(input, this.env);
     if (refused.isFailure) return refused;
 
-    const beyond = permissionsOfRole(input.role).some(
-      (permission) => !input.actorPermissions.includes(permission),
-    );
-
-    return beyond ? Result.fail(grantNotHeld()) : Result.ok();
-  }
-
-  refusedOverrideGrant(input: {
-    actorPermissions: readonly StaffPermission[];
-    permission: StaffPermission;
-    effect: "grant" | "deny";
-    liftsOverride: boolean;
-  }): Result<void, StaffChangeError> {
-    const gives = input.liftsOverride ? input.effect === "deny" : input.effect === "grant";
-
-    return gives && !input.actorPermissions.includes(input.permission)
-      ? Result.fail(grantNotHeld())
-      : Result.ok();
+    return roleGrantRefusal(input.role, input.actorPermissions);
   }
 
   private refusedRemoval(
     input: StaffOverrideRemoval,
     row: { permission: StaffPermission; effect: "grant" | "deny" },
   ): Result<void, StaffChangeError> {
-    return this.refusedOverrideGrant({
+    return overrideGrantRefusal({
       actorPermissions: input.actorPermissions,
       permission: row.permission,
       effect: row.effect,
@@ -608,25 +557,17 @@ export class StaffService {
   }
 
   private refusedChange(input: StaffChange): Result<void, StaffChangeError> {
-    if (input.actorUserId === input.targetUserId) {
-      return Result.fail({
-        code: "ADMIN_STAFF_SELF_CHANGE_FORBIDDEN",
-        message: "Nobody changes their own access.",
-      });
-    }
-
-    if (this.isListed(input.targetUserId)) {
-      return Result.fail({
-        code: "ADMIN_STAFF_LISTED_FORBIDDEN",
-        message: "This access comes from PLATFORM_ADMIN_IDS and changes there.",
-      });
-    }
-
-    return Result.ok();
+    return changeRefusal(input, this.env);
   }
 
-  private isListed(userId: string): boolean {
-    return this.env.PLATFORM_ADMIN_IDS.includes(userId);
+  private async liveOverrides(
+    targetUserId: string,
+  ): Promise<Result<StaffOverrideRow[], StaffChangeError>> {
+    const row = await this.grantingRow(targetUserId);
+    if (row.isFailure) return Result.fail(row.getError());
+    if (row.getValue().isNone()) return Result.fail(staffNotFound());
+
+    return this.store.listLiveOverrides(targetUserId);
   }
 
   private async grantingRow(userId: string): Promise<Result<Option<StaffRecord>, StaffStoreError>> {
@@ -647,39 +588,9 @@ export class StaffService {
     input: StaffModeration,
     target: Option<StaffRecord>,
   ): Result<void, StaffModerationError> {
-    const targetIsStaff = this.isListed(input.targetUserId) || target.isSome();
-    if (targetIsStaff && !input.actorPermissions.includes("staff.manage")) {
-      return Result.fail({
-        code: "ADMIN_USER_STAFF_TARGET_FORBIDDEN",
-        message: "Only someone who manages the staff can act on a staff member.",
-      });
-    }
-
-    return Result.ok();
+    return moderationRefusal(
+      isListed(input.targetUserId, this.env) || target.isSome(),
+      input.actorPermissions,
+    );
   }
-}
-
-function notStaff(): AppError<"ADMIN_STAFF_NOT_FOUND"> {
-  return { code: "ADMIN_STAFF_NOT_FOUND", message: "Not a staff member." };
-}
-
-function grantNotHeld(): AppError<"ADMIN_STAFF_GRANT_NOT_HELD_FORBIDDEN"> {
-  return {
-    code: "ADMIN_STAFF_GRANT_NOT_HELD_FORBIDDEN",
-    message: "Nobody gives a permission they do not hold themselves.",
-  };
-}
-
-function overrideNotFound(): AppError<"ADMIN_STAFF_OVERRIDE_NOT_FOUND"> {
-  return {
-    code: "ADMIN_STAFF_OVERRIDE_NOT_FOUND",
-    message: "This permission change no longer exists.",
-  };
-}
-
-function lastManager(): AppError<"ADMIN_STAFF_LAST_MANAGER_FORBIDDEN"> {
-  return {
-    code: "ADMIN_STAFF_LAST_MANAGER_FORBIDDEN",
-    message: "The last manager cannot lose access.",
-  };
 }

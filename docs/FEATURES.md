@@ -343,7 +343,7 @@ Platform operator tooling: ban/unban users, change platform role, force password
 **Palette** (`shared/components/admin-palette.tsx`, skeleton in `@packages/ui/components/ui/command-palette`): `Ctrl K` or `Cmd K` opens sections the permissions allow, saved views, and a debounced search of accounts and organizations from 2 characters. The app palette sits on the same skeleton.
 
 **Backend** `modules/admin/src/`:
-- `AdminQueryService`: read-only platform user and org queries.
+- `AdminQueryService`: read-only platform user and org lists.
 - `AdminActionService`: ban, unban, role-change, force-password-reset, revoke-sessions. Instantiated in `routes.ts` (not inwire: real import cycle; deps from `di`).
 - `DrizzleAdminUserRepository` / `DrizzleAdminOrgRepository`: org-scoped reads with pagination and search.
 - `routes/admin-impersonation/admin-impersonation.ts`: `POST /admin/impersonation/:id/start` (reason required, ticketRef optional) + `POST /admin/impersonation/stop`.
@@ -357,7 +357,7 @@ Platform operator tooling: ban/unban users, change platform role, force password
 - `router/should-redirect-to-legal-accept.ts`: returns `false` when `isImpersonating(session)` is true, so the legal acceptance gate does not trap the admin on a page whose only exit is to consent.
 - `shared/api/mutations/stop-impersonation.ts`: mutation factory used by the banner.
 
-**Transparency email**: `application/event-handlers/notify-impersonated-user.ts`: `onEvent(ADMIN_IMPERSONATION_STARTED)` handler, tolerant (failure captured, does not abort).
+**Transparency email**: `application/event-handlers/notify-impersonated-user.ts`: `onEvent(ADMIN_IMPERSONATION_STARTED)` dispatching to `NotifyImpersonatedUserUseCase`, tolerant (failure captured, does not abort).
 
 **Events** (7 new, all `compliance` retention): `admin.impersonation.{started,stopped}`, `admin.user.{banned,unbanned,role_changed,password_reset,sessions_revoked}` → catalog 55 → **62 total**.
 

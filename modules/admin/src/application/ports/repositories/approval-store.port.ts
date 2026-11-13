@@ -1,18 +1,9 @@
 import type { ApprovalAction } from "@packages/access-control";
 import type { AppError, Option, Result } from "@packages/ddd-kit";
 import type { TimeIdCursor } from "@packages/http/time-id-cursor";
+import type { ApprovalStatusValue } from "../../../domain/approval/value-objects/approval-status.vo";
 
-export const APPROVAL_STATUSES = [
-  "pending",
-  "approved",
-  "rejected",
-  "cancelled",
-  "expired",
-  "executed",
-  "failed",
-] as const;
-
-export type ApprovalStatus = (typeof APPROVAL_STATUSES)[number];
+export type ApprovalStatus = ApprovalStatusValue;
 
 export interface ListApprovalsQuery {
   status?: ApprovalStatus | undefined;

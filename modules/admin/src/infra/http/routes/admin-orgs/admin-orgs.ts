@@ -12,8 +12,8 @@ import { ssoEnforcementChangeNeedsStepUp } from "../../../../application/service
 import type { AddStaffNoteUseCase } from "../../../../application/usecases/add-staff-note/add-staff-note.usecase";
 import type { RevokePlanOverrideUseCase } from "../../../../application/usecases/revoke-plan-override/revoke-plan-override.usecase";
 import type { SetPlanOverrideUseCase } from "../../../../application/usecases/set-plan-override/set-plan-override.usecase";
-import { serializeStaffNote } from "../../staff-note.presenter";
 import { addStaffNoteBodySchema } from "../../staff-note.schema";
+import { addedStaffNote, listedStaffNotes } from "../../staff-notes";
 import {
   listOrgsQuerySchema,
   setPlanOverrideBodySchema,
@@ -119,15 +119,13 @@ export function createAdminOrgRoutes(deps: AdminOrgRoutesDeps) {
       g.requireAuth,
       g.requireStaffPermission("orgs.read"),
       zV("param", idParamSchema),
-      async (c) => {
-        const result = await deps.IListStaffNotesQuery.execute({
-          type: "org",
-          id: c.req.valid("param").id,
-        });
-        if (result.isFailure) throw new AppErrorException(result.getError());
-
-        return c.json({ items: result.getValue().map(serializeStaffNote) });
-      },
+      async (c) =>
+        c.json(
+          await listedStaffNotes(deps.IListStaffNotesQuery, {
+            type: "org",
+            id: c.req.valid("param").id,
+          }),
+        ),
     )
     .post(
       "/:id/notes",
@@ -135,16 +133,14 @@ export function createAdminOrgRoutes(deps: AdminOrgRoutesDeps) {
       g.requireStaffPermission("notes.write"),
       zV("json", addStaffNoteBodySchema),
       zV("param", idParamSchema),
-      async (c) => {
-        const result = await deps.AddStaffNoteUseCase.execute({
-          actorUserId: g.currentUserId(c),
-          subject: { type: "org", id: c.req.valid("param").id },
-          body: c.req.valid("json").body,
-        });
-        if (result.isFailure) throw new AppErrorException(result.getError());
-
-        return c.json({ ok: true });
-      },
+      async (c) =>
+        c.json(
+          await addedStaffNote(deps.AddStaffNoteUseCase, {
+            actorUserId: g.currentUserId(c),
+            subject: { type: "org", id: c.req.valid("param").id },
+            body: c.req.valid("json").body,
+          }),
+        ),
     )
     .post(
       "/:id/sso-enforcement",

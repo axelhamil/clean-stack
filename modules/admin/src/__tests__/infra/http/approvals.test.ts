@@ -39,17 +39,29 @@ const SERIALIZED = {
   version: 1,
 };
 
-let approvals = mockPort<AdminRoutesDeps["ApprovalService"]>();
+let list = mockPort<AdminRoutesDeps["IListApprovalsQuery"]>();
+let detail = mockPort<AdminRoutesDeps["IGetApprovalQuery"]>();
+let decide = mockPort<AdminRoutesDeps["DecideApprovalUseCase"]>();
+let cancel = mockPort<AdminRoutesDeps["CancelApprovalUseCase"]>();
 
 beforeEach(() => {
-  approvals = mockPort<AdminRoutesDeps["ApprovalService"]>();
+  list = mockPort<AdminRoutesDeps["IListApprovalsQuery"]>();
+  detail = mockPort<AdminRoutesDeps["IGetApprovalQuery"]>();
+  decide = mockPort<AdminRoutesDeps["DecideApprovalUseCase"]>();
+  cancel = mockPort<AdminRoutesDeps["CancelApprovalUseCase"]>();
 });
 
-const app = () => adminApp({ ApprovalService: approvals });
+const app = () =>
+  adminApp({
+    IListApprovalsQuery: list,
+    IGetApprovalQuery: detail,
+    DecideApprovalUseCase: decide,
+    CancelApprovalUseCase: cancel,
+  });
 
 describe("GET /admin/approvals", () => {
   it("lists approvals with the next cursor", async () => {
-    approvals.list.mockResolvedValue(
+    list.execute.mockResolvedValue(
       Result.ok({ items: [RECORD], nextCursor: Option.some("cursor-2") }),
     );
 
@@ -57,32 +69,30 @@ describe("GET /admin/approvals", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ items: [SERIALIZED], nextCursor: "cursor-2" });
-    expect(approvals.list).toHaveBeenCalledWith({ status: "pending", limit: 50 });
+    expect(list.execute).toHaveBeenCalledWith({ status: "pending", limit: 50 });
   });
 
   it("refuses an unknown status", async () => {
     const res = await send(app(), "GET", "/admin/approvals?status=lost");
 
     expect(res.status).toBe(400);
-    expect(approvals.list).not.toHaveBeenCalled();
+    expect(list.execute).not.toHaveBeenCalled();
   });
 });
 
 describe("GET /admin/approvals/:id", () => {
   it("returns one approval", async () => {
-    approvals.get.mockResolvedValue(Result.ok(RECORD));
+    detail.execute.mockResolvedValue(Result.ok(Option.some(RECORD)));
 
     const res = await send(app(), "GET", "/admin/approvals/approval-1");
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(SERIALIZED);
-    expect(approvals.get).toHaveBeenCalledWith("approval-1");
+    expect(detail.execute).toHaveBeenCalledWith({ approvalId: "approval-1" });
   });
 
   it("answers 404 for an unknown approval", async () => {
-    approvals.get.mockResolvedValue(
-      Result.fail({ code: "ADMIN_APPROVAL_NOT_FOUND", message: "none" }),
-    );
+    detail.execute.mockResolvedValue(Result.ok(Option.none()));
 
     const res = await send(app(), "GET", "/admin/approvals/ghost");
 
@@ -93,7 +103,7 @@ describe("GET /admin/approvals/:id", () => {
 
 describe("POST /admin/approvals/:id/decide", () => {
   it("decides as the current staff member with their permissions", async () => {
-    approvals.decide.mockResolvedValue(Result.ok());
+    decide.execute.mockResolvedValue(Result.ok());
 
     const res = await send(app(), "POST", "/admin/approvals/approval-1/decide", {
       decision: "approve",
@@ -101,7 +111,7 @@ describe("POST /admin/approvals/:id/decide", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(approvals.decide).toHaveBeenCalledWith({
+    expect(decide.execute).toHaveBeenCalledWith({
       approvalId: "approval-1",
       deciderUserId: ACTOR_ID,
       deciderPermissions: MANAGER.permissions,
@@ -117,11 +127,11 @@ describe("POST /admin/approvals/:id/decide", () => {
     });
 
     expect(res.status).toBe(400);
-    expect(approvals.decide).not.toHaveBeenCalled();
+    expect(decide.execute).not.toHaveBeenCalled();
   });
 
   it("surfaces a refused decision", async () => {
-    approvals.decide.mockResolvedValue(
+    decide.execute.mockResolvedValue(
       Result.fail({ code: "ADMIN_APPROVAL_SELF_DECISION_FORBIDDEN", message: "own" }),
     );
 
@@ -137,11 +147,11 @@ describe("POST /admin/approvals/:id/decide", () => {
 
 describe("POST /admin/approvals/:id/cancel", () => {
   it("cancels on behalf of the current user", async () => {
-    approvals.cancel.mockResolvedValue(Result.ok());
+    cancel.execute.mockResolvedValue(Result.ok());
 
     const res = await send(app(), "POST", "/admin/approvals/approval-1/cancel");
 
     expect(res.status).toBe(200);
-    expect(approvals.cancel).toHaveBeenCalledWith({ approvalId: "approval-1", userId: ACTOR_ID });
+    expect(cancel.execute).toHaveBeenCalledWith({ approvalId: "approval-1", userId: ACTOR_ID });
   });
 });

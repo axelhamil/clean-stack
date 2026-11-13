@@ -4,12 +4,19 @@ import type { RouteEnv, RouteGuards } from "@packages/http/route-guards";
 import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
 import type { ApprovalRecord } from "../../../../application/ports/repositories/approval-store.port";
-import type { ApprovalService } from "../../../../application/services/approval.service";
+import type { IGetApprovalQuery } from "../../../../application/queries/get-approval.query";
+import type { IListApprovalsQuery } from "../../../../application/queries/list-approvals.query";
+import type { CancelApprovalUseCase } from "../../../../application/usecases/cancel-approval/cancel-approval.usecase";
+import type { DecideApprovalUseCase } from "../../../../application/usecases/decide-approval/decide-approval.usecase";
+import { APPROVAL_NOT_FOUND } from "../../../../domain/approval/approval-request.aggregate";
 import { decideApprovalBodySchema, listApprovalsQuerySchema } from "./approvals.schema";
 
 export interface AdminApprovalRoutesDeps {
   routeGuards: RouteGuards;
-  ApprovalService: Pick<ApprovalService, "list" | "get" | "decide" | "cancel">;
+  IListApprovalsQuery: IListApprovalsQuery;
+  IGetApprovalQuery: IGetApprovalQuery;
+  DecideApprovalUseCase: Pick<DecideApprovalUseCase, "execute">;
+  CancelApprovalUseCase: Pick<CancelApprovalUseCase, "execute">;
 }
 
 function serializeApproval(record: ApprovalRecord) {
@@ -41,7 +48,7 @@ export function createAdminApprovalRoutes(deps: AdminApprovalRoutesDeps) {
       zV("query", listApprovalsQuerySchema),
       async (c) => {
         const input = c.req.valid("query");
-        const result = await deps.ApprovalService.list(input);
+        const result = await deps.IListApprovalsQuery.execute(input);
         if (result.isFailure) throw new AppErrorException(result.getError());
 
         const { items, nextCursor } = result.getValue();
@@ -55,10 +62,15 @@ export function createAdminApprovalRoutes(deps: AdminApprovalRoutesDeps) {
       g.requireStaffPermission("approvals.decide"),
       zV("param", idParamSchema),
       async (c) => {
-        const result = await deps.ApprovalService.get(c.req.valid("param").id);
+        const result = await deps.IGetApprovalQuery.execute({
+          approvalId: c.req.valid("param").id,
+        });
         if (result.isFailure) throw new AppErrorException(result.getError());
 
-        return c.json(serializeApproval(result.getValue()));
+        const found = result.getValue();
+        if (found.isNone()) throw new AppErrorException(APPROVAL_NOT_FOUND);
+
+        return c.json(serializeApproval(found.unwrap()));
       },
     )
     .post(
@@ -69,7 +81,7 @@ export function createAdminApprovalRoutes(deps: AdminApprovalRoutesDeps) {
       zV("json", decideApprovalBodySchema),
       zV("param", idParamSchema),
       async (c) => {
-        const result = await deps.ApprovalService.decide({
+        const result = await deps.DecideApprovalUseCase.execute({
           approvalId: c.req.valid("param").id,
           deciderUserId: g.currentUserId(c),
           deciderPermissions: g.currentStaff(c).permissions,
@@ -81,7 +93,7 @@ export function createAdminApprovalRoutes(deps: AdminApprovalRoutesDeps) {
       },
     )
     .post("/:id/cancel", g.requireAuth, g.requireStaff, zV("param", idParamSchema), async (c) => {
-      const result = await deps.ApprovalService.cancel({
+      const result = await deps.CancelApprovalUseCase.execute({
         approvalId: c.req.valid("param").id,
         userId: g.currentUserId(c),
       });

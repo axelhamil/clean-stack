@@ -20,6 +20,7 @@ const MIGRATED_MODULES = [
   "audit-log",
   "notifications",
   "webhooks",
+  "admin",
 ];
 const MIGRATED =
   MIGRATED_MODULES.length > 0 ? `${MODULES}/(${MIGRATED_MODULES.join("|")})/src/` : "^$";
