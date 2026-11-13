@@ -5,6 +5,8 @@ export interface IDomainEvent<T = unknown> {
   readonly eventType: string;
   readonly dateOccurred: Date;
   readonly aggregateId: string;
+  readonly aggregateType?: string;
+  readonly organizationId?: string | null;
   readonly payload: T;
 }
 

@@ -113,7 +113,13 @@ export const di = container()
     "ITransactionService",
     (c) =>
       new TransactionService(c.IInstrumentation, async (events) => {
-        await c.IOutboxRepository.enqueue(events, { source: "app/api" });
+        for (const event of events) {
+          await c.IOutboxRepository.enqueue([event], {
+            source: "app/api",
+            aggregateType: event.aggregateType,
+            organizationId: event.organizationId,
+          });
+        }
       }),
   )
   .add("IEmailQueue", (c): IEmailQueue => new DrizzleEmailQueue(c.IInstrumentation, logger))
