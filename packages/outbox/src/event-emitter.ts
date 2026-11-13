@@ -50,6 +50,21 @@ export async function emitEvent<TPayload>(
   return id;
 }
 
+export interface BuiltEvent<TPayload> {
+  type: EventType;
+  aggregateType: string;
+  aggregateId: string;
+  payload: TPayload;
+}
+
+export function emitBuiltEvent<TPayload>(
+  outbox: IOutboxRepository,
+  event: BuiltEvent<TPayload>,
+  opts: EmitOptions = {},
+): Promise<string> {
+  return emitEvent(outbox, event.type, event.aggregateType, event.aggregateId, event.payload, opts);
+}
+
 /**
  * `emitEvent` for a request that is refused whatever happens to its event (rate
  * limit, CSRF, CSP report, abuse checks): a failing outbox is logged as `warning`,

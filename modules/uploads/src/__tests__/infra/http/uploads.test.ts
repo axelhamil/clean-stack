@@ -7,12 +7,18 @@ import { mockPort } from "@packages/test/bun";
 import { mockInstrumentation } from "@packages/test/bun/instrumentation";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { createUploadsRoutes, type UploadsRoutesDeps } from "../infrastructure/http/uploads.routes";
+import {
+  createUploadsRoutes,
+  type UploadsRoutesDeps,
+} from "../../../infra/http/routes/uploads/uploads";
 
-const uploads = mockPort<UploadsRoutesDeps["UploadService"]>();
+const createUploadUrl = mockPort<UploadsRoutesDeps["CreateUploadUrlUseCase"]>();
+const confirmUpload = mockPort<UploadsRoutesDeps["ConfirmUploadUseCase"]>();
+const deleteUpload = mockPort<UploadsRoutesDeps["DeleteUploadUseCase"]>();
+const downloadUrl = mockPort<UploadsRoutesDeps["IDownloadUrlQuery"]>();
 
 beforeEach(() => {
-  uploads.createUploadUrl.mockResolvedValue(
+  createUploadUrl.execute.mockResolvedValue(
     Result.ok({
       url: "https://s3.test/put",
       key: "k",
@@ -22,13 +28,13 @@ beforeEach(() => {
       expectedContentType: "image/png",
     }),
   );
-  uploads.confirmUpload.mockResolvedValue(
+  confirmUpload.execute.mockResolvedValue(
     Result.ok({ key: "k", size: 1024, contentType: "image/png", publicUrl: "https://cdn.test/k" }),
   );
-  uploads.createDownloadUrl.mockResolvedValue(
+  downloadUrl.execute.mockResolvedValue(
     Result.ok({ url: "https://s3.test/get", expiresAt: "2026-01-01T00:00:00.000Z" }),
   );
-  uploads.deleteUpload.mockResolvedValue(Result.ok({ deleted: true }));
+  deleteUpload.execute.mockResolvedValue(Result.ok({ deleted: true }));
 });
 
 function send(guards: RouteGuards, method: string, path: string, body: unknown) {
@@ -41,7 +47,10 @@ function send(guards: RouteGuards, method: string, path: string, body: unknown) 
         presignTtlMinSeconds: 60,
         presignTtlMaxSeconds: 3600,
       },
-      UploadService: uploads,
+      CreateUploadUrlUseCase: createUploadUrl,
+      ConfirmUploadUseCase: confirmUpload,
+      DeleteUploadUseCase: deleteUpload,
+      IDownloadUrlQuery: downloadUrl,
     }),
   );
   app.onError(

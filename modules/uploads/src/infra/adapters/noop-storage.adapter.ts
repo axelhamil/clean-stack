@@ -1,5 +1,4 @@
 import { type ILogger, Option, Result } from "@packages/ddd-kit";
-import { keySchema } from "../../application/dto/_key";
 import type {
   IStorageService,
   ObjectMetadata,
@@ -8,7 +7,8 @@ import type {
   PresignUploadInput,
   StorageError,
   UploadObjectInput,
-} from "../../application/ports/storage.port";
+} from "../../application/ports/services/storage.port";
+import { keySchema } from "../../application/services/upload-policy.service";
 
 const unconfigured = <T>(): Promise<Result<T, StorageError>> =>
   Promise.resolve(
