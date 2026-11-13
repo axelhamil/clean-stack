@@ -7,7 +7,7 @@ The transactional outbox kit: the outbox port, the emit helpers, the Drizzle out
 ```
 src/
   outbox.port.ts               `IOutboxRepository`, `DeliveredEvent` (transport fields: `organizationId`, `requestId`, `aggregateType`)
-  event-emitter.ts             `emitEvent`, `emitEventBestEffort`
+  event-emitter.ts             `emitEvent`, `emitBuiltEvent` (takes the event object a module event file builds), `emitEventBestEffort`
   event-handlers.ts            `BuiltInEventHandler`, `buildEventDispatcher` (built-ins on every catalog type + `onEvent` handlers found in the container)
   event-actor.ts               `ACTOR_KEYS` + `readUserId`, the one actor-key priority list the audit trail and the notification audience read
   drizzle-outbox.repository.ts `DrizzleOutboxRepository`

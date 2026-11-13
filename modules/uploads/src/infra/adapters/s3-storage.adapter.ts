@@ -18,7 +18,6 @@ import {
   Result,
 } from "@packages/ddd-kit";
 import type { S3StorageSettings } from "../../application/config/upload-settings";
-import { keySchema } from "../../application/dto/_key";
 import type {
   IStorageService,
   ObjectMetadata,
@@ -27,7 +26,8 @@ import type {
   PresignUploadInput,
   StorageError,
   UploadObjectInput,
-} from "../../application/ports/storage.port";
+} from "../../application/ports/services/storage.port";
+import { keySchema } from "../../application/services/upload-policy.service";
 
 const S3_DELETE_BATCH = 1000;
 const httpAttrs = { "http.method": "POST", "rpc.system": "aws-api" } as const;

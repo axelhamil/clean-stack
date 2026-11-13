@@ -1,21 +1,36 @@
-import { AppErrorException } from "@packages/ddd-kit";
+import { AppErrorException, type IUseCase } from "@packages/ddd-kit";
 import type { RouteEnv, RouteGuards } from "@packages/http/route-guards";
 import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
-import type { UploadSettings } from "../../application/config/upload-settings";
-import { confirmUploadBodySchema } from "../../application/dto/confirm-upload.dto";
-import { deleteUploadBodySchema } from "../../application/dto/delete-upload.dto";
-import { presignDownloadBodySchema } from "../../application/dto/presign-download.dto";
-import { presignUploadBodySchema } from "../../application/dto/presign-upload.dto";
-import type { UploadService } from "../../application/services/upload.service";
+import type { UploadSettings } from "../../../../application/config/upload-settings";
+import type { StorageError } from "../../../../application/ports/services/storage.port";
+import type { IDownloadUrlQuery } from "../../../../application/queries/download-url.query";
+import type {
+  ConfirmUploadInput,
+  ConfirmUploadOutput,
+} from "../../../../application/usecases/confirm-upload/confirm-upload.dto";
+import type {
+  CreateUploadUrlInput,
+  CreateUploadUrlOutput,
+} from "../../../../application/usecases/create-upload-url/create-upload-url.dto";
+import type {
+  DeleteUploadInput,
+  DeleteUploadOutput,
+} from "../../../../application/usecases/delete-upload/delete-upload.dto";
+import {
+  confirmUploadBodySchema,
+  deleteUploadBodySchema,
+  presignDownloadBodySchema,
+  presignUploadBodySchema,
+} from "./uploads.schema";
 
 export interface UploadsRoutesDeps {
   routeGuards: RouteGuards;
   uploadSettings: UploadSettings;
-  UploadService: Pick<
-    UploadService,
-    "createUploadUrl" | "confirmUpload" | "createDownloadUrl" | "deleteUpload"
-  >;
+  CreateUploadUrlUseCase: IUseCase<CreateUploadUrlInput, CreateUploadUrlOutput, StorageError>;
+  ConfirmUploadUseCase: IUseCase<ConfirmUploadInput, ConfirmUploadOutput, StorageError>;
+  DeleteUploadUseCase: IUseCase<DeleteUploadInput, DeleteUploadOutput, StorageError>;
+  IDownloadUrlQuery: IDownloadUrlQuery;
 }
 
 export function createUploadsRoutes(deps: UploadsRoutesDeps) {
@@ -29,7 +44,7 @@ export function createUploadsRoutes(deps: UploadsRoutesDeps) {
       g.denyImpersonated,
       zV("json", presignUploadBodySchema(deps.uploadSettings)),
       async (c) => {
-        const result = await deps.UploadService.createUploadUrl({
+        const result = await deps.CreateUploadUrlUseCase.execute({
           ownerId: g.currentUserId(c),
           ...c.req.valid("json"),
         });
@@ -46,7 +61,7 @@ export function createUploadsRoutes(deps: UploadsRoutesDeps) {
       g.denyImpersonated,
       zV("json", confirmUploadBodySchema),
       async (c) => {
-        const result = await deps.UploadService.confirmUpload({
+        const result = await deps.ConfirmUploadUseCase.execute({
           ownerId: g.currentUserId(c),
           ...c.req.valid("json"),
         });
@@ -62,7 +77,7 @@ export function createUploadsRoutes(deps: UploadsRoutesDeps) {
       g.requireCurrentPolicies,
       zV("json", presignDownloadBodySchema(deps.uploadSettings)),
       async (c) => {
-        const result = await deps.UploadService.createDownloadUrl({
+        const result = await deps.IDownloadUrlQuery.execute({
           ownerId: g.currentUserId(c),
           ...c.req.valid("json"),
         });
@@ -79,7 +94,7 @@ export function createUploadsRoutes(deps: UploadsRoutesDeps) {
       g.denyImpersonated,
       zV("json", deleteUploadBodySchema),
       async (c) => {
-        const result = await deps.UploadService.deleteUpload({
+        const result = await deps.DeleteUploadUseCase.execute({
           ownerId: g.currentUserId(c),
           ...c.req.valid("json"),
         });
