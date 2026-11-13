@@ -8,14 +8,21 @@
 // `check-fanout-preferences.ts` for the reference shape.
 //
 // Run: `pnpm --filter api check:digest` (needs `pnpm --filter api db:seed`).
-// Re-run after any change to the fan-out's due-date branch, `digest-schedule.ts`
-// or `flush-notification-emails.route.ts`.
+// Re-run after any change to the fan-out's due-date branch, `digest-schedule.service.ts`
+// or `flush-notification-digest.usecase.ts`.
 //
 // WARNING: writes real notification, preference and email_message rows for the
 // seeded account, and takes the real `flush-notification-emails` advisory lock.
 // Local database only, `requireLocalDatabase` enforces it.
+//
+// Also proves the notify trigger is installed by the boot path: it drops the
+// trigger, starts `NotificationStreamHub` as `index.ts` does, and expects the
+// trigger back and a fanned-out row to reach the hub on `notification_changed`.
 
+import { DrizzleNotificationFanoutRepository } from "@modules/notifications/adapters/drizzle-notification-fanout-repository";
+import { NotificationStreamHub } from "@modules/notifications/adapters/notification-stream-hub";
 import { NotificationFanoutSubscriber } from "@modules/notifications/handlers/notification-fanout-subscriber";
+import { FanOutNotificationUseCase } from "@modules/notifications/usecases/fan-out-notification";
 import type { IInstrumentation } from "@packages/ddd-kit";
 import { NoOpInstrumentation } from "@packages/ddd-kit";
 import { db, sql, TransactionService } from "@packages/drizzle";
@@ -25,6 +32,7 @@ import {
   findSeededUserId,
   internalApp,
   seedEmail,
+  silentLogger,
 } from "@packages/test/check-harness";
 import { requireLocalDatabase } from "@packages/test/require-local-database";
 import type { Hono } from "hono";
@@ -47,10 +55,16 @@ await db.execute(sql`DELETE FROM email_message`);
 const DIGEST_HOUR_UTC = 8;
 const instrumentation: IInstrumentation = new NoOpInstrumentation();
 const subscriber = new NotificationFanoutSubscriber(
-  new TransactionService(instrumentation, async () => {}),
+  new FanOutNotificationUseCase(
+    new DrizzleNotificationFanoutRepository(instrumentation),
+    new StaffRecipientsQuery(instrumentation),
+    new TransactionService(instrumentation, async () => {}),
+    {
+      digestHourUtc: DIGEST_HOUR_UTC,
+      staff: { PLATFORM_ADMIN_IDS: [], PLATFORM_ADMIN_REQUIRE_MFA: false },
+    },
+  ),
   instrumentation,
-  new StaffRecipientsQuery(instrumentation),
-  DIGEST_HOUR_UTC,
 );
 
 // Far enough in the future that nothing deferred is due by accident: the whole
@@ -346,6 +360,55 @@ check(
   pagedReplay,
 );
 
+await reset();
+
+const triggerNames = async () => {
+  const result = await db.execute(sql`
+    SELECT tgname FROM pg_trigger
+    WHERE tgrelid = 'notification'::regclass AND NOT tgisinternal
+    ORDER BY tgname`);
+  return ((result.rows ?? result) as { tgname: string }[]).map((r) => r.tgname);
+};
+const notifyFunctionExists = async () => {
+  const result = await db.execute(sql`SELECT 1 FROM pg_proc WHERE proname = 'notification_notify'`);
+  return ((result.rows ?? result) as unknown[]).length === 1;
+};
+const BOOT_TRIGGERS = ["notification_notify_trigger", "notification_read_notify_trigger"];
+
+await db.execute(sql`DROP TRIGGER IF EXISTS notification_notify_trigger ON notification`);
+await db.execute(sql`DROP TRIGGER IF EXISTS notification_read_notify_trigger ON notification`);
+await db.execute(sql`DROP FUNCTION IF EXISTS notification_notify()`);
+check(
+  "with the trigger dropped, nothing signals a new notification",
+  (await triggerNames()).filter((t) => BOOT_TRIGGERS.includes(t)).length === 0 &&
+    !(await notifyFunctionExists()),
+  await triggerNames(),
+);
+
+const hub = new NotificationStreamHub(
+  silentLogger(),
+  process.env.DATABASE_URL ?? "",
+  instrumentation,
+);
+await hub.start();
+const installed = await triggerNames();
+check(
+  "the hub boot path reinstalls both notify triggers",
+  BOOT_TRIGGERS.every((t) => installed.includes(t)),
+  installed,
+);
+check("the hub boot path reinstalls the notify function", await notifyFunctionExists());
+
+const signalled = new Promise<boolean>((resolve) => {
+  const timeout = setTimeout(() => resolve(false), 5_000);
+  hub.subscribe(userId, () => {
+    clearTimeout(timeout);
+    resolve(true);
+  });
+});
+await fanout({ ...event(20), aggregateId: "digest-probe-signal" });
+check("a notification written after boot reaches the hub on notification_changed", await signalled);
+await hub.stop();
 await reset();
 
 if (checks.failures > 0) {

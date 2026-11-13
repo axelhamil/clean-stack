@@ -1,5 +1,7 @@
+import { DrizzleNotificationFanoutRepository } from "@modules/notifications/adapters/drizzle-notification-fanout-repository";
 import { NotificationFanoutSubscriber } from "@modules/notifications/handlers/notification-fanout-subscriber";
 import * as notificationSchema from "@modules/notifications/schemas/notification";
+import { FanOutNotificationUseCase } from "@modules/notifications/usecases/fan-out-notification";
 import type { IInstrumentation } from "@packages/ddd-kit";
 import { NoOpInstrumentation } from "@packages/ddd-kit";
 import { db, eq, multiTenantSchema, sql, TransactionService } from "@packages/drizzle";
@@ -16,9 +18,16 @@ const userId = await findSeededUserId();
 
 const instrumentation: IInstrumentation = new NoOpInstrumentation();
 const subscriber = new NotificationFanoutSubscriber(
-  new TransactionService(instrumentation, async () => {}),
+  new FanOutNotificationUseCase(
+    new DrizzleNotificationFanoutRepository(instrumentation),
+    new StaffRecipientsQuery(instrumentation),
+    new TransactionService(instrumentation, async () => {}),
+    {
+      digestHourUtc: 8,
+      staff: { PLATFORM_ADMIN_IDS: [], PLATFORM_ADMIN_REQUIRE_MFA: false },
+    },
+  ),
   instrumentation,
-  new StaffRecipientsQuery(instrumentation),
 );
 
 const event = (eventType: string): DeliveredEvent => ({
