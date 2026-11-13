@@ -583,7 +583,7 @@ async function provePastDueReachesThePortal(): Promise<void> {
     .returning({ id: sub.id });
   subscriptionRowIds.push(...rowIds.map(({ id }) => id));
 
-  const view = await di.EntitlementsService.getEntitlements(REFERENCE);
+  const view = (await di.IGetEntitlementsQuery.execute({ organizationId: REFERENCE })).getValue();
   const customer = await di.ISubscriptionReadStore.findCustomerIdByReference(REFERENCE);
   check(
     "a past due org keeps its tier and sees the billing button",

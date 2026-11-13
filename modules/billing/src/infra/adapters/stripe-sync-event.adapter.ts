@@ -1,10 +1,16 @@
-import { Option } from "@packages/ddd-kit";
+import { type IUseCase, Option } from "@packages/ddd-kit";
 import type Stripe from "stripe";
 import type { SubscriptionSyncKey } from "../../application/ports/repositories/subscription-sync.port";
 import type {
   StripeSubscriptionPlan,
   VerifyStripeSyncInput,
+  VerifyStripeSyncOutput,
 } from "../../application/usecases/verify-stripe-sync/verify-stripe-sync.dto";
+
+export type VerifyStripeSync = Pick<
+  IUseCase<VerifyStripeSyncInput, VerifyStripeSyncOutput, never>,
+  "execute"
+>;
 
 function keyOf(id: string, metadata: Stripe.Metadata | null): SubscriptionSyncKey {
   return { stripeSubscriptionId: id, localId: Option.fromNullable(metadata?.subscriptionId) };
@@ -56,4 +62,14 @@ export function syncInputOf(event: Stripe.Event): Option<VerifyStripeSyncInput> 
     default:
       return Option.none();
   }
+}
+
+export async function syncMismatchOf(
+  verifyStripeSync: VerifyStripeSync,
+  event: Stripe.Event,
+): Promise<Option<string>> {
+  const input = syncInputOf(event);
+  if (input.isNone()) return Option.none();
+
+  return (await verifyStripeSync.execute(input.unwrap())).getValue();
 }

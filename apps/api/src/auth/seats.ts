@@ -19,7 +19,7 @@ export function createSeatCap(deps: Pick<AuthDeps, "entitlements" | "queries">):
      * concurrent provisionings cannot both take the last seat.
      */
     async seatCapFor(orgId) {
-      const view = await deps.entitlements.getEntitlements(orgId);
+      const view = (await deps.entitlements.execute({ organizationId: orgId })).getValue();
       if (ambientTransaction().isSome()) await deps.queries.lockSeatsOf(orgId);
       const activeMembers = await deps.queries.countActiveMembers(orgId);
       return {

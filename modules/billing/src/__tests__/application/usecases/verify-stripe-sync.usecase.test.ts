@@ -9,7 +9,7 @@ import type {
 import type { IStripeEventGateway } from "../../../application/ports/services/stripe-event-gateway.port";
 import type { IListConfiguredPriceIdsQuery } from "../../../application/queries/list-configured-price-ids.query";
 import { VerifyStripeSyncUseCase } from "../../../application/usecases/verify-stripe-sync/verify-stripe-sync.usecase";
-import { StripeSyncVerifier } from "../../../infra/adapters/stripe-sync-verifier.adapter";
+import { syncMismatchOf } from "../../../infra/adapters/stripe-sync-event.adapter";
 
 const ACTIVE = { status: "active", cancelAtPeriodEnd: false };
 
@@ -51,25 +51,26 @@ function setup(
   const priceIds = mockPort<IListConfiguredPriceIdsQuery>();
   priceIds.execute.mockResolvedValue(Result.ok([OUR_PRICE]));
 
-  const verifier = new StripeSyncVerifier(new VerifyStripeSyncUseCase(store, gateway, priceIds));
+  const useCase = new VerifyStripeSyncUseCase(store, gateway, priceIds);
+  const check = (event: Stripe.Event) => syncMismatchOf(useCase, event);
 
-  return { store, gateway, verifier };
+  return { store, gateway, check };
 }
 
-describe("StripeSyncVerifier over VerifyStripeSyncUseCase", () => {
+describe("VerifyStripeSyncUseCase fed by a Stripe event", () => {
   it("has nothing to say when the row holds what the event carries", async () => {
-    const { verifier, gateway } = setup(ACTIVE);
+    const { check, gateway } = setup(ACTIVE);
 
-    const mismatch = await verifier.check(updatedTo("active"));
+    const mismatch = await check(updatedTo("active"));
 
     expect(mismatch.isNone()).toBe(true);
     expect(gateway.currentSubscription).not.toHaveBeenCalled();
   });
 
   it("reports the swallowed sync: the row differs from the event and from Stripe today", async () => {
-    const { verifier } = setup(ACTIVE, { status: "canceled", cancelAtPeriodEnd: false });
+    const { check } = setup(ACTIVE, { status: "canceled", cancelAtPeriodEnd: false });
 
-    const mismatch = await verifier.check(updatedTo("canceled"));
+    const mismatch = await check(updatedTo("canceled"));
 
     expect(mismatch.unwrap()).toContain("active");
     expect(mismatch.unwrap()).toContain("canceled");
@@ -77,19 +78,17 @@ describe("StripeSyncVerifier over VerifyStripeSyncUseCase", () => {
 
   it("raises no alarm for a stale event: the row already holds Stripe's current state", async () => {
     const current = { status: "canceled", cancelAtPeriodEnd: false };
-    const { verifier } = setup(current, current);
+    const { check } = setup(current, current);
 
-    const mismatch = await verifier.check(updatedTo("active"));
+    const mismatch = await check(updatedTo("active"));
 
     expect(mismatch.isNone()).toBe(true);
   });
 
   it("expects a deleted subscription to read canceled", async () => {
-    const { verifier } = setup(ACTIVE, { status: "canceled", cancelAtPeriodEnd: false });
+    const { check } = setup(ACTIVE, { status: "canceled", cancelAtPeriodEnd: false });
 
-    const mismatch = await verifier.check(
-      eventOf("customer.subscription.deleted", subscriptionObject()),
-    );
+    const mismatch = await check(eventOf("customer.subscription.deleted", subscriptionObject()));
 
     expect(mismatch.isSome()).toBe(true);
   });
@@ -103,8 +102,8 @@ describe("StripeSyncVerifier over VerifyStripeSyncUseCase", () => {
     const incomplete = setup({ status: "incomplete", cancelAtPeriodEnd: false });
     const missing = setup(null);
 
-    expect((await incomplete.verifier.check(created)).isNone()).toBe(true);
-    expect((await missing.verifier.check(created)).isSome()).toBe(true);
+    expect((await incomplete.check(created)).isNone()).toBe(true);
+    expect((await missing.check(created)).isSome()).toBe(true);
     expect(incomplete.store.findSyncState).toHaveBeenCalledWith({
       stripeSubscriptionId: "sub_1",
       localId: Option.some("local-1"),
@@ -116,31 +115,29 @@ describe("StripeSyncVerifier over VerifyStripeSyncUseCase", () => {
       eventOf("customer.subscription.created", subscriptionObject(price));
     const deleted = eventOf("customer.subscription.deleted", subscriptionObject("price_other"));
 
-    expect((await setup(null).verifier.check(created("price_other"))).isNone()).toBe(true);
-    expect((await setup(null).verifier.check(deleted)).isNone()).toBe(true);
-    expect((await setup(null, ACTIVE, false).verifier.check(created(OUR_PRICE))).isNone()).toBe(
-      true,
-    );
+    expect((await setup(null).check(created("price_other"))).isNone()).toBe(true);
+    expect((await setup(null).check(deleted)).isNone()).toBe(true);
+    expect((await setup(null, ACTIVE, false).check(created(OUR_PRICE))).isNone()).toBe(true);
   });
 
   it("still reports a missing row for a known customer on a configured plan", async () => {
     const deleted = eventOf("customer.subscription.deleted", subscriptionObject());
 
-    expect((await setup(null).verifier.check(deleted)).isSome()).toBe(true);
+    expect((await setup(null).check(deleted)).isSome()).toBe(true);
   });
 
   it("leaves a missing row to the created event when an update arrives before it", async () => {
-    const { verifier } = setup(null);
+    const { check } = setup(null);
 
-    const mismatch = await verifier.check(updatedTo("active"));
+    const mismatch = await check(updatedTo("active"));
 
     expect(mismatch.isNone()).toBe(true);
   });
 
   it("reports a completed checkout whose subscription never landed", async () => {
-    const { verifier } = setup(null);
+    const { check } = setup(null);
 
-    const mismatch = await verifier.check(
+    const mismatch = await check(
       eventOf("checkout.session.completed", {
         mode: "subscription",
         subscription: "sub_1",
@@ -153,9 +150,9 @@ describe("StripeSyncVerifier over VerifyStripeSyncUseCase", () => {
   });
 
   it("leaves a checkout the plugin does not handle alone", async () => {
-    const { verifier, store } = setup(null);
+    const { check, store } = setup(null);
 
-    const mismatch = await verifier.check(
+    const mismatch = await check(
       eventOf("checkout.session.completed", { mode: "payment", subscription: null, metadata: {} }),
     );
 
@@ -164,20 +161,20 @@ describe("StripeSyncVerifier over VerifyStripeSyncUseCase", () => {
   });
 
   it("records an unverifiable sync rather than claiming it worked", async () => {
-    const { verifier, store } = setup(ACTIVE);
+    const { check, store } = setup(ACTIVE);
     store.findSyncState.mockImplementation(async () =>
       Result.fail({ code: "BILLING_PROVIDER_FAILURE", message: "db down" }),
     );
 
-    const mismatch = await verifier.check(updatedTo("active"));
+    const mismatch = await check(updatedTo("active"));
 
     expect(mismatch.isSome()).toBe(true);
   });
 
   it("says nothing about an event that only means received", async () => {
-    const { verifier, store } = setup(null);
+    const { check, store } = setup(null);
 
-    const mismatch = await verifier.check(eventOf("invoice.paid", { id: "in_1" }));
+    const mismatch = await check(eventOf("invoice.paid", { id: "in_1" }));
 
     expect(mismatch.isNone()).toBe(true);
     expect(store.findSyncState).not.toHaveBeenCalled();

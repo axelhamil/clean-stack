@@ -1,8 +1,9 @@
-import type { IEntitlementsReader } from "@modules/billing/ports/entitlements-reader";
 import type { IStripeEventStore } from "@modules/billing/ports/stripe-event";
+import type { IGetEntitlementsQuery } from "@modules/billing/queries/get-entitlements";
+import type { IGetPlanCatalogQuery } from "@modules/billing/queries/get-plan-catalog";
 import { ENTITLEMENTS } from "@modules/billing/rules/entitlements";
-import type { IProfileStore } from "@modules/profile/ports/profile";
-import { type ILogger, type IUnitOfWork, NoOpInstrumentation } from "@packages/ddd-kit";
+import type { IGetLocaleByEmailQuery } from "@modules/profile/queries/get-locale-by-email";
+import { type ILogger, type IUnitOfWork, NoOpInstrumentation, Result } from "@packages/ddd-kit";
 import type { IEmailService } from "@packages/email/email.port";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { mockPort } from "@packages/test/bun";
@@ -11,11 +12,9 @@ import Stripe from "stripe";
 import type { AuthDeps, AuthSettings } from "../auth/deps";
 import type {
   IConsentReconciler,
-  IPlanCatalog,
   IPolicyAcceptance,
   ISecuritySignals,
   IStaffSessionEnder,
-  IStripeSyncCheck,
 } from "../auth/ports";
 import { type AuthQueries, createAuthQueries } from "../auth/queries";
 import type { OutermostUnitOfWork } from "../auth/unit-of-work-adapter";
@@ -47,21 +46,23 @@ export function outermostUnitOfWork(unitOfWork: IUnitOfWork): IUnitOfWork & Oute
   };
 }
 
-function freePlanEntitlements(): IEntitlementsReader {
-  const entitlements = mockPort<IEntitlementsReader>();
-  entitlements.getEntitlements.mockImplementation(async () => ({
-    ...ENTITLEMENTS.free,
-    tier: "free",
-    status: "free",
-    hasSubscription: false,
-  }));
+function freePlanEntitlements(): IGetEntitlementsQuery {
+  const entitlements = mockPort<IGetEntitlementsQuery>();
+  entitlements.execute.mockImplementation(async () =>
+    Result.ok({
+      ...ENTITLEMENTS.free,
+      tier: "free",
+      status: "free",
+      hasSubscription: false,
+    }),
+  );
 
   return entitlements;
 }
 
-function emptyPlanCatalog(): IPlanCatalog {
-  const plans = mockPort<IPlanCatalog>();
-  plans.getCatalog.mockImplementation(async () => []);
+function emptyPlanCatalog(): IGetPlanCatalogQuery {
+  const plans = mockPort<IGetPlanCatalogQuery>();
+  plans.execute.mockImplementation(async () => Result.ok([]));
 
   return plans;
 }
@@ -75,7 +76,7 @@ export function fakeAuthDeps(overrides: Partial<AuthDeps> = {}): AuthDeps {
     uow: outermostUnitOfWork(mockUnitOfWork().unitOfWork),
     outbox: mockPort<IOutboxRepository>(),
     email: mockPort<IEmailService>(),
-    profiles: mockPort<IProfileStore>(),
+    profiles: mockPort<IGetLocaleByEmailQuery>(),
     rateLimiter: mockPort<IRateLimiter>(),
     disposableEmail: mockPort<IDisposableEmailService>(),
     passwordBreach: mockPort<IPasswordBreachService>(),
@@ -84,7 +85,7 @@ export function fakeAuthDeps(overrides: Partial<AuthDeps> = {}): AuthDeps {
     stripeEvents: mockPort<IStripeEventStore>(),
     stripeClient: new Stripe("sk_test_fake"),
     plans: emptyPlanCatalog(),
-    stripeSync: mockPort<IStripeSyncCheck>(),
+    stripeSync: mockPort<AuthDeps["stripeSync"]>(),
     policies: mockPort<IPolicyAcceptance>(),
     consents: mockPort<IConsentReconciler>(),
     staffSessions: mockPort<IStaffSessionEnder>(),

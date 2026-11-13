@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import type { IEntitlementsReader } from "@modules/billing/ports/entitlements-reader";
+import type { IGetEntitlementsQuery } from "@modules/billing/queries/get-entitlements";
 import { ENTITLEMENTS, type Feature } from "@modules/billing/rules/entitlements";
 import { Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
@@ -23,14 +23,16 @@ const clearExpiredBan = mock(async () => false);
 const { createAuth } = await import("../auth/create-auth");
 const securitySignals = mockPort<ISecuritySignals>();
 securitySignals.refuseDenied.mockImplementation(async () => Result.ok());
-const entitlements = mockPort<IEntitlementsReader>();
-entitlements.getEntitlements.mockImplementation(async () => ({
-  ...ENTITLEMENTS.free,
-  tier: "free",
-  status: "free",
-  hasSubscription: false,
-  features: entitledFeatures,
-}));
+const entitlements = mockPort<IGetEntitlementsQuery>();
+entitlements.execute.mockImplementation(async () =>
+  Result.ok({
+    ...ENTITLEMENTS.free,
+    tier: "free",
+    status: "free",
+    hasSubscription: false,
+    features: entitledFeatures,
+  }),
+);
 const auth = createAuth(
   fakeAuthDeps({
     queries: fakeAuthQueries({

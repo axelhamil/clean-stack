@@ -1,6 +1,8 @@
-import type { IEntitlementsReader } from "@modules/billing/ports/entitlements-reader";
+import type { VerifyStripeSync } from "@modules/billing/adapters/stripe-sync-event";
 import type { IStripeEventStore } from "@modules/billing/ports/stripe-event";
-import type { IProfileStore } from "@modules/profile/ports/profile";
+import type { IGetEntitlementsQuery } from "@modules/billing/queries/get-entitlements";
+import type { IGetPlanCatalogQuery } from "@modules/billing/queries/get-plan-catalog";
+import type { IGetLocaleByEmailQuery } from "@modules/profile/queries/get-locale-by-email";
 import type { ILogger, IUnitOfWork } from "@packages/ddd-kit";
 import type { IEmailService } from "@packages/email/email.port";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
@@ -12,11 +14,9 @@ import type { ITotpVerifier } from "../shared/ports/totp-verifier.port";
 import type { VersionedAuthSecret } from "./auth-secrets";
 import type {
   IConsentReconciler,
-  IPlanCatalog,
   IPolicyAcceptance,
   ISecuritySignals,
   IStaffSessionEnder,
-  IStripeSyncCheck,
 } from "./ports";
 import type { AuthQueries } from "./queries";
 import type { OutermostUnitOfWork } from "./unit-of-work-adapter";
@@ -41,16 +41,16 @@ export interface AuthDeps {
   uow: IUnitOfWork & OutermostUnitOfWork;
   outbox: IOutboxRepository;
   email: IEmailService;
-  profiles: IProfileStore;
+  profiles: IGetLocaleByEmailQuery;
   rateLimiter: IRateLimiter;
   disposableEmail: IDisposableEmailService;
   passwordBreach: IPasswordBreachService;
   totp: ITotpVerifier;
-  entitlements: IEntitlementsReader;
+  entitlements: IGetEntitlementsQuery;
   stripeEvents: IStripeEventStore;
   stripeClient: Stripe;
-  plans: IPlanCatalog;
-  stripeSync: IStripeSyncCheck;
+  plans: IGetPlanCatalogQuery;
+  stripeSync: VerifyStripeSync;
   policies: IPolicyAcceptance;
   consents: IConsentReconciler;
   staffSessions: IStaffSessionEnder;

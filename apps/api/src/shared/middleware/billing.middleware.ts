@@ -31,16 +31,20 @@ export function assertQuota(used: number, limit: number | null): void {
   if (!hasQuotaRemaining(used, limit)) throw quotaExceededError(used, limit);
 }
 
+async function entitlementsOf(organizationId: string): Promise<EntitlementsView> {
+  return (await di.IGetEntitlementsQuery.execute({ organizationId })).getValue();
+}
+
 export const requireFeature = (flag: Feature) =>
   createMiddleware<{ Variables: { orgId: string } }>(async (c, next) => {
-    const view = await di.EntitlementsService.getEntitlements(c.get("orgId"));
+    const view = await entitlementsOf(c.get("orgId"));
     assertFeature(view, flag);
     await next();
   });
 
 export const requirePlan = (minTier: Tier) =>
   createMiddleware<{ Variables: { orgId: string } }>(async (c, next) => {
-    const view = await di.EntitlementsService.getEntitlements(c.get("orgId"));
+    const view = await entitlementsOf(c.get("orgId"));
     assertPlan(view, minTier);
     await next();
   });
@@ -66,7 +70,7 @@ async function emitQuotaExceeded(
 export const requireQuota = (key: QuotaKey, readUsage: (c: Context) => Promise<number>) =>
   createMiddleware<{ Variables: { orgId: string; user: { id: string } } }>(async (c, next) => {
     const orgId = c.get("orgId");
-    const view = await di.EntitlementsService.getEntitlements(orgId);
+    const view = await entitlementsOf(orgId);
     const limit = view.quotas[key];
     const used = await readUsage(c);
     if (limit !== null && used >= limit) {

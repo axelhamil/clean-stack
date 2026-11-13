@@ -1,4 +1,4 @@
-import type { IProfileStore } from "@modules/profile/ports/profile";
+import type { IGetLocaleQuery } from "@modules/profile/queries/get-locale";
 import { type EventHandler, type IDomainEvent, onEvent } from "@packages/ddd-kit";
 import type { IEmailService } from "@packages/email/email.port";
 import { EventTypes, PayloadByEventType } from "@packages/events";
@@ -9,7 +9,7 @@ import { localeForUser } from "../locale-for-user";
 
 interface BackupCodeUsedNotifierDeps {
   IEmailService: IEmailService;
-  IProfileStore: IProfileStore;
+  IGetLocaleQuery: IGetLocaleQuery;
 }
 
 const HANDLER_NAME = "notify-backup-code-used";
@@ -21,7 +21,7 @@ export const backupCodeUsedNotifier: (deps: BackupCodeUsedNotifierDeps) => Event
   HANDLER_NAME,
   (deps: BackupCodeUsedNotifierDeps) => async (event: IDomainEvent, payload) => {
     const securityUrl = `${env.APP_URL}/settings/account`;
-    const locale = await localeForUser(deps.IProfileStore, payload.userId);
+    const locale = await localeForUser(deps.IGetLocaleQuery, payload.userId);
     return deps.IEmailService.sendTemplate(
       "backup_code_used",
       payload.email,

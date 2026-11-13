@@ -4,8 +4,7 @@ import type {
   PolicyAcceptanceRecord,
   PolicyError,
 } from "@modules/policies/ports/policy-acceptance";
-import type { Option, Result } from "@packages/ddd-kit";
-import type Stripe from "stripe";
+import type { Result } from "@packages/ddd-kit";
 import type { GeoDeniedError, VisitorGeo } from "../shared/ports/ip-geo.port";
 
 type PolicyType = PolicyAcceptanceRecord["policyType"];
@@ -24,14 +23,6 @@ export interface ISecuritySignals {
     ip: string | null;
     visitor: VisitorGeo;
   }): Promise<void>;
-}
-
-export interface IPlanCatalog {
-  getCatalog(): Promise<readonly { tier: string; priceId: string | null }[]>;
-}
-
-export interface IStripeSyncCheck {
-  check(event: Stripe.Event): Promise<Option<string>>;
 }
 
 export interface IPolicyAcceptance {
