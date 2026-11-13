@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { setStaffOverrideBodySchema } from "../../../application/approved-action";
 import { listUsersQuerySchema } from "../../../infra/http/routes/admin/admin.schema";
+import { setStaffOverrideBodySchema } from "../../../infra/http/routes/staff/staff.schema";
 
 describe("listUsersQuerySchema", () => {
   it("reads banned=false as active accounts, not as banned ones", () => {

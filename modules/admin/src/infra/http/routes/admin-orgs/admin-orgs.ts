@@ -5,10 +5,13 @@ import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ISsoEnforcement } from "../../../../application/ports/services/sso-enforcement.port";
-import type { AdminQueryService } from "../../../../application/services/admin-query.service";
-import type { PlanOverrideService } from "../../../../application/services/plan-override.service";
+import type { IGetOrgQuery } from "../../../../application/queries/get-org.query";
+import type { IListOrgsQuery } from "../../../../application/queries/list-orgs.query";
+import type { IListStaffNotesQuery } from "../../../../application/queries/list-staff-notes.query";
 import { ssoEnforcementChangeNeedsStepUp } from "../../../../application/services/sso-enforcement-policy.service";
-import type { StaffNoteService } from "../../../../application/services/staff-note.service";
+import type { AddStaffNoteUseCase } from "../../../../application/usecases/add-staff-note/add-staff-note.usecase";
+import type { RevokePlanOverrideUseCase } from "../../../../application/usecases/revoke-plan-override/revoke-plan-override.usecase";
+import type { SetPlanOverrideUseCase } from "../../../../application/usecases/set-plan-override/set-plan-override.usecase";
 import { serializeStaffNote } from "../../staff-note.presenter";
 import { addStaffNoteBodySchema } from "../../staff-note.schema";
 import {
@@ -19,9 +22,12 @@ import {
 
 export interface AdminOrgRoutesDeps {
   routeGuards: RouteGuards;
-  AdminQueryService: Pick<AdminQueryService, "listOrgs" | "getOrg">;
-  PlanOverrideService: Pick<PlanOverrideService, "set" | "revoke">;
-  StaffNoteService: Pick<StaffNoteService, "list" | "add">;
+  IListOrgsQuery: IListOrgsQuery;
+  IGetOrgQuery: IGetOrgQuery;
+  IListStaffNotesQuery: IListStaffNotesQuery;
+  SetPlanOverrideUseCase: Pick<SetPlanOverrideUseCase, "execute">;
+  RevokePlanOverrideUseCase: Pick<RevokePlanOverrideUseCase, "execute">;
+  AddStaffNoteUseCase: Pick<AddStaffNoteUseCase, "execute">;
   AdminActionService: ISsoEnforcement;
 }
 
@@ -35,7 +41,7 @@ export function createAdminOrgRoutes(deps: AdminOrgRoutesDeps) {
       g.requireStaffPermission("orgs.read"),
       zV("query", listOrgsQuerySchema),
       async (c) => {
-        const result = await deps.AdminQueryService.listOrgs(c.req.valid("query"));
+        const result = await deps.IListOrgsQuery.execute(c.req.valid("query"));
         if (result.isFailure) throw new AppErrorException(result.getError());
         const page = result.getValue();
         return c.json({
@@ -53,7 +59,7 @@ export function createAdminOrgRoutes(deps: AdminOrgRoutesDeps) {
       g.requireStaffPermission("orgs.read"),
       zV("param", idParamSchema),
       async (c) => {
-        const result = await deps.AdminQueryService.getOrg(c.req.valid("param").id);
+        const result = await deps.IGetOrgQuery.execute({ organizationId: c.req.valid("param").id });
         if (result.isFailure) throw new AppErrorException(result.getError());
         const found = result.getValue();
         if (found.isNone()) throw new HTTPException(404, { message: "ADMIN_ORG_NOT_FOUND" });
@@ -80,7 +86,7 @@ export function createAdminOrgRoutes(deps: AdminOrgRoutesDeps) {
       zV("param", idParamSchema),
       async (c) => {
         const { tier, expiresAt, note } = c.req.valid("json");
-        const result = await deps.PlanOverrideService.set({
+        const result = await deps.SetPlanOverrideUseCase.execute({
           actorUserId: g.currentUserId(c),
           organizationId: c.req.valid("param").id,
           tier,
@@ -99,7 +105,7 @@ export function createAdminOrgRoutes(deps: AdminOrgRoutesDeps) {
       g.requireStepUp,
       zV("param", idParamSchema),
       async (c) => {
-        const result = await deps.PlanOverrideService.revoke({
+        const result = await deps.RevokePlanOverrideUseCase.execute({
           actorUserId: g.currentUserId(c),
           organizationId: c.req.valid("param").id,
         });
@@ -114,7 +120,7 @@ export function createAdminOrgRoutes(deps: AdminOrgRoutesDeps) {
       g.requireStaffPermission("orgs.read"),
       zV("param", idParamSchema),
       async (c) => {
-        const result = await deps.StaffNoteService.list({
+        const result = await deps.IListStaffNotesQuery.execute({
           type: "org",
           id: c.req.valid("param").id,
         });
@@ -130,7 +136,7 @@ export function createAdminOrgRoutes(deps: AdminOrgRoutesDeps) {
       zV("json", addStaffNoteBodySchema),
       zV("param", idParamSchema),
       async (c) => {
-        const result = await deps.StaffNoteService.add({
+        const result = await deps.AddStaffNoteUseCase.execute({
           actorUserId: g.currentUserId(c),
           subject: { type: "org", id: c.req.valid("param").id },
           body: c.req.valid("json").body,

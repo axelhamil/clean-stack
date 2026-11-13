@@ -1,28 +1,34 @@
-import { AppErrorException, Option } from "@packages/ddd-kit";
+import { AppErrorException } from "@packages/ddd-kit";
 import { idParamSchema } from "@packages/http/id-param";
 import type { RouteEnv, RouteGuards } from "@packages/http/route-guards";
 import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
+import type { IStepUpValidityQuery } from "../../../../application/queries/step-up-validity.query";
+import type { StaffService } from "../../../../application/services/staff.service";
+import type { StaffEnv } from "../../../../application/services/staff-access";
+import type { ChangeStaffRoleUseCase } from "../../../../application/usecases/change-staff-role/change-staff-role.usecase";
+import type { RemoveStaffOverrideUseCase } from "../../../../application/usecases/remove-staff-override/remove-staff-override.usecase";
+import type { RevokeStaffUseCase } from "../../../../application/usecases/revoke-staff/revoke-staff.usecase";
+import type { SetStaffOverrideUseCase } from "../../../../application/usecases/set-staff-override/set-staff-override.usecase";
+import type { VerifyStepUpUseCase } from "../../../../application/usecases/verify-step-up/verify-step-up.usecase";
+import { gatedResponse } from "../../approval-gate.response";
 import {
   setStaffOverrideBodySchema,
   setStaffRoleBodySchema,
-} from "../../../../application/approved-action";
-import type { ApprovalService } from "../../../../application/services/approval.service";
-import type { StaffService } from "../../../../application/services/staff.service";
-import type { StaffEnv } from "../../../../application/services/staff-access";
-import type { StepUpService } from "../../../../application/services/step-up.service";
-import { gateOr202 } from "../../approval-gate.response";
-import { staffOverrideParamSchema, stepUpBodySchema } from "./staff.schema";
+  staffOverrideParamSchema,
+  stepUpBodySchema,
+} from "./staff.schema";
 
 export interface AdminStaffRoutesDeps {
   routeGuards: RouteGuards;
   staffSettings: Pick<StaffEnv, "PLATFORM_ADMIN_REQUIRE_MFA">;
-  StepUpService: Pick<StepUpService, "validUntil" | "verify">;
-  ApprovalService: Pick<ApprovalService, "gate">;
-  StaffService: Pick<
-    StaffService,
-    "list" | "assignRole" | "revoke" | "listOverrides" | "setOverride" | "removeOverride"
-  >;
+  IStepUpValidityQuery: IStepUpValidityQuery;
+  VerifyStepUpUseCase: Pick<VerifyStepUpUseCase, "execute">;
+  StaffService: Pick<StaffService, "list" | "listOverrides">;
+  ChangeStaffRoleUseCase: Pick<ChangeStaffRoleUseCase, "execute">;
+  RevokeStaffUseCase: Pick<RevokeStaffUseCase, "execute">;
+  SetStaffOverrideUseCase: Pick<SetStaffOverrideUseCase, "execute">;
+  RemoveStaffOverrideUseCase: Pick<RemoveStaffOverrideUseCase, "execute">;
 }
 
 export function createAdminStaffRoutes(deps: AdminStaffRoutesDeps) {
@@ -32,7 +38,7 @@ export function createAdminStaffRoutes(deps: AdminStaffRoutesDeps) {
     .get("/me", g.requireAuth, g.requireStaff, async (c) => {
       const session = g.currentSession(c);
       const staff = g.currentStaff(c);
-      const stepUp = await deps.StepUpService.validUntil(session.id);
+      const stepUp = await deps.IStepUpValidityQuery.execute({ sessionId: session.id });
       if (stepUp.isFailure) throw new AppErrorException(stepUp.getError());
 
       return c.json({
@@ -50,7 +56,7 @@ export function createAdminStaffRoutes(deps: AdminStaffRoutesDeps) {
     })
     .post("/step-up", g.requireAuth, g.requireStaff, zV("json", stepUpBodySchema), async (c) => {
       const session = g.currentSession(c);
-      const result = await deps.StepUpService.verify({
+      const result = await deps.VerifyStepUpUseCase.execute({
         userId: session.userId,
         sessionId: session.id,
         code: c.req.valid("json").code,
@@ -78,32 +84,16 @@ export function createAdminStaffRoutes(deps: AdminStaffRoutesDeps) {
       g.requireStepUp,
       zV("json", setStaffRoleBodySchema),
       zV("param", idParamSchema),
-      async (c) => {
-        const actorUserId = g.currentUserId(c);
-        const targetUserId = c.req.valid("param").id;
-        const body = c.req.valid("json");
-        const pending = gateOr202(
+      async (c) =>
+        gatedResponse(
           c,
-          await deps.ApprovalService.gate({
-            action: "staff.role_change",
-            subjectId: targetUserId,
-            params: body,
-            requestedBy: actorUserId,
-            requesterPermissions: g.currentStaff(c).permissions,
+          await deps.ChangeStaffRoleUseCase.execute({
+            actorUserId: g.currentUserId(c),
+            actorPermissions: g.currentStaff(c).permissions,
+            targetUserId: c.req.valid("param").id,
+            change: c.req.valid("json"),
           }),
-        );
-        if (pending) return pending;
-
-        const result = await deps.StaffService.assignRole({
-          actorUserId,
-          actorPermissions: g.currentStaff(c).permissions,
-          targetUserId,
-          role: body.role,
-        });
-        if (result.isFailure) throw new AppErrorException(result.getError());
-
-        return c.json({ ok: true });
-      },
+        ),
     )
     .delete(
       "/staff/:id",
@@ -111,26 +101,15 @@ export function createAdminStaffRoutes(deps: AdminStaffRoutesDeps) {
       g.requireStaffPermission("staff.manage"),
       g.requireStepUp,
       zV("param", idParamSchema),
-      async (c) => {
-        const actorUserId = g.currentUserId(c);
-        const targetUserId = c.req.valid("param").id;
-        const pending = gateOr202(
+      async (c) =>
+        gatedResponse(
           c,
-          await deps.ApprovalService.gate({
-            action: "staff.revoke",
-            subjectId: targetUserId,
-            params: {},
-            requestedBy: actorUserId,
-            requesterPermissions: g.currentStaff(c).permissions,
+          await deps.RevokeStaffUseCase.execute({
+            actorUserId: g.currentUserId(c),
+            actorPermissions: g.currentStaff(c).permissions,
+            targetUserId: c.req.valid("param").id,
           }),
-        );
-        if (pending) return pending;
-
-        const result = await deps.StaffService.revoke({ actorUserId, targetUserId });
-        if (result.isFailure) throw new AppErrorException(result.getError());
-
-        return c.json({ ok: true });
-      },
+        ),
     )
     .get(
       "/staff/:id/overrides",
@@ -159,34 +138,16 @@ export function createAdminStaffRoutes(deps: AdminStaffRoutesDeps) {
       g.requireStepUp,
       zV("json", setStaffOverrideBodySchema),
       zV("param", idParamSchema),
-      async (c) => {
-        const actorUserId = g.currentUserId(c);
-        const targetUserId = c.req.valid("param").id;
-        const body = c.req.valid("json");
-        const pending = gateOr202(
+      async (c) =>
+        gatedResponse(
           c,
-          await deps.ApprovalService.gate({
-            action: "staff.permission_override",
-            subjectId: targetUserId,
-            params: { op: "set", ...body },
-            requestedBy: actorUserId,
-            requesterPermissions: g.currentStaff(c).permissions,
+          await deps.SetStaffOverrideUseCase.execute({
+            actorUserId: g.currentUserId(c),
+            actorPermissions: g.currentStaff(c).permissions,
+            targetUserId: c.req.valid("param").id,
+            override: c.req.valid("json"),
           }),
-        );
-        if (pending) return pending;
-
-        const result = await deps.StaffService.setOverride({
-          actorUserId,
-          actorPermissions: g.currentStaff(c).permissions,
-          targetUserId,
-          permission: body.permission,
-          effect: body.effect,
-          expiresAt: Option.fromNullable(body.expiresAt).map((iso) => new Date(iso)),
-        });
-        if (result.isFailure) throw new AppErrorException(result.getError());
-
-        return c.json({ ok: true });
-      },
+        ),
     )
     .delete(
       "/staff/:id/overrides/:overrideId",
@@ -195,30 +156,17 @@ export function createAdminStaffRoutes(deps: AdminStaffRoutesDeps) {
       g.requireStepUp,
       zV("param", staffOverrideParamSchema),
       async (c) => {
-        const actorUserId = g.currentUserId(c);
-        const targetUserId = c.req.valid("param").id;
-        const overrideId = c.req.valid("param").overrideId;
-        const pending = gateOr202(
+        const { id, overrideId } = c.req.valid("param");
+
+        return gatedResponse(
           c,
-          await deps.ApprovalService.gate({
-            action: "staff.permission_override",
-            subjectId: targetUserId,
-            params: { op: "revoke", overrideId },
-            requestedBy: actorUserId,
-            requesterPermissions: g.currentStaff(c).permissions,
+          await deps.RemoveStaffOverrideUseCase.execute({
+            actorUserId: g.currentUserId(c),
+            actorPermissions: g.currentStaff(c).permissions,
+            targetUserId: id,
+            overrideId,
           }),
         );
-        if (pending) return pending;
-
-        const result = await deps.StaffService.removeOverride({
-          actorUserId,
-          actorPermissions: g.currentStaff(c).permissions,
-          targetUserId,
-          overrideId,
-        });
-        if (result.isFailure) throw new AppErrorException(result.getError());
-
-        return c.json({ ok: true });
       },
     );
 }

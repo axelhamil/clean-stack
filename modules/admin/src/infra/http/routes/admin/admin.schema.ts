@@ -1,5 +1,6 @@
 import { timeIdCursorSchema } from "@packages/http/time-id-cursor";
 import { z } from "zod";
+import { banParamsSchema } from "../../../../application/approved-action";
 
 export const listUsersQuerySchema = z.object({
   search: z.string().trim().min(1).optional(),
@@ -11,3 +12,5 @@ export const listUsersQuerySchema = z.object({
   cursor: timeIdCursorSchema.optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
+
+export const banUserBodySchema = banParamsSchema;

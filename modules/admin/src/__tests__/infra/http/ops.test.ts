@@ -6,27 +6,36 @@ import type { AdminRoutesDeps } from "../../fixtures/mount-admin-routes";
 
 const AT = new Date("2026-01-02T03:04:05.000Z");
 
-let ops = mockPort<AdminRoutesDeps["OpsService"]>();
-let replays = mockPort<AdminRoutesDeps["StripeReplayService"]>();
+let deadLetters = mockPort<AdminRoutesDeps["IListDeadLettersQuery"]>();
+let sweeps = mockPort<AdminRoutesDeps["IListSweepRunsQuery"]>();
+let stripeEvents = mockPort<AdminRoutesDeps["IListStripeEventsQuery"]>();
+let requeue = mockPort<AdminRoutesDeps["RequeueOutboxUseCase"]>();
+let replays = mockPort<AdminRoutesDeps["ReplayStripeEventUseCase"]>();
 let auth = mockPort<AdminRoutesDeps["IAuthProvider"]>();
 
 beforeEach(() => {
-  ops = mockPort<AdminRoutesDeps["OpsService"]>();
-  replays = mockPort<AdminRoutesDeps["StripeReplayService"]>();
+  deadLetters = mockPort<AdminRoutesDeps["IListDeadLettersQuery"]>();
+  sweeps = mockPort<AdminRoutesDeps["IListSweepRunsQuery"]>();
+  stripeEvents = mockPort<AdminRoutesDeps["IListStripeEventsQuery"]>();
+  requeue = mockPort<AdminRoutesDeps["RequeueOutboxUseCase"]>();
+  replays = mockPort<AdminRoutesDeps["ReplayStripeEventUseCase"]>();
   auth = mockPort<AdminRoutesDeps["IAuthProvider"]>();
 });
 
 const app = () =>
   adminApp({
-    OpsService: ops,
-    StripeReplayService: replays,
+    IListDeadLettersQuery: deadLetters,
+    IListSweepRunsQuery: sweeps,
+    IListStripeEventsQuery: stripeEvents,
+    RequeueOutboxUseCase: requeue,
+    ReplayStripeEventUseCase: replays,
     IAuthProvider: auth,
     isReplayableStripeEvent: (type) => type === "invoice.paid",
   });
 
 describe("GET /admin/ops/dead-letters", () => {
   it("lists dead outbox events and the dead queue counts", async () => {
-    ops.deadLetters.mockResolvedValue(
+    deadLetters.execute.mockResolvedValue(
       Result.ok({
         outbox: {
           total: 1,
@@ -53,26 +62,26 @@ describe("GET /admin/ops/dead-letters", () => {
 
 describe("POST /admin/ops/outbox/requeue", () => {
   it("requeues the given ids as the actor and returns the count", async () => {
-    ops.requeue.mockResolvedValue(Result.ok({ requeued: 2 }));
+    requeue.execute.mockResolvedValue(Result.ok({ requeued: 2 }));
 
     const res = await send(app(), "POST", "/admin/ops/outbox/requeue", { ids: ["e-1", "e-2"] });
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ requeued: 2 });
-    expect(ops.requeue).toHaveBeenCalledWith({ actorUserId: ACTOR_ID, ids: ["e-1", "e-2"] });
+    expect(requeue.execute).toHaveBeenCalledWith({ actorUserId: ACTOR_ID, ids: ["e-1", "e-2"] });
   });
 
   it("refuses an empty list", async () => {
     const res = await send(app(), "POST", "/admin/ops/outbox/requeue", { ids: [] });
 
     expect(res.status).toBe(400);
-    expect(ops.requeue).not.toHaveBeenCalled();
+    expect(requeue.execute).not.toHaveBeenCalled();
   });
 });
 
 describe("GET /admin/ops/sweeps", () => {
   it("lists the last run of each sweep with its lateness", async () => {
-    ops.sweeps.mockResolvedValue(
+    sweeps.execute.mockResolvedValue(
       Result.ok([
         {
           label: "sweep-x",
@@ -99,7 +108,7 @@ describe("GET /admin/ops/sweeps", () => {
 
 describe("GET /admin/ops/stripe-events", () => {
   it("marks each event replayable or not by its type", async () => {
-    replays.list.mockResolvedValue(
+    stripeEvents.execute.mockResolvedValue(
       Result.ok({
         configured: true,
         items: [
@@ -156,7 +165,7 @@ describe("POST /admin/ops/stripe-events/:id/replay", () => {
   it("replays the event as the actor through the auth webhook handler", async () => {
     const delivered = new Response(null, { status: 200 });
     auth.handle.mockResolvedValue(delivered);
-    replays.replay.mockImplementation(async ({ handler }) => {
+    replays.execute.mockImplementation(async ({ handler }) => {
       const answered = await handler(new Request("https://example.test/webhook"));
 
       return answered === delivered
@@ -170,7 +179,7 @@ describe("POST /admin/ops/stripe-events/:id/replay", () => {
     const res = await send(app(), "POST", "/admin/ops/stripe-events/evt_1/replay");
 
     expect(res.status).toBe(200);
-    expect(replays.replay).toHaveBeenCalledWith(
+    expect(replays.execute).toHaveBeenCalledWith(
       expect.objectContaining({ actorUserId: ACTOR_ID, stripeEventId: "evt_1" }),
     );
     expect(auth.handle).toHaveBeenCalledTimes(1);

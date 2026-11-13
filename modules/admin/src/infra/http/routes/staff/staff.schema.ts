@@ -1,5 +1,9 @@
 import { idParamSchema, idSchema } from "@packages/http/id-param";
 import { z } from "zod";
+import {
+  overrideParamsSchema,
+  roleChangeParamsSchema,
+} from "../../../../application/approved-action";
 
 export const stepUpBodySchema = z.object({
   code: z
@@ -9,3 +13,7 @@ export const stepUpBodySchema = z.object({
 });
 
 export const staffOverrideParamSchema = idParamSchema.and(z.object({ overrideId: idSchema }));
+
+export const setStaffRoleBodySchema = roleChangeParamsSchema;
+
+export const setStaffOverrideBodySchema = overrideParamsSchema;

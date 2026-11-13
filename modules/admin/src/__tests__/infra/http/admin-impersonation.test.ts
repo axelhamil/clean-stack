@@ -35,6 +35,9 @@ mock.module("@packages/outbox/event-emitter", () => ({
 const { AdminModerationService } = await import(
   "../../../application/services/admin-moderation.service"
 );
+const { StartImpersonationUseCase } = await import(
+  "../../../application/usecases/start-impersonation/start-impersonation.usecase"
+);
 const { createAdminImpersonationRoutes } = await import(
   "../../../infra/http/routes/admin-impersonation/admin-impersonation"
 );
@@ -80,10 +83,12 @@ const routes = createAdminImpersonationRoutes({
     impersonateUser: mockImpersonateUser,
     stopImpersonating: mockStopImpersonating,
   },
-  AdminModerationService: new AdminModerationService(
-    mockPort<IAdminUserStore>(),
-    mockPort<IOutboxRepository>(),
-    unitOfWork,
+  StartImpersonationUseCase: new StartImpersonationUseCase(
+    new AdminModerationService(
+      mockPort<IAdminUserStore>(),
+      mockPort<IOutboxRepository>(),
+      unitOfWork,
+    ),
   ),
 });
 

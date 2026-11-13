@@ -1,7 +1,14 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
 import { mockPort } from "@packages/test/bun";
-import type { AdminUserDetail } from "../../../application/services/admin-query.service";
+import type { AdminUserDetail } from "../../../application/queries/get-user.query";
+import type { AdminModerationService } from "../../../application/services/admin-moderation.service";
+import type { ApprovalService } from "../../../application/services/approval.service";
+import type { StaffService } from "../../../application/services/staff.service";
+import { BanUserUseCase } from "../../../application/usecases/ban-user/ban-user.usecase";
+import { ResetUserPasswordUseCase } from "../../../application/usecases/reset-user-password/reset-user-password.usecase";
+import { RevokeUserSessionsUseCase } from "../../../application/usecases/revoke-user-sessions/revoke-user-sessions.usecase";
+import { UnbanUserUseCase } from "../../../application/usecases/unban-user/unban-user.usecase";
 import { ACTOR_ID, adminApp, errorCodeOf, MANAGER, send } from "../../fixtures/http-app";
 import type { AdminRoutesDeps } from "../../fixtures/mount-admin-routes";
 
@@ -29,21 +36,27 @@ const USER: AdminUserDetail = {
   memberships: [{ organizationId: "org-1", organizationName: "Acme", role: "owner" }],
 };
 
-let queries = mockPort<AdminRoutesDeps["AdminQueryService"]>();
-let moderation = mockPort<AdminRoutesDeps["AdminModerationService"]>();
-let approvals = mockPort<AdminRoutesDeps["ApprovalService"]>();
-let staff = mockPort<AdminRoutesDeps["StaffService"]>();
-let notes = mockPort<AdminRoutesDeps["StaffNoteService"]>();
+let listUsers = mockPort<AdminRoutesDeps["IListUsersQuery"]>();
+let getUser = mockPort<AdminRoutesDeps["IGetUserQuery"]>();
+let listNotes = mockPort<AdminRoutesDeps["IListStaffNotesQuery"]>();
+let addNote = mockPort<AdminRoutesDeps["AddStaffNoteUseCase"]>();
+let moderation =
+  mockPort<Pick<AdminModerationService, "ban" | "unban" | "resetPassword" | "revokeSessions">>();
+let approvals = mockPort<Pick<ApprovalService, "gate">>();
+let staff = mockPort<Pick<StaffService, "banIsSensitive" | "moderate" | "moderateBan">>();
 let auth = mockPort<AdminRoutesDeps["IAuthProvider"]>();
 
 beforeEach(() => {
-  queries = mockPort<AdminRoutesDeps["AdminQueryService"]>();
-  moderation = mockPort<AdminRoutesDeps["AdminModerationService"]>();
-  approvals = mockPort<AdminRoutesDeps["ApprovalService"]>();
-  staff = mockPort<AdminRoutesDeps["StaffService"]>();
-  notes = mockPort<AdminRoutesDeps["StaffNoteService"]>();
+  listUsers = mockPort<AdminRoutesDeps["IListUsersQuery"]>();
+  getUser = mockPort<AdminRoutesDeps["IGetUserQuery"]>();
+  listNotes = mockPort<AdminRoutesDeps["IListStaffNotesQuery"]>();
+  addNote = mockPort<AdminRoutesDeps["AddStaffNoteUseCase"]>();
+  moderation =
+    mockPort<Pick<AdminModerationService, "ban" | "unban" | "resetPassword" | "revokeSessions">>();
+  approvals = mockPort<Pick<ApprovalService, "gate">>();
+  staff = mockPort<Pick<StaffService, "banIsSensitive" | "moderate" | "moderateBan">>();
   auth = mockPort<AdminRoutesDeps["IAuthProvider"]>();
-  queries.getUser.mockResolvedValue(Result.ok(Option.some(USER)));
+  getUser.execute.mockResolvedValue(Result.ok(Option.some(USER)));
   staff.moderate.mockImplementation(async (_change, run) => run());
   staff.moderateBan.mockImplementation(async (_change, run) => run());
   staff.banIsSensitive.mockResolvedValue(Result.ok(false));
@@ -56,17 +69,20 @@ beforeEach(() => {
 
 const app = () =>
   adminApp({
-    AdminQueryService: queries,
-    AdminModerationService: moderation,
-    ApprovalService: approvals,
-    StaffService: staff,
-    StaffNoteService: notes,
+    IListUsersQuery: listUsers,
+    IGetUserQuery: getUser,
+    IListStaffNotesQuery: listNotes,
+    AddStaffNoteUseCase: addNote,
+    BanUserUseCase: new BanUserUseCase(staff, approvals, moderation),
+    UnbanUserUseCase: new UnbanUserUseCase(staff, moderation),
+    ResetUserPasswordUseCase: new ResetUserPasswordUseCase(staff, moderation),
+    RevokeUserSessionsUseCase: new RevokeUserSessionsUseCase(staff, moderation),
     IAuthProvider: auth,
   });
 
 describe("GET /admin/users", () => {
   it("lists users with dates as ISO strings and absent values as null", async () => {
-    queries.listUsers.mockResolvedValue(
+    listUsers.execute.mockResolvedValue(
       Result.ok({
         items: [{ ...USER, cursorAt: "2026-01-02 03:04:05" }],
         nextCursor: Option.some("next"),
@@ -93,13 +109,13 @@ describe("GET /admin/users", () => {
     const res = await send(app(), "GET", "/admin/users?cursor=nope");
 
     expect(res.status).toBe(400);
-    expect(queries.listUsers).not.toHaveBeenCalled();
+    expect(listUsers.execute).not.toHaveBeenCalled();
   });
 });
 
 describe("GET /admin/users/:id", () => {
   it("answers 404 for an unknown user", async () => {
-    queries.getUser.mockResolvedValue(Result.ok(Option.none()));
+    getUser.execute.mockResolvedValue(Result.ok(Option.none()));
 
     const res = await send(app(), "GET", "/admin/users/ghost");
 
@@ -225,7 +241,7 @@ describe("POST /admin/users/:id/reset-password", () => {
   });
 
   it("answers 404 and resets nothing for an unknown user", async () => {
-    queries.getUser.mockResolvedValue(Result.ok(Option.none()));
+    getUser.execute.mockResolvedValue(Result.ok(Option.none()));
 
     const res = await send(app(), "POST", "/admin/users/ghost/reset-password");
 
@@ -246,7 +262,7 @@ describe("DELETE /admin/users/:id/sessions", () => {
   });
 
   it("answers 404 and revokes nothing for an unknown user", async () => {
-    queries.getUser.mockResolvedValue(Result.ok(Option.none()));
+    getUser.execute.mockResolvedValue(Result.ok(Option.none()));
 
     const res = await send(app(), "DELETE", "/admin/users/ghost/sessions");
 
@@ -257,26 +273,26 @@ describe("DELETE /admin/users/:id/sessions", () => {
 
 describe("staff notes on a user", () => {
   it("lists the notes of the user", async () => {
-    notes.list.mockResolvedValue(
+    listNotes.execute.mockResolvedValue(
       Result.ok([{ id: "n-1", authorName: Option.none(), body: "hello", createdAt: CREATED }]),
     );
 
     const res = await send(app(), "GET", "/admin/users/user-2/notes");
 
     expect(res.status).toBe(200);
-    expect(notes.list).toHaveBeenCalledWith({ type: "user", id: "user-2" });
+    expect(listNotes.execute).toHaveBeenCalledWith({ type: "user", id: "user-2" });
     expect(await res.json()).toEqual({
       items: [{ id: "n-1", authorName: null, body: "hello", createdAt: CREATED.toISOString() }],
     });
   });
 
   it("adds a trimmed note signed by the actor", async () => {
-    notes.add.mockResolvedValue(Result.ok());
+    addNote.execute.mockResolvedValue(Result.ok());
 
     const res = await send(app(), "POST", "/admin/users/user-2/notes", { body: "  hello  " });
 
     expect(res.status).toBe(200);
-    expect(notes.add).toHaveBeenCalledWith({
+    expect(addNote.execute).toHaveBeenCalledWith({
       actorUserId: ACTOR_ID,
       subject: { type: "user", id: "user-2" },
       body: "hello",

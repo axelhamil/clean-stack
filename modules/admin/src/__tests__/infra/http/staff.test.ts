@@ -1,20 +1,36 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
 import { mockPort } from "@packages/test/bun";
+import type { ApprovalService } from "../../../application/services/approval.service";
+import type { StaffService } from "../../../application/services/staff.service";
+import { ChangeStaffRoleUseCase } from "../../../application/usecases/change-staff-role/change-staff-role.usecase";
+import { RemoveStaffOverrideUseCase } from "../../../application/usecases/remove-staff-override/remove-staff-override.usecase";
+import { RevokeStaffUseCase } from "../../../application/usecases/revoke-staff/revoke-staff.usecase";
+import { SetStaffOverrideUseCase } from "../../../application/usecases/set-staff-override/set-staff-override.usecase";
 import { ACTOR_ID, adminApp, errorCodeOf, MANAGER, send } from "../../fixtures/http-app";
 import type { AdminRoutesDeps } from "../../fixtures/mount-admin-routes";
 
 const CREATED = new Date("2026-01-02T03:04:05.000Z");
 const FUTURE = "2099-01-01T00:00:00.000Z";
 
-let stepUp = mockPort<AdminRoutesDeps["StepUpService"]>();
-let approvals = mockPort<AdminRoutesDeps["ApprovalService"]>();
-let staff = mockPort<AdminRoutesDeps["StaffService"]>();
+type StaffWrites =
+  | "list"
+  | "listOverrides"
+  | "assignRole"
+  | "revoke"
+  | "setOverride"
+  | "removeOverride";
+
+let validity = mockPort<AdminRoutesDeps["IStepUpValidityQuery"]>();
+let verify = mockPort<AdminRoutesDeps["VerifyStepUpUseCase"]>();
+let approvals = mockPort<Pick<ApprovalService, "gate">>();
+let staff = mockPort<Pick<StaffService, StaffWrites>>();
 
 beforeEach(() => {
-  stepUp = mockPort<AdminRoutesDeps["StepUpService"]>();
-  approvals = mockPort<AdminRoutesDeps["ApprovalService"]>();
-  staff = mockPort<AdminRoutesDeps["StaffService"]>();
+  validity = mockPort<AdminRoutesDeps["IStepUpValidityQuery"]>();
+  verify = mockPort<AdminRoutesDeps["VerifyStepUpUseCase"]>();
+  approvals = mockPort<Pick<ApprovalService, "gate">>();
+  staff = mockPort<Pick<StaffService, StaffWrites>>();
   approvals.gate.mockResolvedValue(Result.ok(Option.none()));
   staff.assignRole.mockResolvedValue(Result.ok());
   staff.revoke.mockResolvedValue(Result.ok());
@@ -24,15 +40,19 @@ beforeEach(() => {
 
 const app = () =>
   adminApp({
-    StepUpService: stepUp,
-    ApprovalService: approvals,
+    IStepUpValidityQuery: validity,
+    VerifyStepUpUseCase: verify,
     StaffService: staff,
+    ChangeStaffRoleUseCase: new ChangeStaffRoleUseCase(approvals, staff),
+    RevokeStaffUseCase: new RevokeStaffUseCase(approvals, staff),
+    SetStaffOverrideUseCase: new SetStaffOverrideUseCase(approvals, staff),
+    RemoveStaffOverrideUseCase: new RemoveStaffOverrideUseCase(approvals, staff),
     staffSettings: { PLATFORM_ADMIN_REQUIRE_MFA: true },
   });
 
 describe("GET /admin/me", () => {
   it("describes the staff member, the live step-up and the MFA policy", async () => {
-    stepUp.validUntil.mockResolvedValue(Result.ok(Option.some(CREATED)));
+    validity.execute.mockResolvedValue(Result.ok(Option.some(CREATED)));
 
     const res = await send(app(), "GET", "/admin/me");
 
@@ -46,19 +66,19 @@ describe("GET /admin/me", () => {
       stepUpValidUntil: CREATED.toISOString(),
       policy: { requireMfa: true },
     });
-    expect(stepUp.validUntil).toHaveBeenCalledWith("session-1");
+    expect(validity.execute).toHaveBeenCalledWith({ sessionId: "session-1" });
   });
 });
 
 describe("POST /admin/step-up", () => {
   it("verifies the code for the current session and returns the expiry", async () => {
-    stepUp.verify.mockResolvedValue(Result.ok({ validUntil: CREATED }));
+    verify.execute.mockResolvedValue(Result.ok({ validUntil: CREATED }));
 
     const res = await send(app(), "POST", "/admin/step-up", { code: " 123456 " });
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ validUntil: CREATED.toISOString() });
-    expect(stepUp.verify).toHaveBeenCalledWith({
+    expect(verify.execute).toHaveBeenCalledWith({
       userId: ACTOR_ID,
       sessionId: "session-1",
       code: "123456",
@@ -70,11 +90,11 @@ describe("POST /admin/step-up", () => {
     const res = await send(app(), "POST", "/admin/step-up", { code: "12ab56" });
 
     expect(res.status).toBe(400);
-    expect(stepUp.verify).not.toHaveBeenCalled();
+    expect(verify.execute).not.toHaveBeenCalled();
   });
 
   it("surfaces a refused code", async () => {
-    stepUp.verify.mockResolvedValue(
+    verify.execute.mockResolvedValue(
       Result.fail({ code: "ADMIN_STEP_UP_MFA_FORBIDDEN", message: "bad code" }),
     );
 
