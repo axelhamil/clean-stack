@@ -15,8 +15,10 @@ function services() {
     IGetOrgQuery: mockPort<AdminRoutesDeps["IGetOrgQuery"]>(),
     IListStaffNotesQuery: mockPort<AdminRoutesDeps["IListStaffNotesQuery"]>(),
     AdminActionService: mockPort<AdminRoutesDeps["AdminActionService"]>(),
-    ApprovalService: mockPort<AdminRoutesDeps["ApprovalService"]>(),
-    StaffService: mockPort<AdminRoutesDeps["StaffService"]>(),
+    IGetApprovalQuery: mockPort<AdminRoutesDeps["IGetApprovalQuery"]>(),
+    DecideApprovalUseCase: mockPort<AdminRoutesDeps["DecideApprovalUseCase"]>(),
+    CancelApprovalUseCase: mockPort<AdminRoutesDeps["CancelApprovalUseCase"]>(),
+    IListStaffOverridesQuery: mockPort<AdminRoutesDeps["IListStaffOverridesQuery"]>(),
     BanUserUseCase: mockPort<AdminRoutesDeps["BanUserUseCase"]>(),
     UnbanUserUseCase: mockPort<AdminRoutesDeps["UnbanUserUseCase"]>(),
     ResetUserPasswordUseCase: mockPort<AdminRoutesDeps["ResetUserPasswordUseCase"]>(),
@@ -96,7 +98,7 @@ const CASES: ParamCase[] = [
   {
     method: "GET",
     path: `/admin/staff/${MALFORMED}/overrides`,
-    reached: (s) => [s.StaffService.listOverrides],
+    reached: (s) => [s.IListStaffOverridesQuery.execute],
   },
   {
     method: "POST",
@@ -120,17 +122,21 @@ const CASES: ParamCase[] = [
     path: `/admin/views/${MALFORMED}`,
     reached: (s) => [s.DeleteViewUseCase.execute],
   },
-  { method: "GET", path: `/admin/approvals/${MALFORMED}`, reached: (s) => [s.ApprovalService.get] },
+  {
+    method: "GET",
+    path: `/admin/approvals/${MALFORMED}`,
+    reached: (s) => [s.IGetApprovalQuery.execute],
+  },
   {
     method: "POST",
     path: `/admin/approvals/${MALFORMED}/decide`,
     body: { decision: "approve", note: "ok" },
-    reached: (s) => [s.ApprovalService.decide],
+    reached: (s) => [s.DecideApprovalUseCase.execute],
   },
   {
     method: "POST",
     path: `/admin/approvals/${MALFORMED}/cancel`,
-    reached: (s) => [s.ApprovalService.cancel],
+    reached: (s) => [s.CancelApprovalUseCase.execute],
   },
   { method: "GET", path: `/admin/orgs/${MALFORMED}`, reached: (s) => [s.IGetOrgQuery.execute] },
   {

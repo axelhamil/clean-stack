@@ -1,10 +1,14 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { Option, Result } from "@packages/ddd-kit";
-import type { EmailError } from "@packages/email/email.port";
+import type { EmailError, IEmailService } from "@packages/email/email.port";
 import { EventTypes } from "@packages/events";
 import type { Locale } from "@packages/i18n";
+import { mockPort } from "@packages/test/bun";
 import { notifyImpersonatedUser } from "../../../application/event-handlers/notify-impersonated-user";
 import type { ILocaleReader } from "../../../application/ports/services/locale-reader.port";
+import type { AdminUserDetail, IGetUserQuery } from "../../../application/queries/get-user.query";
+import type { AdminQueryError } from "../../../application/queries/list-users.query";
+import { NotifyImpersonatedUserUseCase } from "../../../application/usecases/notify-impersonated-user/notify-impersonated-user.usecase";
 
 const sendTemplate = mock(async (): Promise<Result<void, EmailError>> => Result.ok());
 
@@ -23,13 +27,33 @@ const BASE_EVENT = {
   },
 };
 
-function handlerWith(getUser: () => Promise<unknown>) {
+const TARGET: AdminUserDetail = {
+  id: "u-2",
+  email: "target@example.com",
+  name: "Ada",
+  banned: false,
+  banReason: Option.none(),
+  banExpires: Option.none(),
+  twoFactorEnabled: false,
+  createdAt: new Date("2026-01-02T03:04:05.000Z"),
+  sessions: [],
+  memberships: [],
+};
+
+function handlerWith(getUser: () => Promise<Result<Option<AdminUserDetail>, AdminQueryError>>) {
+  const users = mockPort<IGetUserQuery>();
+  users.execute.mockImplementation(getUser);
+  const emails = mockPort<IEmailService>();
+  emails.sendTemplate.mockImplementation(sendTemplate);
+
   return notifyImpersonatedUser({
-    IEmailService: { sendTemplate },
-    AdminQueryService: { getUser: mock(getUser) },
-    ILocaleReader: localeReader,
-    supportUrl: "https://example.com/support",
-  } as never);
+    NotifyImpersonatedUserUseCase: new NotifyImpersonatedUserUseCase(
+      users,
+      emails,
+      localeReader,
+      "https://example.com/support",
+    ),
+  });
 }
 
 describe("notifyImpersonatedUser", () => {
@@ -38,9 +62,7 @@ describe("notifyImpersonatedUser", () => {
   });
 
   it("emails the impersonated user with the reason and the expiry", async () => {
-    const handler = handlerWith(async () =>
-      Result.ok(Option.some({ email: "target@example.com", name: "Ada" })),
-    );
+    const handler = handlerWith(async () => Result.ok(Option.some(TARGET)));
 
     await handler.handle(BASE_EVENT);
 
@@ -85,17 +107,13 @@ describe("notifyImpersonatedUser", () => {
     sendTemplate.mockImplementationOnce(async () =>
       Result.fail({ code: "EMAIL_PROVIDER_FAILURE" as const, message: "boom" }),
     );
-    const handler = handlerWith(async () =>
-      Result.ok(Option.some({ email: "target@example.com", name: "Ada" })),
-    );
+    const handler = handlerWith(async () => Result.ok(Option.some(TARGET)));
 
     await expect(handler.handle(BASE_EVENT)).rejects.toThrow("EMAIL_PROVIDER_FAILURE");
   });
 
   it("given a redelivered event, when handled twice, then both sends carry the same idempotency key", async () => {
-    const handler = handlerWith(async () =>
-      Result.ok(Option.some({ email: "target@example.com", name: "Ada" })),
-    );
+    const handler = handlerWith(async () => Result.ok(Option.some(TARGET)));
     const event = { ...BASE_EVENT, eventId: "evt-42" };
 
     await handler.handle(event);

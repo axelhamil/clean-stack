@@ -8,7 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
  */
 
 import { AdminModerationService } from "@modules/admin/services/admin-moderation";
-import { StaffService } from "@modules/admin/services/staff";
+import { ExpireImpersonationsUseCase } from "@modules/admin/usecases/expire-impersonations";
 import { Result } from "@packages/ddd-kit";
 import { authSchema, db, eq } from "@packages/drizzle";
 import { EventTypes } from "@packages/events";
@@ -224,22 +224,20 @@ async function proveImpersonationEndsAnnouncedOnce(): Promise<void> {
   const liveToken = await impersonationSessionOf(staff.id, live.id);
   await impersonationSessionOf(null, ordinary.id, past);
 
-  const failingSweep = new StaffService(
+  const failingSweep = new ExpireImpersonationsUseCase(
     di.IStaffStore,
-    di.IAdminUserStore,
     failingOutbox,
     di.ITransactionService,
-    { PLATFORM_ADMIN_IDS: [] },
   );
   check(
     "a failing emit surfaces from the impersonation sweep",
-    await refusedByEmit(() => failingSweep.expireImpersonations(100)),
+    await refusedByEmit(() => failingSweep.execute({ batchSize: 100 })),
   );
   check("a failing emit keeps the expired session", (await sessionCount(swept.id)) === 1);
 
   const ctx = await auth.$context;
   const [sweep] = await Promise.all([
-    di.StaffService.expireImpersonations(100),
+    di.ExpireImpersonationsUseCase.execute({ batchSize: 100 }),
     ctx.internalAdapter.deleteSession(racedToken),
   ]);
   check("the impersonation sweep succeeds", sweep.isSuccess);
@@ -253,7 +251,7 @@ async function proveImpersonationEndsAnnouncedOnce(): Promise<void> {
     await stoppedReasons(raced.id),
   );
 
-  const again = await di.StaffService.expireImpersonations(100);
+  const again = await di.ExpireImpersonationsUseCase.execute({ batchSize: 100 });
   check("a second sweep succeeds", again.isSuccess);
   check(
     "each expired impersonation is announced once, as expired",

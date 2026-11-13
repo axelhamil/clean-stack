@@ -56,8 +56,10 @@ const SWEEP_PATH = "/internal/sweep-admin-approvals";
 const adminInternalRoutes = createAdminInternalRoutes({
   internalGuards: internalLayers,
   runSweep: runSweepRequest,
-  ApprovalService: di.ApprovalService,
-  StaffService: di.StaffService,
+  ExpireApprovalsUseCase: di.ExpireApprovalsUseCase,
+  ICountDueApprovalsQuery: di.ICountDueApprovalsQuery,
+  ExpireImpersonationsUseCase: di.ExpireImpersonationsUseCase,
+  ICountExpiredImpersonationsQuery: di.ICountExpiredImpersonationsQuery,
 });
 const sweepApp = internalApp(new Hono().route("/", adminInternalRoutes));
 

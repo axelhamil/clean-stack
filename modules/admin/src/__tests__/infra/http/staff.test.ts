@@ -13,24 +13,22 @@ import type { AdminRoutesDeps } from "../../fixtures/mount-admin-routes";
 const CREATED = new Date("2026-01-02T03:04:05.000Z");
 const FUTURE = "2099-01-01T00:00:00.000Z";
 
-type StaffWrites =
-  | "list"
-  | "listOverrides"
-  | "assignRole"
-  | "revoke"
-  | "setOverride"
-  | "removeOverride";
+type StaffWrites = "assignRole" | "revoke" | "setOverride" | "removeOverride";
 
 let validity = mockPort<AdminRoutesDeps["IStepUpValidityQuery"]>();
 let verify = mockPort<AdminRoutesDeps["VerifyStepUpUseCase"]>();
 let approvals = mockPort<Pick<ApprovalService, "gate">>();
 let staff = mockPort<Pick<StaffService, StaffWrites>>();
+let staffList = mockPort<AdminRoutesDeps["IListStaffQuery"]>();
+let overrides = mockPort<AdminRoutesDeps["IListStaffOverridesQuery"]>();
 
 beforeEach(() => {
   validity = mockPort<AdminRoutesDeps["IStepUpValidityQuery"]>();
   verify = mockPort<AdminRoutesDeps["VerifyStepUpUseCase"]>();
   approvals = mockPort<Pick<ApprovalService, "gate">>();
   staff = mockPort<Pick<StaffService, StaffWrites>>();
+  staffList = mockPort<AdminRoutesDeps["IListStaffQuery"]>();
+  overrides = mockPort<AdminRoutesDeps["IListStaffOverridesQuery"]>();
   approvals.gate.mockResolvedValue(Result.ok(Option.none()));
   staff.assignRole.mockResolvedValue(Result.ok());
   staff.revoke.mockResolvedValue(Result.ok());
@@ -42,7 +40,8 @@ const app = () =>
   adminApp({
     IStepUpValidityQuery: validity,
     VerifyStepUpUseCase: verify,
-    StaffService: staff,
+    IListStaffQuery: staffList,
+    IListStaffOverridesQuery: overrides,
     ChangeStaffRoleUseCase: new ChangeStaffRoleUseCase(approvals, staff),
     RevokeStaffUseCase: new RevokeStaffUseCase(approvals, staff),
     SetStaffOverrideUseCase: new SetStaffOverrideUseCase(approvals, staff),
@@ -107,7 +106,7 @@ describe("POST /admin/step-up", () => {
 
 describe("GET /admin/staff", () => {
   it("lists staff with ISO dates", async () => {
-    staff.list.mockResolvedValue(
+    staffList.execute.mockResolvedValue(
       Result.ok([
         {
           userId: "u-1",
@@ -201,22 +200,24 @@ describe("DELETE /admin/staff/:id", () => {
 
 describe("staff overrides", () => {
   it("lists the overrides with null for no expiry", async () => {
-    staff.listOverrides.mockResolvedValue(
-      Result.ok([
-        {
-          id: "o-1",
-          permission: "users.read",
-          effect: "grant",
-          expiresAt: Option.none(),
-          createdAt: CREATED,
-        },
-      ]),
+    overrides.execute.mockResolvedValue(
+      Result.ok(
+        Option.some([
+          {
+            id: "o-1",
+            permission: "users.read",
+            effect: "grant",
+            expiresAt: Option.none(),
+            createdAt: CREATED,
+          },
+        ]),
+      ),
     );
 
     const res = await send(app(), "GET", "/admin/staff/u-2/overrides");
 
     expect(res.status).toBe(200);
-    expect(staff.listOverrides).toHaveBeenCalledWith("u-2");
+    expect(overrides.execute).toHaveBeenCalledWith({ userId: "u-2" });
     expect(await res.json()).toEqual({
       items: [
         {
@@ -228,6 +229,15 @@ describe("staff overrides", () => {
         },
       ],
     });
+  });
+
+  it("answers 404 for the overrides of someone who is not staff", async () => {
+    overrides.execute.mockResolvedValue(Result.ok(Option.none()));
+
+    const res = await send(app(), "GET", "/admin/staff/u-2/overrides");
+
+    expect(res.status).toBe(404);
+    expect(await errorCodeOf(res)).toBe("ADMIN_STAFF_NOT_FOUND");
   });
 
   it("sets an override with its expiry as a date when no approval is required", async () => {

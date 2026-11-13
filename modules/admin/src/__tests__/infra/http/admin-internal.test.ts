@@ -13,13 +13,17 @@ import {
   createAdminInternalRoutes,
 } from "../../../infra/http/routes/admin-internal/admin-internal";
 
-let approvals = mockPort<AdminInternalRoutesDeps["ApprovalService"]>();
-let staff = mockPort<AdminInternalRoutesDeps["StaffService"]>();
+let expireApprovals = mockPort<AdminInternalRoutesDeps["ExpireApprovalsUseCase"]>();
+let dueApprovals = mockPort<AdminInternalRoutesDeps["ICountDueApprovalsQuery"]>();
+let expireImpersonations = mockPort<AdminInternalRoutesDeps["ExpireImpersonationsUseCase"]>();
+let expiredImpersonations = mockPort<AdminInternalRoutesDeps["ICountExpiredImpersonationsQuery"]>();
 let ran: { label: string; passes: RetentionPass[] }[] = [];
 
 beforeEach(() => {
-  approvals = mockPort<AdminInternalRoutesDeps["ApprovalService"]>();
-  staff = mockPort<AdminInternalRoutesDeps["StaffService"]>();
+  expireApprovals = mockPort<AdminInternalRoutesDeps["ExpireApprovalsUseCase"]>();
+  dueApprovals = mockPort<AdminInternalRoutesDeps["ICountDueApprovalsQuery"]>();
+  expireImpersonations = mockPort<AdminInternalRoutesDeps["ExpireImpersonationsUseCase"]>();
+  expiredImpersonations = mockPort<AdminInternalRoutesDeps["ICountExpiredImpersonationsQuery"]>();
   ran = [];
 });
 
@@ -54,8 +58,10 @@ function app() {
       createAdminInternalRoutes({
         internalGuards: [refuseUnsigned],
         runSweep,
-        ApprovalService: approvals,
-        StaffService: staff,
+        ExpireApprovalsUseCase: expireApprovals,
+        ICountDueApprovalsQuery: dueApprovals,
+        ExpireImpersonationsUseCase: expireImpersonations,
+        ICountExpiredImpersonationsQuery: expiredImpersonations,
       }),
     );
   internal.onError(
@@ -86,8 +92,8 @@ describe("internal admin sweeps", () => {
   });
 
   it("expires due approvals in batches and counts what is left", async () => {
-    approvals.expireDue.mockResolvedValue(Result.ok(3));
-    approvals.countDue.mockResolvedValue(Result.ok(7));
+    expireApprovals.execute.mockResolvedValue(Result.ok(3));
+    dueApprovals.execute.mockResolvedValue(Result.ok(7));
 
     const res = await sweep("sweep-admin-approvals");
 
@@ -96,25 +102,25 @@ describe("internal admin sweeps", () => {
     expect(run?.label).toBe("sweep-admin-approvals");
     const [pass] = run?.passes ?? [];
     expect(await pass?.purgeBatch(new Date(), 50)).toBe(3);
-    expect(approvals.expireDue).toHaveBeenCalledWith(50);
+    expect(expireApprovals.execute).toHaveBeenCalledWith({ batchSize: 50 });
     expect(await pass?.countEligible(new Date())).toBe(7);
   });
 
   it("ends expired impersonations in batches and counts what is left", async () => {
-    staff.expireImpersonations.mockResolvedValue(Result.ok(2));
-    staff.countExpiredImpersonations.mockResolvedValue(Result.ok(5));
+    expireImpersonations.execute.mockResolvedValue(Result.ok(2));
+    expiredImpersonations.execute.mockResolvedValue(Result.ok(5));
 
     const res = await sweep("sweep-admin-impersonations");
 
     expect(res.status).toBe(200);
     const [pass] = ran[0]?.passes ?? [];
     expect(await pass?.purgeBatch(new Date(), 25)).toBe(2);
-    expect(staff.expireImpersonations).toHaveBeenCalledWith(25);
+    expect(expireImpersonations.execute).toHaveBeenCalledWith({ batchSize: 25 });
     expect(await pass?.countEligible(new Date())).toBe(5);
   });
 
   it("fails the batch when the expiry fails, so the runner records it", async () => {
-    approvals.expireDue.mockResolvedValue(
+    expireApprovals.execute.mockResolvedValue(
       Result.fail({ code: "ADMIN_APPROVAL_PROVIDER_FAILURE", message: "down" }),
     );
 

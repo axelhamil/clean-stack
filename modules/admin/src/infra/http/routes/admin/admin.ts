@@ -18,8 +18,9 @@ import type { ResetUserPasswordUseCase } from "../../../../application/usecases/
 import type { RevokeUserSessionsUseCase } from "../../../../application/usecases/revoke-user-sessions/revoke-user-sessions.usecase";
 import type { UnbanUserUseCase } from "../../../../application/usecases/unban-user/unban-user.usecase";
 import { gatedResponse } from "../../approval-gate.response";
-import { serializeStaffNote } from "../../staff-note.presenter";
 import { addStaffNoteBodySchema } from "../../staff-note.schema";
+import { addedStaffNote, listedStaffNotes } from "../../staff-notes";
+import { stepUpGateOf } from "../../step-up-gate";
 import { banUserBodySchema, listUsersQuerySchema } from "./admin.schema";
 
 export interface AdminUserRoutesDeps {
@@ -108,7 +109,7 @@ export function createAdminUserRoutes(deps: AdminUserRoutesDeps) {
             actorPermissions: g.currentStaff(c).permissions,
             userId: c.req.valid("param").id,
             ban: c.req.valid("json"),
-            confirmStepUp: () => g.assertStepUp(c),
+            stepUp: stepUpGateOf(g, c),
           }),
         ),
     )
@@ -167,15 +168,13 @@ export function createAdminUserRoutes(deps: AdminUserRoutesDeps) {
       g.requireAuth,
       g.requireStaffPermission("users.read"),
       zV("param", idParamSchema),
-      async (c) => {
-        const result = await deps.IListStaffNotesQuery.execute({
-          type: "user",
-          id: c.req.valid("param").id,
-        });
-        if (result.isFailure) throw new AppErrorException(result.getError());
-
-        return c.json({ items: result.getValue().map(serializeStaffNote) });
-      },
+      async (c) =>
+        c.json(
+          await listedStaffNotes(deps.IListStaffNotesQuery, {
+            type: "user",
+            id: c.req.valid("param").id,
+          }),
+        ),
     )
     .post(
       "/:id/notes",
@@ -183,15 +182,13 @@ export function createAdminUserRoutes(deps: AdminUserRoutesDeps) {
       g.requireStaffPermission("notes.write"),
       zV("json", addStaffNoteBodySchema),
       zV("param", idParamSchema),
-      async (c) => {
-        const result = await deps.AddStaffNoteUseCase.execute({
-          actorUserId: g.currentUserId(c),
-          subject: { type: "user", id: c.req.valid("param").id },
-          body: c.req.valid("json").body,
-        });
-        if (result.isFailure) throw new AppErrorException(result.getError());
-
-        return c.json({ ok: true });
-      },
+      async (c) =>
+        c.json(
+          await addedStaffNote(deps.AddStaffNoteUseCase, {
+            actorUserId: g.currentUserId(c),
+            subject: { type: "user", id: c.req.valid("param").id },
+            body: c.req.valid("json").body,
+          }),
+        ),
     );
 }

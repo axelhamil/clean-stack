@@ -1,6 +1,6 @@
 import { timeIdCursorSchema } from "@packages/http/time-id-cursor";
 import { z } from "zod";
-import { APPROVAL_STATUSES } from "../../../../application/ports/repositories/approval-store.port";
+import { APPROVAL_STATUSES } from "../../../../domain/approval/value-objects/approval-status.vo";
 
 export const listApprovalsQuerySchema = z.object({
   status: z.enum(APPROVAL_STATUSES).optional(),

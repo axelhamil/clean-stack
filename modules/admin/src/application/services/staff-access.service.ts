@@ -3,17 +3,17 @@ import { type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { emitEvent } from "@packages/outbox/event-emitter";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
-import type {
-  IStaffStore,
-  StaffRecord,
-  StaffStoreError,
-} from "../ports/repositories/staff-store.port";
 import {
   IMPERSONATE_PERMISSION,
   type StaffEnv,
   type StaffUser,
   staffAccessOf,
-} from "./staff-access";
+} from "../../domain/staff/services/staff-access.service";
+import type {
+  IStaffStore,
+  StaffRecord,
+  StaffStoreError,
+} from "../ports/repositories/staff-store.port";
 
 export interface StaffSessionRef {
   impersonatedBy?: string | null;

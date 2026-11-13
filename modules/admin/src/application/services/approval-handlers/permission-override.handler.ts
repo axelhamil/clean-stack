@@ -1,4 +1,5 @@
 import { type AppError, Option, Result } from "@packages/ddd-kit";
+import { overrideGrantRefusal } from "../../../domain/staff/services/staff-rules.service";
 import type {
   ApprovalActor,
   ApprovalHandler,
@@ -14,11 +15,7 @@ export class PermissionOverrideApprovalHandler implements ApprovalHandler<Action
   constructor(
     private readonly staff: Pick<
       StaffService,
-      | "refuseOverride"
-      | "refuseOverrideRemoval"
-      | "refusedOverrideGrant"
-      | "setOverride"
-      | "removeOverride"
+      "refuseOverride" | "refuseOverrideRemoval" | "setOverride" | "removeOverride"
     >,
   ) {}
 
@@ -72,7 +69,7 @@ export class PermissionOverrideApprovalHandler implements ApprovalHandler<Action
     { params }: ApprovedActionOf<Action>,
     actor: ApprovalActor,
   ): Promise<Result<void, AppError>> {
-    return this.staff.refusedOverrideGrant({
+    return overrideGrantRefusal({
       actorPermissions: actor.permissions,
       permission: params.permission,
       effect: params.effect,

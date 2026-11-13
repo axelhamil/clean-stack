@@ -28,19 +28,18 @@ import { lockedBatch, requireFilter, withSweepGuards } from "@packages/drizzle/s
 import { sweepSpans } from "@packages/drizzle/sweep-span";
 import { afterTimeIdCursor } from "@packages/http/time-id-cursor";
 import * as staffSchema from "../../../../schemas/staff";
-import {
-  APPROVAL_STATUSES,
-  type ApprovalClaim,
-  type ApprovalCreation,
-  type ApprovalFailure,
-  type ApprovalRecord,
-  type ApprovalStatus,
-  type ApprovalStoreError,
-  type ApprovalWrite,
-  type IApprovalStore,
-  type ListApprovalsQuery,
-  type OpenApprovals,
+import type {
+  ApprovalClaim,
+  ApprovalCreation,
+  ApprovalFailure,
+  ApprovalRecord,
+  ApprovalStoreError,
+  ApprovalWrite,
+  IApprovalStore,
+  ListApprovalsQuery,
+  OpenApprovals,
 } from "../../../application/ports/repositories/approval-store.port";
+import { ApprovalStatus } from "../../../domain/approval/value-objects/approval-status.vo";
 
 type Executor = ReturnType<typeof resolveExecutor>;
 
@@ -48,13 +47,10 @@ const dbAttrs = { "db.system.name": "postgresql" } as const;
 const { adminApproval: table } = staffSchema;
 const NEXT_VERSION = sql`${table.version} + 1`;
 
-function isStatus(value: string): value is ApprovalStatus {
-  return APPROVAL_STATUSES.some((status) => status === value);
-}
-
 function recordOf(row: typeof table.$inferSelect): Option<ApprovalRecord> {
-  const { action, status } = row;
-  if (!isApprovalAction(action) || !isStatus(status)) return Option.none();
+  const { action } = row;
+  const status = ApprovalStatus.parse(row.status);
+  if (!isApprovalAction(action) || status.isFailure) return Option.none();
 
   return Option.some({
     id: row.id,
@@ -62,7 +58,7 @@ function recordOf(row: typeof table.$inferSelect): Option<ApprovalRecord> {
     subjectId: row.subjectId,
     params: row.params,
     requestedBy: row.requestedBy,
-    status,
+    status: status.getValue().value,
     decidedBy: Option.fromNullable(row.decidedBy),
     decisionNote: Option.fromNullable(row.decisionNote),
     failureReason: Option.fromNullable(row.failureReason),

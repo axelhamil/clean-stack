@@ -3,14 +3,16 @@ import { idParamSchema } from "@packages/http/id-param";
 import type { RouteEnv, RouteGuards } from "@packages/http/route-guards";
 import { zV } from "@packages/http/validator";
 import { Hono } from "hono";
+import type { IListStaffQuery } from "../../../../application/queries/list-staff.query";
+import type { IListStaffOverridesQuery } from "../../../../application/queries/list-staff-overrides.query";
 import type { IStepUpValidityQuery } from "../../../../application/queries/step-up-validity.query";
-import type { StaffService } from "../../../../application/services/staff.service";
-import type { StaffEnv } from "../../../../application/services/staff-access";
 import type { ChangeStaffRoleUseCase } from "../../../../application/usecases/change-staff-role/change-staff-role.usecase";
 import type { RemoveStaffOverrideUseCase } from "../../../../application/usecases/remove-staff-override/remove-staff-override.usecase";
 import type { RevokeStaffUseCase } from "../../../../application/usecases/revoke-staff/revoke-staff.usecase";
 import type { SetStaffOverrideUseCase } from "../../../../application/usecases/set-staff-override/set-staff-override.usecase";
 import type { VerifyStepUpUseCase } from "../../../../application/usecases/verify-step-up/verify-step-up.usecase";
+import type { StaffEnv } from "../../../../domain/staff/services/staff-access.service";
+import { staffNotFound } from "../../../../domain/staff/services/staff-rules.service";
 import { gatedResponse } from "../../approval-gate.response";
 import {
   setStaffOverrideBodySchema,
@@ -24,7 +26,8 @@ export interface AdminStaffRoutesDeps {
   staffSettings: Pick<StaffEnv, "PLATFORM_ADMIN_REQUIRE_MFA">;
   IStepUpValidityQuery: IStepUpValidityQuery;
   VerifyStepUpUseCase: Pick<VerifyStepUpUseCase, "execute">;
-  StaffService: Pick<StaffService, "list" | "listOverrides">;
+  IListStaffQuery: IListStaffQuery;
+  IListStaffOverridesQuery: IListStaffOverridesQuery;
   ChangeStaffRoleUseCase: Pick<ChangeStaffRoleUseCase, "execute">;
   RevokeStaffUseCase: Pick<RevokeStaffUseCase, "execute">;
   SetStaffOverrideUseCase: Pick<SetStaffOverrideUseCase, "execute">;
@@ -67,7 +70,7 @@ export function createAdminStaffRoutes(deps: AdminStaffRoutesDeps) {
       return c.json({ validUntil: result.getValue().validUntil.toISOString() });
     })
     .get("/staff", g.requireAuth, g.requireStaffPermission("staff.manage"), async (c) => {
-      const result = await deps.StaffService.list();
+      const result = await deps.IListStaffQuery.execute();
       if (result.isFailure) throw new AppErrorException(result.getError());
 
       return c.json({
@@ -117,11 +120,16 @@ export function createAdminStaffRoutes(deps: AdminStaffRoutesDeps) {
       g.requireStaffPermission("staff.manage"),
       zV("param", idParamSchema),
       async (c) => {
-        const result = await deps.StaffService.listOverrides(c.req.valid("param").id);
+        const result = await deps.IListStaffOverridesQuery.execute({
+          userId: c.req.valid("param").id,
+        });
         if (result.isFailure) throw new AppErrorException(result.getError());
 
+        const live = result.getValue();
+        if (live.isNone()) throw new AppErrorException(staffNotFound());
+
         return c.json({
-          items: result.getValue().map((row) => ({
+          items: live.unwrap().map((row) => ({
             id: row.id,
             permission: row.permission,
             effect: row.effect,

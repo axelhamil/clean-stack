@@ -25,12 +25,18 @@ import type { IEntitlementsReader } from "./application/ports/services/entitleme
 import type { ILocaleReader } from "./application/ports/services/locale-reader.port";
 import type { IStripeEventGateway } from "./application/ports/services/stripe-event-gateway.port";
 import type { ITotpVerifier } from "./application/ports/services/totp-verifier.port";
+import type { ICountDueApprovalsQuery } from "./application/queries/count-due-approvals.query";
+import type { ICountExpiredImpersonationsQuery } from "./application/queries/count-expired-impersonations.query";
+import type { IGetApprovalQuery } from "./application/queries/get-approval.query";
 import type { IGetOrgQuery } from "./application/queries/get-org.query";
 import type { IGetUserQuery } from "./application/queries/get-user.query";
+import type { IListApprovalsQuery } from "./application/queries/list-approvals.query";
 import type { IListDeadLettersQuery } from "./application/queries/list-dead-letters.query";
 import type { IListOrgsQuery } from "./application/queries/list-orgs.query";
 import type { IListSavedViewsQuery } from "./application/queries/list-saved-views.query";
+import type { IListStaffQuery } from "./application/queries/list-staff.query";
 import type { IListStaffNotesQuery } from "./application/queries/list-staff-notes.query";
+import type { IListStaffOverridesQuery } from "./application/queries/list-staff-overrides.query";
 import type { IListStripeEventsQuery } from "./application/queries/list-stripe-events.query";
 import type { IListSweepRunsQuery } from "./application/queries/list-sweep-runs.query";
 import type { IListUsersQuery } from "./application/queries/list-users.query";
@@ -45,7 +51,6 @@ import { RoleChangeApprovalHandler } from "./application/services/approval-handl
 import { StaffRevokeApprovalHandler } from "./application/services/approval-handlers/staff-revoke.handler";
 import { PlanOverrideService } from "./application/services/plan-override.service";
 import { StaffService } from "./application/services/staff.service";
-import type { StaffEnv } from "./application/services/staff-access";
 import {
   StaffAccessService,
   type StaffLookupOnce,
@@ -53,8 +58,14 @@ import {
 import { StepUpService } from "./application/services/step-up.service";
 import { AddStaffNoteUseCase } from "./application/usecases/add-staff-note/add-staff-note.usecase";
 import { BanUserUseCase } from "./application/usecases/ban-user/ban-user.usecase";
+import { CancelApprovalUseCase } from "./application/usecases/cancel-approval/cancel-approval.usecase";
 import { ChangeStaffRoleUseCase } from "./application/usecases/change-staff-role/change-staff-role.usecase";
+import { CloseApprovalsOfDeletedUserUseCase } from "./application/usecases/close-approvals-of-deleted-user/close-approvals-of-deleted-user.usecase";
+import { DecideApprovalUseCase } from "./application/usecases/decide-approval/decide-approval.usecase";
 import { DeleteViewUseCase } from "./application/usecases/delete-view/delete-view.usecase";
+import { ExpireApprovalsUseCase } from "./application/usecases/expire-approvals/expire-approvals.usecase";
+import { ExpireImpersonationsUseCase } from "./application/usecases/expire-impersonations/expire-impersonations.usecase";
+import { NotifyImpersonatedUserUseCase } from "./application/usecases/notify-impersonated-user/notify-impersonated-user.usecase";
 import { RemoveStaffOverrideUseCase } from "./application/usecases/remove-staff-override/remove-staff-override.usecase";
 import { ReplayStripeEventUseCase } from "./application/usecases/replay-stripe-event/replay-stripe-event.usecase";
 import { RequeueOutboxUseCase } from "./application/usecases/requeue-outbox/requeue-outbox.usecase";
@@ -68,12 +79,19 @@ import { SetStaffOverrideUseCase } from "./application/usecases/set-staff-overri
 import { StartImpersonationUseCase } from "./application/usecases/start-impersonation/start-impersonation.usecase";
 import { UnbanUserUseCase } from "./application/usecases/unban-user/unban-user.usecase";
 import { VerifyStepUpUseCase } from "./application/usecases/verify-step-up/verify-step-up.usecase";
+import type { StaffEnv } from "./domain/staff/services/staff-access.service";
+import { DueApprovalCountQuery } from "./infra/queries/count-due-approvals.query";
+import { ExpiredImpersonationCountQuery } from "./infra/queries/count-expired-impersonations.query";
+import { ApprovalDetailQuery } from "./infra/queries/get-approval.query";
 import { AdminOrgDetailQuery } from "./infra/queries/get-org.query";
 import { AdminUserDetailQuery } from "./infra/queries/get-user.query";
+import { ApprovalListQuery } from "./infra/queries/list-approvals.query";
 import { DeadLettersQuery } from "./infra/queries/list-dead-letters.query";
 import { AdminOrgListQuery } from "./infra/queries/list-orgs.query";
 import { SavedViewListQuery } from "./infra/queries/list-saved-views.query";
+import { StaffListQuery } from "./infra/queries/list-staff.query";
 import { StaffNoteListQuery } from "./infra/queries/list-staff-notes.query";
+import { StaffOverrideListQuery } from "./infra/queries/list-staff-overrides.query";
 import { StripeEventListQuery } from "./infra/queries/list-stripe-events.query";
 import { SweepRunsQuery } from "./infra/queries/list-sweep-runs.query";
 import { AdminUserListQuery } from "./infra/queries/list-users.query";
@@ -140,11 +158,7 @@ export const adminModule = defineModule<AdminPrerequisites>()((b) =>
           c.IInstrumentation,
         ),
     )
-    .add(
-      "AdminQueryService",
-      (c) =>
-        new AdminQueryService(c.IListUsersQuery, c.IListOrgsQuery, c.IGetOrgQuery, c.IGetUserQuery),
-    )
+    .add("AdminQueryService", (c) => new AdminQueryService(c.IListUsersQuery, c.IListOrgsQuery))
     .add(
       "IStaffStore",
       (c): IStaffStore =>
@@ -202,7 +216,7 @@ export const adminModule = defineModule<AdminPrerequisites>()((b) =>
           c.ILogger,
         ),
     )
-    .add("StepUpService", (c) => new StepUpService(c.IStepUpValidityQuery, c.VerifyStepUpUseCase))
+    .add("StepUpService", (c) => new StepUpService(c.IStepUpValidityQuery))
     .add(
       "IApprovalStore",
       (c): IApprovalStore =>
@@ -226,14 +240,67 @@ export const adminModule = defineModule<AdminPrerequisites>()((b) =>
         new ApprovalService(
           c.IApprovalStore,
           c.IAdminUserStore,
+          c.ITransactionService,
+          c.ApprovalHandlers,
+          c.adminSettings,
+        ),
+    )
+    .add(
+      "IListApprovalsQuery",
+      (c): IListApprovalsQuery => new ApprovalListQuery(c.IApprovalStore, c.IInstrumentation),
+    )
+    .add(
+      "IGetApprovalQuery",
+      (c): IGetApprovalQuery => new ApprovalDetailQuery(c.IApprovalStore, c.IInstrumentation),
+    )
+    .add(
+      "ICountDueApprovalsQuery",
+      (c): ICountDueApprovalsQuery =>
+        new DueApprovalCountQuery(c.IApprovalStore, c.IInstrumentation),
+    )
+    .add(
+      "DecideApprovalUseCase",
+      (c) =>
+        new DecideApprovalUseCase(
+          c.IApprovalStore,
           c.IStaffStore,
-          c.IOutboxRepository,
           c.ITransactionService,
           c.IInstrumentation,
           c.ApprovalHandlers,
           c.staffSettings,
-          c.adminSettings,
         ),
+    )
+    .add(
+      "CancelApprovalUseCase",
+      (c) => new CancelApprovalUseCase(c.IApprovalStore, c.ITransactionService),
+    )
+    .add(
+      "ExpireApprovalsUseCase",
+      (c) => new ExpireApprovalsUseCase(c.IApprovalStore, c.ITransactionService),
+    )
+    .add(
+      "CloseApprovalsOfDeletedUserUseCase",
+      (c) => new CloseApprovalsOfDeletedUserUseCase(c.IApprovalStore, c.ITransactionService),
+    )
+    .add(
+      "IListStaffQuery",
+      (c): IListStaffQuery =>
+        new StaffListQuery(c.IStaffStore, c.staffSettings, c.IInstrumentation),
+    )
+    .add(
+      "IListStaffOverridesQuery",
+      (c): IListStaffOverridesQuery =>
+        new StaffOverrideListQuery(c.IStaffStore, c.staffSettings, c.IInstrumentation),
+    )
+    .add(
+      "ICountExpiredImpersonationsQuery",
+      (c): ICountExpiredImpersonationsQuery =>
+        new ExpiredImpersonationCountQuery(c.IStaffStore, c.IInstrumentation),
+    )
+    .add(
+      "ExpireImpersonationsUseCase",
+      (c) =>
+        new ExpireImpersonationsUseCase(c.IStaffStore, c.IOutboxRepository, c.ITransactionService),
     )
     .add(
       "BanUserUseCase",
@@ -319,10 +386,7 @@ export const adminModule = defineModule<AdminPrerequisites>()((b) =>
           c.ITransactionService,
         ),
     )
-    .add(
-      "PlanOverrideService",
-      (c) => new PlanOverrideService(c.SetPlanOverrideUseCase, c.RevokePlanOverrideUseCase),
-    )
+    .add("PlanOverrideService", (c) => new PlanOverrideService(c.SetPlanOverrideUseCase))
     .add(
       "IStaffNoteStore",
       (c): IStaffNoteStore => new DrizzleStaffNoteRepository(c.IInstrumentation),
@@ -357,14 +421,21 @@ export const adminModule = defineModule<AdminPrerequisites>()((b) =>
         new StaffInboxQuery(c.IApprovalStore, c.IOpsStore, c.ISweepRunStore, c.IInstrumentation),
     )
     .add("CloseApprovalsOfDeletedUser", (c) =>
-      closeApprovalsOfDeletedUser({ ApprovalService: c.ApprovalService }),
+      closeApprovalsOfDeletedUser({
+        CloseApprovalsOfDeletedUserUseCase: c.CloseApprovalsOfDeletedUserUseCase,
+      }),
+    )
+    .add(
+      "NotifyImpersonatedUserUseCase",
+      (c) =>
+        new NotifyImpersonatedUserUseCase(
+          c.IGetUserQuery,
+          c.IEmailService,
+          c.ILocaleReader,
+          c.adminSettings.supportUrl,
+        ),
     )
     .add("NotifyImpersonatedUser", (c) =>
-      notifyImpersonatedUser({
-        IEmailService: c.IEmailService,
-        AdminQueryService: c.AdminQueryService,
-        ILocaleReader: c.ILocaleReader,
-        supportUrl: c.adminSettings.supportUrl,
-      }),
+      notifyImpersonatedUser({ NotifyImpersonatedUserUseCase: c.NotifyImpersonatedUserUseCase }),
     ),
 );

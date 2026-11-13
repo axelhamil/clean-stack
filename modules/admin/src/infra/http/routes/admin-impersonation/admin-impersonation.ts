@@ -41,6 +41,7 @@ export function createAdminImpersonationRoutes(deps: AdminImpersonationRoutesDep
           ticketRef,
           ip: g.clientIp(c),
           expiresAt: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
+          // raw-body: the auth library reads the session from the forwarded headers
           start: () => deps.IAuthProvider.impersonateUser(targetId, [...c.req.raw.headers]),
         });
         if (started.isFailure) throw new AppErrorException(started.getError());
@@ -53,6 +54,7 @@ export function createAdminImpersonationRoutes(deps: AdminImpersonationRoutesDep
         throw new HTTPException(400, { message: "ADMIN_NOT_IMPERSONATING" });
       }
 
+      // raw-body: the auth library reads the session from the forwarded headers
       const stopped = await deps.IAuthProvider.stopImpersonating([...c.req.raw.headers]);
       if (stopped.isFailure) throw new AppErrorException(stopped.getError());
 

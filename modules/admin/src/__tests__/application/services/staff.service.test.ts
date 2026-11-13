@@ -691,29 +691,6 @@ describe("StaffService", () => {
     });
   });
 
-  describe("list", () => {
-    it("hides a row whose env listing is gone, since it grants nothing", async () => {
-      const row = {
-        email: "a@example.com",
-        name: "A",
-        role: "manager" as const,
-        createdAt: new Date(),
-      };
-      const { store, service } = setup({ listed: ["kept"] });
-      store.listActive.mockImplementation(async () =>
-        Result.ok([
-          { ...row, userId: "kept", source: "env" as const },
-          { ...row, userId: "gone", source: "env" as const },
-          { ...row, userId: "hired", source: "console" as const },
-        ]),
-      );
-
-      const listed = (await service.list()).getValue().map((r) => r.userId);
-
-      expect(listed).toEqual(["kept", "hired"]);
-    });
-  });
-
   describe("what a request is refused or stamped with before it queues", () => {
     it("a timed ban is sensitive on a staff member and over a permanent ban, not otherwise", async () => {
       const timed = { targetUserId: TARGET, expiresIn: 3600 };
@@ -794,31 +771,6 @@ describe("StaffService", () => {
       enqueuedEvents(outbox).filter(
         (event) => event.eventType === EventTypes.ADMIN_IMPERSONATION_STOPPED,
       );
-
-    it("announces each expired session once, with its full length, and nothing on a second sweep", async () => {
-      const { store, outbox, service } = setup({});
-      const expired = [impersonation(2 * HOUR_MS, "s1"), impersonation(3 * HOUR_MS, "s2")];
-      store.endExpiredImpersonations.mockImplementationOnce(async () => Result.ok(expired));
-      store.endExpiredImpersonations.mockImplementationOnce(async () => Result.ok([]));
-
-      const first = await service.expireImpersonations(100);
-      const second = await service.expireImpersonations(100);
-
-      expect(first.getValue()).toBe(2);
-      expect(second.getValue()).toBe(0);
-      expect(stopped(outbox)).toEqual(
-        ["s1", "s2"].map(() => ({
-          eventType: EventTypes.ADMIN_IMPERSONATION_STOPPED,
-          aggregateId: CUSTOMER,
-          payload: {
-            actorUserId: TARGET,
-            userId: CUSTOMER,
-            durationMs: HOUR_MS,
-            endReason: "expired",
-          },
-        })),
-      );
-    });
 
     it("announces each session revoked when a write takes the permission away", async () => {
       const ended = [impersonation(60_000, "s1"), impersonation(60_000, "s2")];
@@ -1017,17 +969,6 @@ describe("StaffService", () => {
         aggregateId: sessionId,
         payload: { userId: "customer", sessionId, actorUserId },
       }));
-
-    it("announces each expired session the sweep deletes as signed out by no one", async () => {
-      const { store, outbox, service } = setup({});
-      store.endExpiredImpersonations.mockImplementation(async () =>
-        Result.ok([impersonation("s1"), impersonation("s2")]),
-      );
-
-      await service.expireImpersonations(100);
-
-      expect(signedOut(outbox)).toEqual(announced(null));
-    });
 
     it("announces each session ended by taking the permission away as signed out by the actor", async () => {
       const { outbox, service } = setup({

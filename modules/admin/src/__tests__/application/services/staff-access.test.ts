@@ -9,7 +9,7 @@ import {
   grantsStaffAccess,
   isLastManager,
   staffAccessOf,
-} from "../../../application/services/staff-access";
+} from "../../../domain/staff/services/staff-access.service";
 
 const NOW = new Date("2026-10-30T12:00:00Z");
 

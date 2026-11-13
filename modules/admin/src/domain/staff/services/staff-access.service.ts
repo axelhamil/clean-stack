@@ -2,9 +2,24 @@ import {
   effectivePermissions,
   type StaffAccess,
   type StaffPermission,
+  type StaffRole,
 } from "@packages/access-control";
 import { Option } from "@packages/ddd-kit";
-import type { StaffRecord, StaffSource } from "../ports/repositories/staff-store.port";
+
+export type StaffSource = "env" | "console" | "migration";
+
+export interface StaffOverrideGrant {
+  permission: StaffPermission;
+  effect: "grant" | "deny";
+  expiresAt: Option<Date>;
+}
+
+export interface StaffGrant {
+  userId: string;
+  role: StaffRole;
+  source: StaffSource;
+  overrides: StaffOverrideGrant[];
+}
 
 export interface StaffEnv {
   PLATFORM_ADMIN_IDS: readonly string[];
@@ -40,7 +55,7 @@ export function isLastManager(
   );
 }
 
-export function permissionsOfRecord(row: StaffRecord, now: Date): StaffPermission[] {
+export function permissionsOfRecord(row: StaffGrant, now: Date): StaffPermission[] {
   return effectivePermissions(
     row.role,
     row.overrides.map((o) => ({ ...o, expiresAt: o.expiresAt.toNull() })),
@@ -50,7 +65,7 @@ export function permissionsOfRecord(row: StaffRecord, now: Date): StaffPermissio
 
 export function staffAccessOf(
   user: StaffUser,
-  staffRow: Option<StaffRecord>,
+  staffRow: Option<StaffGrant>,
   env: StaffEnv,
   now: Date = new Date(),
 ): Option<StaffAccess> {

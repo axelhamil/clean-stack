@@ -1,6 +1,7 @@
 import { type IUseCase, Option, Result } from "@packages/ddd-kit";
 import type { AdminStoreError } from "../../ports/repositories/admin-user-store.port";
 import type { StaffStoreError } from "../../ports/repositories/staff-store.port";
+import type { StepUpRefusal } from "../../ports/services/step-up-gate.port";
 import type {
   AdminModerationError,
   AdminModerationService,
@@ -15,7 +16,8 @@ export type BanUserError =
   | AdminStoreError
   | ApprovalRequestError
   | StaffBanError
-  | AdminModerationError;
+  | AdminModerationError
+  | StepUpRefusal;
 
 export class BanUserUseCase implements IUseCase<BanUserInput, GatedOutcome, BanUserError> {
   constructor(
@@ -32,7 +34,7 @@ export class BanUserUseCase implements IUseCase<BanUserInput, GatedOutcome, BanU
     });
     if (sensitive.isFailure) return Result.fail(sensitive.getError());
 
-    const gated: Result<Option<string>, ApprovalRequestError> = sensitive.getValue()
+    const gated: Result<Option<string>, ApprovalRequestError | StepUpRefusal> = sensitive.getValue()
       ? await this.gate(input)
       : Result.ok(Option.none());
 
@@ -48,8 +50,11 @@ export class BanUserUseCase implements IUseCase<BanUserInput, GatedOutcome, BanU
     );
   }
 
-  private async gate(input: BanUserInput): Promise<Result<Option<string>, ApprovalRequestError>> {
-    await input.confirmStepUp();
+  private async gate(
+    input: BanUserInput,
+  ): Promise<Result<Option<string>, ApprovalRequestError | StepUpRefusal>> {
+    const confirmed = await input.stepUp.confirm();
+    if (confirmed.isFailure) return Result.fail(confirmed.getError());
 
     return this.approvals.gate({
       action: "user.ban_permanent",

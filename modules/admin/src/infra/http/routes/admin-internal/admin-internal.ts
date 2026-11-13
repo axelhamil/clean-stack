@@ -3,10 +3,10 @@
 // deletes impersonation sessions past their expiry; each announces one event per row in the batch's unit of work.
 
 import { type AppError, AppErrorException, type Result } from "@packages/ddd-kit";
-import type { SweepSpans } from "@packages/drizzle/sweep-span";
 import type { RouteGuard } from "@packages/http/route-guards";
 import {
   type RetentionPass,
+  type RunRetentionSweepOptions,
   type SweepBody,
   type SweepResponse,
   sweepBodySchema,
@@ -15,8 +15,10 @@ import { zV } from "@packages/http/validator";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import type { PinoLogger } from "hono-pino";
-import type { ApprovalService } from "../../../../application/services/approval.service";
-import type { StaffService } from "../../../../application/services/staff.service";
+import type { ICountDueApprovalsQuery } from "../../../../application/queries/count-due-approvals.query";
+import type { ICountExpiredImpersonationsQuery } from "../../../../application/queries/count-expired-impersonations.query";
+import type { ExpireApprovalsUseCase } from "../../../../application/usecases/expire-approvals/expire-approvals.usecase";
+import type { ExpireImpersonationsUseCase } from "../../../../application/usecases/expire-impersonations/expire-impersonations.usecase";
 
 type HonoEnv = { Variables: { logger: PinoLogger } };
 
@@ -24,14 +26,16 @@ type SweepRequest = (opts: {
   label: string;
   body: SweepBody;
   logger: PinoLogger;
-  passes: (spans: SweepSpans) => RetentionPass[];
+  passes: (spans: RunRetentionSweepOptions["spans"]) => RetentionPass[];
 }) => Promise<SweepResponse>;
 
 export interface AdminInternalRoutesDeps {
   internalGuards: readonly RouteGuard[];
   runSweep: SweepRequest;
-  ApprovalService: Pick<ApprovalService, "expireDue" | "countDue">;
-  StaffService: Pick<StaffService, "expireImpersonations" | "countExpiredImpersonations">;
+  ExpireApprovalsUseCase: Pick<ExpireApprovalsUseCase, "execute">;
+  ICountDueApprovalsQuery: ICountDueApprovalsQuery;
+  ExpireImpersonationsUseCase: Pick<ExpireImpersonationsUseCase, "execute">;
+  ICountExpiredImpersonationsQuery: ICountExpiredImpersonationsQuery;
 }
 
 async function valueOrThrow<T>(pending: Promise<Result<T, AppError>>): Promise<T> {
@@ -70,15 +74,15 @@ export function createAdminInternalRoutes(deps: AdminInternalRoutesDeps) {
   const sweepApprovals = dueRowsSweep(
     deps.runSweep,
     "sweep-admin-approvals",
-    (batchSize) => deps.ApprovalService.expireDue(batchSize),
-    () => deps.ApprovalService.countDue(),
+    (batchSize) => deps.ExpireApprovalsUseCase.execute({ batchSize }),
+    () => deps.ICountDueApprovalsQuery.execute(),
   );
 
   const sweepImpersonations = dueRowsSweep(
     deps.runSweep,
     "sweep-admin-impersonations",
-    (batchSize) => deps.StaffService.expireImpersonations(batchSize),
-    () => deps.StaffService.countExpiredImpersonations(),
+    (batchSize) => deps.ExpireImpersonationsUseCase.execute({ batchSize }),
+    () => deps.ICountExpiredImpersonationsQuery.execute(),
   );
 
   return new Hono<HonoEnv>()
