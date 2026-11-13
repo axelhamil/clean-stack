@@ -344,7 +344,7 @@ async function proveOtherFlowsBurnTheCode(): Promise<void> {
   const spare = await probes.manager("burn-rgpd-spare");
   check("a second manager exists for the deletion", spare.id.length > 0);
   const rgpdCode = await codeAt(leaving.probe, currentCounter());
-  const deletion = await di.RgpdService.requestAccountDeletion({
+  const deletion = await di.RequestAccountDeletionUseCase.execute({
     userId: leaving.probe.id,
     totpCode: rgpdCode,
   });

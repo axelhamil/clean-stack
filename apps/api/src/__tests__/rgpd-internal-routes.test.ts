@@ -1,10 +1,8 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import type { RgpdError } from "@modules/rgpd/ports/rgpd";
-import { createRgpdInternalRoutes } from "@modules/rgpd/routes/rgpd-internal";
-import type {
-  ProcessPendingDeletionsInput,
-  ProcessPendingDeletionsOutput,
-} from "@modules/rgpd/services/rgpd";
+import {
+  createRgpdInternalRoutes,
+  type RgpdInternalRoutesDeps,
+} from "@modules/rgpd/routes/rgpd-internal";
 import { NoOpInstrumentation, Result } from "@packages/ddd-kit";
 import {
   buildSignatureHeader,
@@ -12,14 +10,15 @@ import {
   SIGNATURE_HEADER,
   sign,
 } from "@packages/http/internal-signature";
-import type { ISweepRunStore, SweepRun, SweepRunStoreError } from "@packages/http/sweep-run.port";
-import { mockPort } from "@packages/test/bun";
 import { Hono } from "hono";
 import { env } from "../shared/env";
 import { internalLayers } from "../shared/internal-routes/internal-layers";
 import { createErrorHandler } from "../shared/middleware/error.middleware";
 
-type SweepResult = Result<ProcessPendingDeletionsOutput, RgpdError>;
+type SweepUseCase = RgpdInternalRoutesDeps["ProcessPendingDeletionsUseCase"];
+type ProcessPendingDeletionsInput = Parameters<SweepUseCase["execute"]>[0];
+type SweepResult = Awaited<ReturnType<SweepUseCase["execute"]>>;
+type ProcessPendingDeletionsOutput = ReturnType<SweepResult["getValue"]>;
 
 const SWEEP_OK: ProcessPendingDeletionsOutput = {
   processed: 2,
@@ -33,17 +32,11 @@ const mockedExecute = mock<(input: ProcessPendingDeletionsInput) => Promise<Swee
   async () => Result.ok(SWEEP_OK),
 );
 
-const mockedRecord = mock<(run: SweepRun) => Promise<Result<void, SweepRunStoreError>>>(async () =>
-  Result.ok(),
-);
-
 const SETTINGS = { sweepBatchSize: 50, sweepDeadlineMs: 90_000 };
 
 const routes = createRgpdInternalRoutes({
   internalGuards: internalLayers,
-  ISweepRunStore: { ...mockPort<ISweepRunStore>(), record: mockedRecord },
-  IInstrumentation: new NoOpInstrumentation(),
-  RgpdService: { processPendingDeletions: mockedExecute },
+  ProcessPendingDeletionsUseCase: { execute: mockedExecute },
   rgpdSettings: SETTINGS,
 });
 
@@ -92,32 +85,7 @@ async function postSignedSweep(body: object) {
 describe("POST /internal/rgpd-sweep", () => {
   beforeEach(() => {
     mockedExecute.mockClear();
-    mockedRecord.mockClear();
     mockedExecute.mockResolvedValue(Result.ok(SWEEP_OK));
-  });
-
-  describe("heartbeat", () => {
-    it("records a run with a failed account as a batch error", async () => {
-      mockedExecute.mockResolvedValue(
-        Result.ok({ ...SWEEP_OK, failed: [{ userId: "u3", errorCode: "X" }] }),
-      );
-
-      await postSignedSweep({});
-
-      expect(mockedRecord.mock.calls[0]?.[0]).toMatchObject({
-        label: "rgpd-sweep",
-        outcome: "batch-error",
-        count: 2,
-      });
-    });
-
-    it("leaves the last real run in place on a dry run", async () => {
-      mockedExecute.mockResolvedValue(Result.ok({ ...SWEEP_OK, dryRun: true }));
-
-      await postSignedSweep({ dryRun: true });
-
-      expect(mockedRecord).not.toHaveBeenCalled();
-    });
   });
 
   describe("when the request carries a valid signature", () => {

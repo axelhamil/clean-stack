@@ -521,7 +521,7 @@ No module imports another. Dependencies run through ports the host binds, throug
 | `profile` | host | the name-writing port of `update-display-name` (D17), bound to `IUserAccountStore` |
 | `admin` | host | `IAuthProvider` (bound in the `routeDeps` scope), `ITotpVerifier`, `ISsoEnforcement` (key `AdminActionService`), `staffLookupOnce`, `staffSettings`, `adminSettings`, `ISweepRunStore`, `IEmailService`, `ILocaleReader`, route deps `routeGuards`, `internalGuards`, `runSweep`, `accountDeleteRateLimit` |
 | `rgpd` | `admin` | key `IStaffStore`; the host `sources/rgpd.ts` builds `IStaffAccessRules`, `IStaffDataEraser` and `IEndedSessionsReader` from 4 admin export keys (`adapters/drizzle-staff-data-eraser`, `adapters/ended-sessions`, `rules/staff-access`, `services/impersonation-end`) |
-| `rgpd` | `api-token` | `IApiTokenRevoker` (`ApiTokenService`) |
+| `rgpd` | `api-token` | `IApiTokenRevoker` (`RevokeAllUserTokensUseCase`) |
 | `rgpd` | `uploads` | `IExportStorage` (key `IStorageService`) |
 | `notifications` | `admin` tables | host query `StaffRecipientsQuery` behind `IStaffRecipientsReader` |
 | `api-token` | host | `IUserContactReader` (key `IUserAccountStore`) |
@@ -950,7 +950,7 @@ Updated in the PR that delivers each line.
 | 2 | `webhooks` | technical | no | L | done 2026-11-13; HTTP drift: a malformed `:id` or `:deliveryId` answers 400 `REQUEST_INVALID` instead of 404 | | yes |
 | 2 | `notifications` | technical | no | L | done 2026-11-13 | | yes |
 | 2 | `admin` | business | `ApprovalRequest`; staff domain service file | XL | done 2026-11-13; HTTP drift: a malformed `:id` answers 400 `REQUEST_INVALID` instead of 404 | | yes |
-| 3 | `rgpd` | business | `domain/deletion/` pure rules | L | to do | | |
+| 3 | `rgpd` | business | `domain/deletion/` pure rules | L | done 2026-11-13 | | yes |
 | 4 | `organization` (from the host) | business | no | M | to do | | |
 | 4 | host use cases | host | n/a | M | to do | | |
 | 5, last | `auth` (D9) | technical | no | XL | to do | | |

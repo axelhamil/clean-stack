@@ -18,8 +18,8 @@ Those of invariant 3, plus `USER_DELETION_REQUESTED`, `USER_DELETION_CANCELLED`,
 
 ## Ports exposed
 
-rgpd declares and the host binds (`apps/api/src/composition/sources/rgpd.ts`, `container.ts`): `IApiTokenRevoker` (bound to `ApiTokenService.revokeAllOfUser` of `@modules/api-token`; rgpd emits the resulting `API_TOKEN_REVOKED`), `IStaffStore`, `IStaffAccessRules`, `IStaffDataEraser`, `IEndedSessionsReader` (served by `@modules/admin`), `ITotpVerifier` and `IExportStorage` (host and uploads).
+rgpd declares and the host binds (`apps/api/src/composition/sources/rgpd.ts`, `container.ts`): `IApiTokenRevoker` (bound to `RevokeAllUserTokensUseCase` of `@modules/api-token`; rgpd emits the resulting `API_TOKEN_REVOKED`), `IStaffStore`, `IStaffAccessRules`, `IStaffDataEraser`, `IEndedSessionsReader` (served by `@modules/admin`), `ITotpVerifier` and `IExportStorage` (host and uploads).
 
 ## Traps
 
-- **A new table holding personal data joins the wipe and the export in the same change**: `executeWipe` and `collectUserDataForExport` of the rgpd repository, or the port of the module that owns the table. A table scoped by `organizationId` is covered by the organization cascade only when that organization is deleted. Nothing fails when a table is forgotten: it survives the erasure silently. The rollback is proven by `check:wipe-rollback` (`apps/api`).
+- **A new table holding personal data joins the wipe and the export in the same change**: `IAccountEraser` (with its step in `AccountWipeService`) and `IUserDataExportReader`, or the port of the module that owns the table. A table scoped by `organizationId` is covered by the organization cascade only when that organization is deleted. Nothing fails when a table is forgotten: it survives the erasure silently. The rollback is proven by `check:wipe-rollback` (`apps/api`).

@@ -8,7 +8,6 @@ import type { IGithubKeyVerifier } from "./application/ports/services/github-key
 import type { ITokenHasher } from "./application/ports/services/token-hasher.port";
 import type { IUserContactReader } from "./application/ports/services/user-contact.port";
 import type { IListApiTokensQuery } from "./application/queries/list-api-tokens.query";
-import { ApiTokenService } from "./application/services/api-token.service";
 import { CreateApiTokenUseCase } from "./application/usecases/create-api-token/create-api-token.usecase";
 import { HandleLeakReportUseCase } from "./application/usecases/handle-leak-report/handle-leak-report.usecase";
 import { RevokeAllUserTokensUseCase } from "./application/usecases/revoke-all-user-tokens/revoke-all-user-tokens.usecase";
@@ -73,7 +72,6 @@ export const apiTokenModule = defineModule<ApiTokenPrerequisites>()((b) =>
           c.apiTokenSettings,
         ),
     )
-    .add("ApiTokenService", (c) => new ApiTokenService(c.RevokeAllUserTokensUseCase))
     .add(
       "RevokeTokensOnMembershipLost",
       (c): EventHandler =>

@@ -1,10 +1,10 @@
 /**
  * Proves against a real Postgres that a failed deletion-confirmation enqueue rolls back
- * the whole account-wipe transaction, the guarantee added by moving `sendTemplate` inside
- * `this.transactions.run(...)` in `RgpdService.executeAccountWipe`.
+ * the whole account-wipe transaction, the guarantee given by enqueuing `sendTemplate` inside
+ * the unit of work `AccountWipeService.wipe` opens.
  *
- * A mocked unit-of-work (see `rgpd.service.test.ts`) can only prove the callback *throws*
- * instead of returning; only a real `db.transaction(...)` can prove Postgres actually
+ * A mocked unit-of-work (see `account-wipe.service.test.ts`) can only prove the callback fails
+ * instead of committing; only a real `db.transaction(...)` can prove Postgres actually
  * discards the wipe's writes when that throw happens. This script is that proof.
  *
  * Note: `DrizzleEmailQueue.enqueue` uses `onConflictDoNothing` on the idempotency-key unique
@@ -37,8 +37,10 @@ import * as staffSchema from "@modules/admin/schemas/staff";
 import { DrizzleApiTokenRepository } from "@modules/api-token/adapters/drizzle-api-token-repository";
 import { generateToken, hmacToken } from "@modules/api-token/rules/api-token-crypto";
 import * as apiTokenSchema from "@modules/api-token/schemas/api-token";
-import { DrizzleRgpdRepository } from "@modules/rgpd/adapters/drizzle-rgpd-repository";
-import { RgpdService } from "@modules/rgpd/services/rgpd";
+import { DrizzleAccountEraser } from "@modules/rgpd/adapters/drizzle-account-eraser";
+import { DrizzleDeletionStateRepository } from "@modules/rgpd/adapters/drizzle-deletion-state-repository";
+import { AccountWipeService } from "@modules/rgpd/services/account-wipe";
+import { ExecuteAccountWipeUseCase } from "@modules/rgpd/usecases/execute-account-wipe";
 import { NoOpStorageService } from "@modules/uploads/adapters/noop-storage";
 import type { IInstrumentation } from "@packages/ddd-kit";
 import { NoOpInstrumentation } from "@packages/ddd-kit";
@@ -57,14 +59,11 @@ import { QueuedEmailService } from "@packages/email/email.service";
 import { EventTypes } from "@packages/events";
 import { DrizzleOutboxRepository } from "@packages/outbox/drizzle-outbox.repository";
 import { Hono } from "hono";
-import { authSecretKey } from "../src/auth/auth-secrets";
 import { createAuthQueries } from "../src/auth/queries";
 import { staffAccessRules } from "../src/composition/sources/rgpd";
 import { di } from "../src/container";
-import { env } from "../src/shared/env";
 import { logger } from "../src/shared/logger";
 import { requireApiToken } from "../src/shared/middleware/api-token.middleware";
-import { DrizzleTotpVerifier } from "../src/shared/services/drizzle-totp-verifier";
 
 const instrumentation: IInstrumentation = new NoOpInstrumentation();
 const PROBE_MARKER = "wipe-rollback-probe";
@@ -130,40 +129,33 @@ async function cleanup(): Promise<void> {
   await db.execute(sql`DELETE FROM outbox_event WHERE aggregate_id = ${userId}`);
 }
 
-function buildRepository(): DrizzleRgpdRepository {
-  return new DrizzleRgpdRepository(
-    logger,
-    instrumentation,
-    di.IApiTokenRevoker,
-    di.IStaffDataEraser,
-    di.IEndedSessionsReader,
-  );
+function buildStates(): DrizzleDeletionStateRepository {
+  return new DrizzleDeletionStateRepository(logger, instrumentation);
 }
 
-function buildService(): RgpdService {
+function buildUseCase(): ExecuteAccountWipeUseCase {
   const outbox = new DrizzleOutboxRepository(instrumentation, () => undefined);
   const email = new QueuedEmailService(
     new DrizzleEmailQueue(instrumentation, logger),
     instrumentation,
   );
   const uow = new TransactionService(instrumentation);
-  return new RgpdService(
-    buildRepository(),
-    new NoOpStorageService(logger),
-    email,
-    uow,
-    outbox,
-    instrumentation,
-    new DrizzleStaffRepository(instrumentation, uow, logger),
-    staffAccessRules(outbox, { PLATFORM_ADMIN_IDS: [] }),
-    new DrizzleTotpVerifier(instrumentation, authSecretKey(env)),
-    {
-      appUrl: env.APP_URL,
-      gracePeriodDays: env.RGPD_GRACE_PERIOD_DAYS,
-      exportRateLimitHours: env.RGPD_EXPORT_RATE_LIMIT_HOURS,
-      sweepDeadlineMs: env.SWEEP_DEADLINE_MS,
-    },
-    logger,
+  return new ExecuteAccountWipeUseCase(
+    new AccountWipeService({
+      states: buildStates(),
+      eraser: new DrizzleAccountEraser(logger, instrumentation),
+      staffData: di.IStaffDataEraser,
+      apiTokens: di.IApiTokenRevoker,
+      endedSessions: di.IEndedSessionsReader,
+      staff: new DrizzleStaffRepository(instrumentation, uow, logger),
+      staffAccess: staffAccessRules(outbox, { PLATFORM_ADMIN_IDS: [] }),
+      storage: new NoOpStorageService(logger),
+      email,
+      transactions: uow,
+      outbox,
+      instrumentation,
+      logger,
+    }),
   );
 }
 
@@ -267,7 +259,7 @@ async function checkErasedAccountLosesAccess(): Promise<void> {
   const raw = await seedErasedAccount();
   check("the token authenticates before the wipe", (await requestWithToken(raw)) === 200);
 
-  const result = await buildService().executeAccountWipe({ userId: erasedId });
+  const result = await buildUseCase().execute({ userId: erasedId });
   check("the completed wipe reports success", result.isSuccess);
 
   const tokens = await db
@@ -318,9 +310,9 @@ async function main(): Promise<void> {
   await seedUser();
   await addFailingConstraint();
 
-  const result = await buildService().executeAccountWipe({ userId });
+  const result = await buildUseCase().execute({ userId });
 
-  console.log("[1] executeAccountWipe result ->", result.isFailure ? result.getError() : "success");
+  console.log("[1] account wipe result ->", result.isFailure ? result.getError() : "success");
   check("the wipe reports failure when the confirmation enqueue fails", result.isFailure);
   check(
     "the failure code is ACCOUNT_WIPE_NOTIFY_PROVIDER_FAILURE",
@@ -348,10 +340,10 @@ async function main(): Promise<void> {
     .where(eq(staffSchema.staffNote.userId, userId));
   check("the staff notes come back with the rolled back wipe", notes.length === 1, notes);
 
-  const readyForWipe = await buildRepository().findUsersReadyForWipe(50);
+  const readyForWipe = await buildStates().findReadyForWipe(50);
   const stillPending =
     readyForWipe.isSuccess && readyForWipe.getValue().some((r) => r.userId === userId);
-  console.log("[3] still returned by findUsersReadyForWipe ->", stillPending);
+  console.log("[3] still returned by findReadyForWipe ->", stillPending);
   check("the account is still picked up by the next sweep (not lost)", stillPending);
 
   await cleanup();

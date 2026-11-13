@@ -192,7 +192,7 @@ async function proveErasure() {
     .set({ pendingDeletionUntil: new Date(Date.now() - 1000) })
     .where(eq(authSchema.user.id, erased.id));
 
-  const wiped = await di.RgpdService.executeAccountWipe({ userId: erased.id });
+  const wiped = await di.ExecuteAccountWipeUseCase.execute({ userId: erased.id });
   check("the erasure runs", wiped.isSuccess, wiped.isFailure ? wiped.getError() : null);
 
   const rows = await db.select().from(savedView).where(eq(savedView.ownerId, erased.id));
@@ -336,9 +336,7 @@ async function proveHeartbeats() {
         "/",
         createRgpdInternalRoutes({
           internalGuards: internalLayers,
-          ISweepRunStore: di.ISweepRunStore,
-          IInstrumentation: di.IInstrumentation,
-          RgpdService: di.RgpdService,
+          ProcessPendingDeletionsUseCase: di.ProcessPendingDeletionsUseCase,
           rgpdSettings: di.rgpdSettings,
         }),
       )

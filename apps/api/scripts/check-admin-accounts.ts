@@ -444,7 +444,7 @@ async function proveWipes(cookie: string, ownerId: string): Promise<void> {
     note: "x",
   });
 
-  const wiped = await di.RgpdService.executeAccountWipe({ userId: erased.id });
+  const wiped = await di.ExecuteAccountWipeUseCase.execute({ userId: erased.id });
   check("the erasure runs", wiped.isSuccess, wiped.isFailure ? wiped.getError() : null);
   check("the erasure removes the user's notes", (await notesOf("user", erased.id)).length === 0);
   check(

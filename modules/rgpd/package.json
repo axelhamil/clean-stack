@@ -6,11 +6,21 @@
   "exports": {
     "./module": "./src/rgpd.module.ts",
     "./config": "./src/application/config/rgpd-settings.ts",
-    "./routes/rgpd": "./src/infrastructure/http/rgpd.routes.ts",
-    "./routes/rgpd-internal": "./src/infrastructure/http/rgpd-internal.routes.ts",
-    "./ports/*": "./src/application/ports/*.port.ts",
-    "./services/rgpd": "./src/application/services/rgpd.service.ts",
-    "./adapters/drizzle-rgpd-repository": "./src/infrastructure/repositories/drizzle-rgpd.repository.ts"
+    "./routes/rgpd": "./src/infra/http/routes/rgpd/rgpd.ts",
+    "./routes/rgpd-internal": "./src/infra/http/routes/rgpd-internal/rgpd-internal.ts",
+    "./ports/deletion-state": "./src/application/ports/repositories/deletion-state.port.ts",
+    "./ports/account-eraser": "./src/application/ports/repositories/account-eraser.port.ts",
+    "./ports/user-data-export": "./src/application/ports/repositories/user-data-export.port.ts",
+    "./ports/*": "./src/application/ports/services/*.port.ts",
+    "./queries/*": "./src/application/queries/*.query.ts",
+    "./adapters/drizzle-deletion-state-repository": "./src/infra/repos/drizzle/deletion-state.repository.ts",
+    "./adapters/drizzle-account-eraser": "./src/infra/repos/drizzle/account-eraser.repository.ts",
+    "./services/account-wipe": "./src/application/services/account-wipe.service.ts",
+    "./usecases/execute-account-wipe": "./src/application/usecases/execute-account-wipe/execute-account-wipe.usecase.ts",
+    "./usecases/request-account-deletion": "./src/application/usecases/request-account-deletion/request-account-deletion.usecase.ts",
+    "./usecases/process-pending-deletions": "./src/application/usecases/process-pending-deletions/process-pending-deletions.usecase.ts",
+    "./usecases/cancel-account-deletion": "./src/application/usecases/cancel-account-deletion/cancel-account-deletion.usecase.ts",
+    "./usecases/request-data-export": "./src/application/usecases/request-data-export/request-data-export.usecase.ts"
   },
   "scripts": {
     "format": "biome format . --write",

@@ -10,7 +10,6 @@
     "./routes/scanning": "./src/infra/http/routes/scanning/scanning.ts",
     "./ports/api-token": "./src/application/ports/repositories/api-token.port.ts",
     "./ports/*": "./src/application/ports/services/*.port.ts",
-    "./services/api-token": "./src/application/services/api-token.service.ts",
     "./usecases/create-api-token": "./src/application/usecases/create-api-token/create-api-token.usecase.ts",
     "./usecases/revoke-api-token": "./src/application/usecases/revoke-api-token/revoke-api-token.usecase.ts",
     "./usecases/revoke-all-user-tokens": "./src/application/usecases/revoke-all-user-tokens/revoke-all-user-tokens.usecase.ts",
