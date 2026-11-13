@@ -222,7 +222,7 @@ code review, not a configuration change an operator can make by clicking.
 
 Three consumers enforce it:
 
-1. **`WebhookFanoutSubscriber`** (`modules/webhooks/src/infrastructure/services/webhook-fanout-subscriber.ts`):
+1. **`WebhookFanoutSubscriber`** (`modules/webhooks/src/application/usecases/fan-out-event-to-endpoints/fan-out-event-to-endpoints.usecase.ts`):
    calls `isPublicEvent(event.type)` before fan-out; internal events flow to
    `audit_log` and in-process handlers but are never delivered to customer
    endpoints.

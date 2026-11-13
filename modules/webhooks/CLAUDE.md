@@ -21,4 +21,4 @@ Organization webhook endpoints, the fan-out of public catalog events into delive
 
 ## Traps
 
-- `isStaleTimestamp` in `hmac-signer.ts` is the receiver side check (300 s tolerance); the module never calls it, keep it in step with the signature format if that format changes.
+- `isStaleTimestamp` in `infra/adapters/hmac-signer.adapter.ts` is the receiver side check (300 s tolerance); the module never calls it, keep it in step with the signature format if that format changes.
