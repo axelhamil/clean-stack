@@ -1,11 +1,11 @@
 import { stripe } from "@better-auth/stripe";
-import type { IStripeEventStore } from "@modules/billing/application/ports/stripe-event.port";
+import { paymentFailureOf } from "@modules/billing/adapters/stripe-payment-failure";
+import type { IStripeEventStore } from "@modules/billing/ports/stripe-event";
 import {
   authorizeSubscriptionAction,
   subscriptionEventSource,
   subscriptionEventType,
-} from "@modules/billing/application/subscription-events";
-import { paymentFailureOf } from "@modules/billing/infrastructure/adapters/stripe-payment-failure";
+} from "@modules/billing/rules/subscription-events";
 import { ORG_ROLES } from "@packages/access-control";
 import { Option } from "@packages/ddd-kit";
 import { type EventType, EventTypes } from "@packages/events";

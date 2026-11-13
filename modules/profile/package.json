@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./profile.module": "./src/profile.module.ts",
-    "./application/ports/profile.port": "./src/application/ports/profile.port.ts",
-    "./infrastructure/http/profile.routes": "./src/infrastructure/http/profile.routes.ts"
+    "./module": "./src/profile.module.ts",
+    "./routes/profile": "./src/infrastructure/http/profile.routes.ts",
+    "./ports/*": "./src/application/ports/*.port.ts"
   },
   "scripts": {
     "format": "biome format . --write",

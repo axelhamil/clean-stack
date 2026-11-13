@@ -4,14 +4,13 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./uploads.module": "./src/uploads.module.ts",
-    "./application/config/upload-settings": "./src/application/config/upload-settings.ts",
-    "./application/ports/health.port": "./src/application/ports/health.port.ts",
-    "./application/ports/storage.port": "./src/application/ports/storage.port.ts",
-    "./application/services/upload.service": "./src/application/services/upload.service.ts",
-    "./infrastructure/services/noop-storage.service": "./src/infrastructure/services/noop-storage.service.ts",
-    "./infrastructure/storage-health-probe": "./src/infrastructure/storage-health-probe.ts",
-    "./infrastructure/http/uploads.routes": "./src/infrastructure/http/uploads.routes.ts"
+    "./module": "./src/uploads.module.ts",
+    "./config": "./src/application/config/upload-settings.ts",
+    "./routes/uploads": "./src/infrastructure/http/uploads.routes.ts",
+    "./ports/*": "./src/application/ports/*.port.ts",
+    "./services/upload": "./src/application/services/upload.service.ts",
+    "./adapters/noop-storage": "./src/infrastructure/services/noop-storage.service.ts",
+    "./adapters/storage-health-probe": "./src/infrastructure/storage-health-probe.ts"
   },
   "scripts": {
     "format": "biome format . --write",

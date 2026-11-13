@@ -4,17 +4,13 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./rgpd.module": "./src/rgpd.module.ts",
-    "./application/config/rgpd-settings": "./src/application/config/rgpd-settings.ts",
-    "./application/ports/api-token-revoker.port": "./src/application/ports/api-token-revoker.port.ts",
-    "./application/ports/ended-sessions.port": "./src/application/ports/ended-sessions.port.ts",
-    "./application/ports/rgpd.port": "./src/application/ports/rgpd.port.ts",
-    "./application/ports/staff-access-rules.port": "./src/application/ports/staff-access-rules.port.ts",
-    "./application/ports/staff-data-eraser.port": "./src/application/ports/staff-data-eraser.port.ts",
-    "./application/services/rgpd.service": "./src/application/services/rgpd.service.ts",
-    "./infrastructure/repositories/drizzle-rgpd.repository": "./src/infrastructure/repositories/drizzle-rgpd.repository.ts",
-    "./infrastructure/http/rgpd.routes": "./src/infrastructure/http/rgpd.routes.ts",
-    "./infrastructure/http/rgpd-internal.routes": "./src/infrastructure/http/rgpd-internal.routes.ts"
+    "./module": "./src/rgpd.module.ts",
+    "./config": "./src/application/config/rgpd-settings.ts",
+    "./routes/rgpd": "./src/infrastructure/http/rgpd.routes.ts",
+    "./routes/rgpd-internal": "./src/infrastructure/http/rgpd-internal.routes.ts",
+    "./ports/*": "./src/application/ports/*.port.ts",
+    "./services/rgpd": "./src/application/services/rgpd.service.ts",
+    "./adapters/drizzle-rgpd-repository": "./src/infrastructure/repositories/drizzle-rgpd.repository.ts"
   },
   "scripts": {
     "format": "biome format . --write",

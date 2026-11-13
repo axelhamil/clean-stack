@@ -17,7 +17,7 @@ import { BEFORE_ROUTE_CUTOFF } from "./check-outbox-lease.env";
 
 requireLocalDatabase("check-outbox-lease");
 
-import { AuditEventSubscriber } from "@modules/audit-log/infrastructure/services/audit-event-subscriber";
+import { AuditEventSubscriber } from "@modules/audit-log/handlers/audit-event-subscriber";
 import * as auditLogSchema from "@modules/audit-log/schemas/audit-log";
 import * as webhooksSchema from "@modules/webhooks/schemas/webhooks";
 import { Result, uuidv7 } from "@packages/ddd-kit";

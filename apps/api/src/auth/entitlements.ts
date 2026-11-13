@@ -1,4 +1,4 @@
-import { hasFeature } from "@modules/billing/domain/entitlements";
+import { hasFeature } from "@modules/billing/rules/entitlements";
 import { APIError } from "better-auth/api";
 import type { AuthDeps } from "./deps";
 

@@ -1,4 +1,4 @@
-import type { IProfileStore, ProfileError } from "@modules/profile/application/ports/profile.port";
+import type { IProfileStore, ProfileError } from "@modules/profile/ports/profile";
 import type { Option, Result } from "@packages/ddd-kit";
 import { DEFAULT_LOCALE, type Locale } from "@packages/i18n";
 

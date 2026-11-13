@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { entitlementsForTier } from "@modules/billing/domain/entitlements";
+import { entitlementsForTier } from "@modules/billing/rules/entitlements";
 import type { Tier } from "@packages/access-control";
 import { NoOpInstrumentation, Option, Result } from "@packages/ddd-kit";
 import { Hono } from "hono";

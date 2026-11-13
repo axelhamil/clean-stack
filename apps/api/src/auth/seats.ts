@@ -1,4 +1,4 @@
-import { hasSeatAvailable } from "@modules/billing/domain/entitlements";
+import { hasSeatAvailable } from "@modules/billing/rules/entitlements";
 import { ambientTransaction } from "@packages/drizzle";
 import type { AuthDeps } from "./deps";
 

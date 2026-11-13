@@ -1,9 +1,9 @@
-import type { StaffStoreError } from "@modules/admin/application/ports/staff-store.port";
-import type { ConsentError } from "@modules/consents/application/ports/consent.port";
+import type { StaffStoreError } from "@modules/admin/ports/staff-store";
+import type { ConsentError } from "@modules/consents/ports/consent";
 import type {
   PolicyAcceptanceRecord,
   PolicyError,
-} from "@modules/policies/application/ports/policy-acceptance.port";
+} from "@modules/policies/ports/policy-acceptance";
 import type { Option, Result } from "@packages/ddd-kit";
 import type Stripe from "stripe";
 import type { GeoDeniedError, VisitorGeo } from "../shared/ports/ip-geo.port";

@@ -1,4 +1,4 @@
-import type { Feature, QuotaKey } from "@modules/billing/domain/entitlements";
+import type { Feature, QuotaKey } from "@modules/billing/rules/entitlements";
 import type { StaffAccess } from "@packages/access-control";
 import { Option } from "@packages/ddd-kit";
 import type { CurrentSession, RouteGuards } from "@packages/http/route-guards";

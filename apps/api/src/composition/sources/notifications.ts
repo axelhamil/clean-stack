@@ -1,4 +1,4 @@
-import type { IStaffRecipientsReader } from "@modules/notifications/application/ports/staff-recipients.port";
+import type { IStaffRecipientsReader } from "@modules/notifications/ports/staff-recipients";
 import type { IInstrumentation } from "@packages/ddd-kit";
 import { defineModule } from "inwire";
 import { StaffRecipientsQuery } from "../../queries/staff-recipients.query";

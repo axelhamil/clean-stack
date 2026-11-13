@@ -1,10 +1,7 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import type { RgpdError } from "@modules/rgpd/application/ports/rgpd.port";
-import type { RequestAccountDeletionOutput } from "@modules/rgpd/application/services/rgpd.service";
-import {
-  createRgpdRoutes,
-  type RgpdRoutesDeps,
-} from "@modules/rgpd/infrastructure/http/rgpd.routes";
+import type { RgpdError } from "@modules/rgpd/ports/rgpd";
+import { createRgpdRoutes, type RgpdRoutesDeps } from "@modules/rgpd/routes/rgpd";
+import type { RequestAccountDeletionOutput } from "@modules/rgpd/services/rgpd";
 import { Result } from "@packages/ddd-kit";
 import { openRouteGuards } from "@packages/http/testing/route-guards";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";

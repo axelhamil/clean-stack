@@ -7,7 +7,7 @@
  */
 
 import * as staffSchema from "@modules/admin/schemas/staff";
-import { createRgpdInternalRoutes } from "@modules/rgpd/infrastructure/http/rgpd-internal.routes";
+import { createRgpdInternalRoutes } from "@modules/rgpd/routes/rgpd-internal";
 import { uuidv7 } from "@packages/ddd-kit";
 import {
   authSchema,

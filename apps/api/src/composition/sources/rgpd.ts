@@ -1,16 +1,16 @@
-import { announceImpersonationsEnded } from "@modules/admin/application/services/impersonation-end";
+import { DrizzleStaffDataEraser } from "@modules/admin/adapters/drizzle-staff-data-eraser";
+import { endedImpersonationsOf } from "@modules/admin/adapters/ended-sessions";
 import {
   grantsStaffAccess,
   isLastManager,
   type StaffListing,
-} from "@modules/admin/application/services/staff-access";
-import { DrizzleStaffDataEraser } from "@modules/admin/infrastructure/repositories/drizzle-staff-data-eraser";
-import { endedImpersonationsOf } from "@modules/admin/infrastructure/repositories/ended-sessions";
-import type { ApiTokenService } from "@modules/api-token/application/services/api-token.service";
-import type { IApiTokenRevoker } from "@modules/rgpd/application/ports/api-token-revoker.port";
-import type { IEndedSessionsReader } from "@modules/rgpd/application/ports/ended-sessions.port";
-import type { IStaffAccessRules } from "@modules/rgpd/application/ports/staff-access-rules.port";
-import type { IStaffDataEraser } from "@modules/rgpd/application/ports/staff-data-eraser.port";
+} from "@modules/admin/rules/staff-access";
+import { announceImpersonationsEnded } from "@modules/admin/services/impersonation-end";
+import type { ApiTokenService } from "@modules/api-token/services/api-token";
+import type { IApiTokenRevoker } from "@modules/rgpd/ports/api-token-revoker";
+import type { IEndedSessionsReader } from "@modules/rgpd/ports/ended-sessions";
+import type { IStaffAccessRules } from "@modules/rgpd/ports/staff-access-rules";
+import type { IStaffDataEraser } from "@modules/rgpd/ports/staff-data-eraser";
 import type { IInstrumentation } from "@packages/ddd-kit";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { defineModule } from "inwire";

@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
-import type { AuditLogRoutesDeps } from "@modules/audit-log/infrastructure/http/audit-log.routes";
+import type { AuditLogRoutesDeps } from "@modules/audit-log/routes/audit-log";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import { mockPort } from "@packages/test/bun";
 import { Hono } from "hono";
@@ -28,9 +28,7 @@ mock.module("../shared/middleware/staff.middleware", () => ({
 }));
 
 const { mountAdminRoutes } = await import("@modules/admin/testing/mount-admin-routes");
-const { createAuditLogRoutes } = await import(
-  "@modules/audit-log/infrastructure/http/audit-log.routes"
-);
+const { createAuditLogRoutes } = await import("@modules/audit-log/routes/audit-log");
 const { routeGuards } = await import("../composition/route-guards");
 const { listBackRoutes } = await import("../shared/surface/back-routes");
 

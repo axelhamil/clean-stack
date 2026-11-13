@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./policies.module": "./src/policies.module.ts",
-    "./application/ports/policy-acceptance.port": "./src/application/ports/policy-acceptance.port.ts",
-    "./application/services/policy-acceptance.service": "./src/application/services/policy-acceptance.service.ts",
-    "./infrastructure/http/policies.routes": "./src/infrastructure/http/policies.routes.ts",
+    "./module": "./src/policies.module.ts",
+    "./routes/policies": "./src/infrastructure/http/policies.routes.ts",
+    "./ports/*": "./src/application/ports/*.port.ts",
+    "./services/policy-acceptance": "./src/application/services/policy-acceptance.service.ts",
     "./schemas/*": "./schemas/*.ts"
   },
   "scripts": {

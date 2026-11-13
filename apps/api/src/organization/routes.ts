@@ -1,4 +1,4 @@
-import { setSsoEnforcementBodySchema } from "@modules/admin/application/dto/set-sso-enforcement.dto";
+import { setSsoEnforcementBodySchema } from "@modules/admin/contracts/set-sso-enforcement";
 import { AppErrorException } from "@packages/ddd-kit";
 import { zV } from "@packages/http/validator";
 import { Hono } from "hono";

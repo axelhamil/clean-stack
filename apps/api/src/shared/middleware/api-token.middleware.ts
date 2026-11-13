@@ -1,6 +1,6 @@
-import type { ApiScope } from "@modules/api-token/application/dto/create-token.dto";
-import type { IApiTokenRepository } from "@modules/api-token/application/ports/api-token.port";
-import { hmacToken, parseToken } from "@modules/api-token/domain/api-token-crypto";
+import type { ApiScope } from "@modules/api-token/contracts/create-token";
+import type { IApiTokenRepository } from "@modules/api-token/ports/api-token";
+import { hmacToken, parseToken } from "@modules/api-token/rules/api-token-crypto";
 import { isBanLive } from "@packages/access-control";
 import type { IInstrumentation, ILogger, IUnitOfWork } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
