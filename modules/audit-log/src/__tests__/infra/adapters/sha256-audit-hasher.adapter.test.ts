@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { computeAuditHash, GENESIS_HASH } from "../infrastructure/services/audit-hash";
+import { GENESIS_HASH } from "../../../application/ports/services/audit-hasher.port";
+import { sha256AuditHasher } from "../../../infra/adapters/sha256-audit-hasher.adapter";
+
+const computeAuditHash = sha256AuditHasher.hash;
 
 describe("computeAuditHash", () => {
   const base = {
@@ -16,6 +19,12 @@ describe("computeAuditHash", () => {
     retention: "compliance",
     prevHash: GENESIS_HASH,
   };
+  it("keeps the hash format stored rows were chained with", () => {
+    expect(GENESIS_HASH).toBe("GENESIS");
+    expect(computeAuditHash(base)).toBe(
+      "d6dcf915c47def5563b4e0cb3f5453a78a77e0bd8055e091762327d6f6a9c165",
+    );
+  });
   it("is deterministic", () => {
     expect(computeAuditHash(base)).toBe(computeAuditHash(base));
   });

@@ -1,5 +1,6 @@
 import { timeIdCursorSchema } from "@packages/http/time-id-cursor";
 import { z } from "zod";
+import type { AuditFilters } from "../../../../application/queries/list-audit-events.query";
 
 export const listAuditEventsQuerySchema = z.object({
   actorId: z.string().optional(),
@@ -25,4 +26,4 @@ export const listAuditEventsQuerySchema = z.object({
       "This cursor was not issued by this list.",
     )
     .optional(),
-});
+}) satisfies z.ZodType<AuditFilters>;

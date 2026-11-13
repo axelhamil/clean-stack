@@ -1,6 +1,3 @@
-import { canonicalize } from "@packages/ddd-kit";
-import { CryptoHasher } from "bun";
-
 export const GENESIS_HASH = "GENESIS";
 
 export interface AuditHashInput {
@@ -18,6 +15,6 @@ export interface AuditHashInput {
   prevHash: string;
 }
 
-export function computeAuditHash(input: AuditHashInput): string {
-  return new CryptoHasher("sha256").update(canonicalize(input)).digest("hex");
+export interface IAuditHasher {
+  hash(input: AuditHashInput): string;
 }

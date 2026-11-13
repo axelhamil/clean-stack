@@ -17,8 +17,11 @@ import { BEFORE_ROUTE_CUTOFF } from "./check-outbox-lease.env";
 
 requireLocalDatabase("check-outbox-lease");
 
+import { DrizzleAuditLogRepository } from "@modules/audit-log/adapters/drizzle-audit-log-repository";
+import { sha256AuditHasher } from "@modules/audit-log/adapters/sha256-audit-hasher";
 import { AuditEventSubscriber } from "@modules/audit-log/handlers/audit-event-subscriber";
 import * as auditLogSchema from "@modules/audit-log/schemas/audit-log";
+import { RecordAuditEntryUseCase } from "@modules/audit-log/usecases/record-audit-entry";
 import * as webhooksSchema from "@modules/webhooks/schemas/webhooks";
 import { Result, uuidv7 } from "@packages/ddd-kit";
 import {
@@ -54,6 +57,7 @@ import {
   buildPurgeFilter,
   sweepOutboxRoutes,
 } from "../src/shared/internal-routes/sweep-outbox.route";
+import { logger } from "../src/shared/logger";
 import { signedInternalRequest } from "./check-seed";
 
 const PROBE = `check.outbox-lease.${crypto.randomUUID()}`;
@@ -370,7 +374,15 @@ async function main(): Promise<void> {
       : pending.getError(),
   );
 
-  const audit = new AuditEventSubscriber(uow, instrumentation, true);
+  const audit = new AuditEventSubscriber(
+    new RecordAuditEntryUseCase(
+      new DrizzleAuditLogRepository(instrumentation, logger),
+      sha256AuditHasher,
+      uow,
+      { tamperEvidence: true },
+    ),
+    instrumentation,
+  );
   const audited = {
     eventId: uuidv7(),
     eventType: EventTypes.USER_PROFILE_UPDATED,

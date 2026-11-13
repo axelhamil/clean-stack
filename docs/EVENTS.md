@@ -78,7 +78,7 @@ export type OrderPlacedPayload = z.infer<typeof OrderPlacedPayload>;
 [EventTypes.ORDER_PLACED]: OrderPlacedPayload,
 ```
 
-> **Actor identification (rule #7 of root CLAUDE.md).** `AuditEventSubscriber.extractActor` scans the payload for the actor in priority order: `actorUserId` → `inviterUserId` → `ownerUserId` → `userId`. **`userId` is the subject, not the actor by default.** When the actor differs from the subject (admin kicks member, system cron processes deletion, owner changes someone else's role), `actorUserId` must be a separate, NOT NULL field. Self-actor flows (sign-in, MFA toggle, self-deletion) can rely on `userId` alone. A row landing in `audit_log` with `actor_type="system"` should be the exception, not a default: the runtime guard at `enqueue` catches a missing/wrong-shape payload, but it can't catch a *semantically* missing actor: that's on the schema author.
+> **Actor identification (rule #7 of root CLAUDE.md).** `RecordAuditEntryUseCase` (audit-log) reads the actor from the payload through `readActorId`, which scans it for the actor in priority order: `actorUserId` → `inviterUserId` → `ownerUserId` → `userId`. **`userId` is the subject, not the actor by default.** When the actor differs from the subject (admin kicks member, system cron processes deletion, owner changes someone else's role), `actorUserId` must be a separate, NOT NULL field. Self-actor flows (sign-in, MFA toggle, self-deletion) can rely on `userId` alone. A row landing in `audit_log` with `actor_type="system"` should be the exception, not a default: the runtime guard at `enqueue` catches a missing/wrong-shape payload, but it can't catch a *semantically* missing actor: that's on the schema author.
 
 **Step 3**: set retention in `packages/events/src/retention-map.ts`:
 
@@ -272,7 +272,7 @@ Three sweep endpoints purge derived tables. All gated by `internalLayers` (HMAC)
 Notes:
 - **An outbox row is purged only once delivered**: the filter reads `dispatched_at` alone, so a dead row that never delivered stays until a replay succeeds, however old it is.
 - **`pending` and `failed` webhook deliveries are NEVER purged automatically**: they signal worker death or active retry. A `pending` row stale > 24h must page on-call, not be cleaned up.
-- **`retention = 'none'`** rows never reach the DB. `AuditEventSubscriber` returns early when `retentionFor(eventType) === "none"`: uncatalogued events are never written.
+- **`retention = 'none'`** rows never reach the DB. `RecordAuditEntryUseCase` returns early when `retentionFor(eventType) === "none"`: uncatalogued events are never written.
 
 ### Endpoints
 
@@ -519,7 +519,7 @@ Internal, compliance retention, forced notifications to whoever holds `approvals
 The rows backfilled by migration `0028` announce nothing: no request and no actor exist at that point, the migration file is the record.
 
 ### Via `PolicyAcceptanceService` (Phase A.2)
-- `USER_POLICY_ACCEPTED` (`user.policy.accepted`): payload `{ userId, policyType, policyVersion, ipAddress? }`, retention `compliance`. Self-actor: `userId` resolves as the actor via `AuditEventSubscriber.extractActor`. Emitted from `PolicyAcceptanceService.accept`, which is called from **two sites**: (1) the BetterAuth `/verify-email` after-hook in `auth/hooks/after.ts` (sign-up path, idempotent via `getStaleTypes`) and (2) the `POST /me/policies/accept` route (explicit re-acceptance by already-authenticated users).
+- `USER_POLICY_ACCEPTED` (`user.policy.accepted`): payload `{ userId, policyType, policyVersion, ipAddress? }`, retention `compliance`. Self-actor: `userId` resolves as the actor via `readActorId` in `RecordAuditEntryUseCase`. Emitted from `PolicyAcceptanceService.accept`, which is called from **two sites**: (1) the BetterAuth `/verify-email` after-hook in `auth/hooks/after.ts` (sign-up path, idempotent via `getStaleTypes`) and (2) the `POST /me/policies/accept` route (explicit re-acceptance by already-authenticated users).
 
 ### Via les use cases de `modules/consents` (Phase A.4)
 
@@ -624,7 +624,7 @@ The guard lives in `DrizzleOutboxRepository.enqueue` (the single porte d'entrée
 | `packages/outbox/src/outbox-relay.ts` | Claim by lease, run the named handlers, settle, dead announcement |
 | `packages/outbox/src/drizzle-outbox.repository.ts` | Outbox repository: enqueue, claim, `pendingState`, `markDelivered`, `markFailed` |
 | `packages/outbox/src/event-handlers.ts` | Subscribes the built-in handlers to every catalog type, then the discovered `onEvent` handlers |
-| `modules/audit-log/src/infrastructure/services/audit-event-subscriber.ts` | Built-in `audit-log` handler |
+| `modules/audit-log/src/infra/adapters/audit-event-subscriber.adapter.ts` | Built-in `audit-log` handler, dispatches to `RecordAuditEntryUseCase` (`application/usecases/record-audit-entry/`) |
 | `modules/webhooks/src/infrastructure/services/webhook-fanout-subscriber.ts` | Built-in `webhook-fanout` handler (org-scoped) |
 | `modules/webhooks/src/infrastructure/services/webhook-delivery-worker.service.ts` | HMAC POST + claim window + retry |
 | `modules/webhooks/src/infrastructure/crypto/aead.ts` | AEAD encrypt/decrypt for webhook secrets |
