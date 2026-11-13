@@ -10,7 +10,7 @@ import "./check-admin-ops.env";
 import { StripeReplayService } from "@modules/admin/services/stripe-replay";
 import { StripeEventGateway } from "@modules/billing/adapters/stripe-event-gateway";
 import * as billingSchema from "@modules/billing/schemas/billing";
-import { NoOpInstrumentation, uuidv7 } from "@packages/ddd-kit";
+import { NoOpInstrumentation, Result, uuidv7 } from "@packages/ddd-kit";
 import {
   and,
   db,
@@ -481,20 +481,21 @@ async function proveSubscriptionLifecycle(managerId: string): Promise<void> {
     .update(schema.user)
     .set({ stripeCustomerId: customer })
     .where(eq(schema.user.id, managerId));
-  di.BillingCatalogService.getCatalog = async () => [
-    {
-      tier: "pro",
-      name: "Pro",
-      priceId: CONFIGURED_PRICE,
-      unitAmount: 1000,
-      currency: "usd",
-      interval: "month",
-      marketingFeatures: [],
-      rank: 1,
-      features: [],
-      maxMembers: null,
-    },
-  ];
+  di.IGetPlanCatalogQuery.execute = async () =>
+    Result.ok([
+      {
+        tier: "pro",
+        name: "Pro",
+        priceId: CONFIGURED_PRICE,
+        unitAmount: 1000,
+        currency: "usd",
+        interval: "month",
+        marketingFeatures: [],
+        rank: 1,
+        features: [],
+        maxMembers: null,
+      },
+    ]);
 
   await signedWebhook(
     subscriptionEvent("customer.subscription.created", "foreign", {

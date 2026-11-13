@@ -2,24 +2,35 @@ import type { IInstrumentation } from "@packages/ddd-kit";
 import { defineModule } from "inwire";
 import type Stripe from "stripe";
 import type { BillingSettings } from "./application/config/billing-settings";
-import type { IBillingPortalGateway } from "./application/ports/billing-portal.port";
-import type { IPlanOverrideStore } from "./application/ports/plan-override.port";
-import type { IStripeCatalogSource } from "./application/ports/stripe-catalog.port";
-import type { IStripeEventGateway, IStripeEventStore } from "./application/ports/stripe-event.port";
-import type { ISubscriptionReadStore } from "./application/ports/subscription-read.port";
-import type { ISubscriptionSyncStore } from "./application/ports/subscription-sync.port";
+import type { IPlanOverrideStore } from "./application/ports/repositories/plan-override.port";
+import type { IStripeEventStore } from "./application/ports/repositories/stripe-event.port";
+import type { ISubscriptionReadStore } from "./application/ports/repositories/subscription-read.port";
+import type { ISubscriptionSyncStore } from "./application/ports/repositories/subscription-sync.port";
+import type { IBillingPortalGateway } from "./application/ports/services/billing-portal.port";
+import type { IStripeCatalogSource } from "./application/ports/services/stripe-catalog.port";
+import type { IStripeEventGateway } from "./application/ports/services/stripe-event-gateway.port";
+import type { IGetEntitlementsQuery } from "./application/queries/get-entitlements.query";
+import type { IGetPlanCatalogQuery } from "./application/queries/get-plan-catalog.query";
+import type { IListConfiguredPriceIdsQuery } from "./application/queries/list-configured-price-ids.query";
+import type { IReadEntitlementsQuery } from "./application/queries/read-entitlements.query";
 import { BillingCatalogService } from "./application/services/billing-catalog.service";
-import { BillingPortalService } from "./application/services/billing-portal.service";
 import { EntitlementsService } from "./application/services/entitlements.service";
-import { StripeBillingPortalGateway } from "./infrastructure/adapters/stripe-billing-portal.gateway";
-import { StripeCatalogSource } from "./infrastructure/adapters/stripe-catalog.source";
-import { StripeEventGateway } from "./infrastructure/adapters/stripe-event.gateway";
-import { StripeSyncVerifier } from "./infrastructure/adapters/stripe-sync-verifier";
-import { DrizzlePlanOverrideStore } from "./infrastructure/repositories/drizzle-plan-override.store";
-import { DrizzleStripeEventStore } from "./infrastructure/repositories/drizzle-stripe-event.store";
-import { DrizzleSubscriptionReadStore } from "./infrastructure/repositories/drizzle-subscription-read.store";
-import { DrizzleSubscriptionSyncStore } from "./infrastructure/repositories/drizzle-subscription-sync.store";
-import { createStripeClient } from "./infrastructure/stripe-client";
+import { OpenBillingPortalUseCase } from "./application/usecases/open-billing-portal/open-billing-portal.usecase";
+import { VerifyStripeSyncUseCase } from "./application/usecases/verify-stripe-sync/verify-stripe-sync.usecase";
+import { StripeBillingPortalGateway } from "./infra/adapters/stripe-billing-portal.adapter";
+import { StripeCatalogSource } from "./infra/adapters/stripe-catalog.adapter";
+import { createStripeClient } from "./infra/adapters/stripe-client.adapter";
+import { StripeEventGateway } from "./infra/adapters/stripe-event-gateway.adapter";
+import { StripeSyncVerifier } from "./infra/adapters/stripe-sync-verifier.adapter";
+import { CachedPlanCatalogQuery } from "./infra/queries/cached-plan-catalog.query";
+import { CatalogConfiguredPriceIdsQuery } from "./infra/queries/configured-price-ids.query";
+import { FailClosedEntitlementsQuery } from "./infra/queries/get-entitlements.query";
+import { StripePlanCatalogQuery } from "./infra/queries/plan-catalog.query";
+import { StrictEntitlementsQuery } from "./infra/queries/read-entitlements.query";
+import { DrizzlePlanOverrideRepository } from "./infra/repos/drizzle/plan-override.repository";
+import { DrizzleStripeEventRepository } from "./infra/repos/drizzle/stripe-event.repository";
+import { DrizzleSubscriptionReadRepository } from "./infra/repos/drizzle/subscription-read.repository";
+import { DrizzleSubscriptionSyncRepository } from "./infra/repos/drizzle/subscription-sync.repository";
 
 export interface BillingPrerequisites {
   IInstrumentation: IInstrumentation;
@@ -40,11 +51,11 @@ export const billingModule = defineModule<BillingPrerequisites>()((b) =>
     )
     .add(
       "IPlanOverrideStore",
-      (c): IPlanOverrideStore => new DrizzlePlanOverrideStore(c.IInstrumentation),
+      (c): IPlanOverrideStore => new DrizzlePlanOverrideRepository(c.IInstrumentation),
     )
     .add(
       "IStripeEventStore",
-      (c): IStripeEventStore => new DrizzleStripeEventStore(c.IInstrumentation),
+      (c): IStripeEventStore => new DrizzleStripeEventRepository(c.IInstrumentation),
     )
     .add(
       "IStripeEventGateway",
@@ -60,30 +71,60 @@ export const billingModule = defineModule<BillingPrerequisites>()((b) =>
     )
     .add(
       "ISubscriptionReadStore",
-      (c): ISubscriptionReadStore => new DrizzleSubscriptionReadStore(c.IInstrumentation),
+      (c): ISubscriptionReadStore => new DrizzleSubscriptionReadRepository(c.IInstrumentation),
     )
     .add(
       "ISubscriptionSyncStore",
-      (c): ISubscriptionSyncStore => new DrizzleSubscriptionSyncStore(c.IInstrumentation),
+      (c): ISubscriptionSyncStore => new DrizzleSubscriptionSyncRepository(c.IInstrumentation),
     )
     .add(
-      "BillingCatalogService",
-      (c) => new BillingCatalogService(c.IStripeCatalogSource, c.IInstrumentation),
-    )
-    .add(
-      "StripeSyncVerifier",
-      (c) =>
-        new StripeSyncVerifier(c.ISubscriptionSyncStore, c.IStripeEventGateway, () =>
-          c.BillingCatalogService.configuredPriceIds(),
+      "IGetPlanCatalogQuery",
+      (c): IGetPlanCatalogQuery =>
+        new CachedPlanCatalogQuery(
+          new StripePlanCatalogQuery(c.IStripeCatalogSource),
+          c.IInstrumentation,
         ),
     )
     .add(
-      "BillingPortalService",
-      (c) => new BillingPortalService(c.ISubscriptionReadStore, c.IBillingPortalGateway),
+      "IListConfiguredPriceIdsQuery",
+      (c): IListConfiguredPriceIdsQuery =>
+        new CatalogConfiguredPriceIdsQuery(c.IGetPlanCatalogQuery),
     )
     .add(
-      "EntitlementsService",
+      "IGetEntitlementsQuery",
+      (c): IGetEntitlementsQuery =>
+        new FailClosedEntitlementsQuery(
+          c.ISubscriptionReadStore,
+          c.IPlanOverrideStore,
+          c.IInstrumentation,
+        ),
+    )
+    .add(
+      "IReadEntitlementsQuery",
+      (c): IReadEntitlementsQuery =>
+        new StrictEntitlementsQuery(
+          c.ISubscriptionReadStore,
+          c.IPlanOverrideStore,
+          c.IInstrumentation,
+        ),
+    )
+    .add(
+      "OpenBillingPortalUseCase",
+      (c) => new OpenBillingPortalUseCase(c.ISubscriptionReadStore, c.IBillingPortalGateway),
+    )
+    .add(
+      "VerifyStripeSyncUseCase",
       (c) =>
-        new EntitlementsService(c.ISubscriptionReadStore, c.IPlanOverrideStore, c.IInstrumentation),
+        new VerifyStripeSyncUseCase(
+          c.ISubscriptionSyncStore,
+          c.IStripeEventGateway,
+          c.IListConfiguredPriceIdsQuery,
+        ),
+    )
+    .add("BillingCatalogService", (c) => new BillingCatalogService(c.IGetPlanCatalogQuery))
+    .add("StripeSyncVerifier", (c) => new StripeSyncVerifier(c.VerifyStripeSyncUseCase))
+    .add(
+      "EntitlementsService",
+      (c) => new EntitlementsService(c.IGetEntitlementsQuery, c.IReadEntitlementsQuery),
     ),
 );

@@ -1,0 +1,79 @@
+import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
+import { authSchema, dbOperationFailure, eq, or, resolveExecutor } from "@packages/drizzle";
+import * as billingSchema from "../../../../schemas/billing";
+import type { BillingError } from "../../../application/ports/repositories/subscription-read.port";
+import type {
+  ISubscriptionSyncStore,
+  SubscriptionSyncKey,
+  SubscriptionSyncState,
+} from "../../../application/ports/repositories/subscription-sync.port";
+
+const sub = billingSchema.subscription;
+const { user } = authSchema;
+const dbAttrs = { "db.system.name": "postgresql" } as const;
+const failure = dbOperationFailure("BILLING_PROVIDER_FAILURE");
+
+export class DrizzleSubscriptionSyncRepository implements ISubscriptionSyncStore {
+  constructor(private readonly instrumentation: IInstrumentation) {}
+
+  async findSyncState({
+    stripeSubscriptionId,
+    localId,
+  }: SubscriptionSyncKey): Promise<Result<Option<SubscriptionSyncState>, BillingError>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan(
+      { name: "DrizzleSubscriptionSyncRepository > findSyncState" },
+      async () => {
+        try {
+          const byStripeId = eq(sub.stripeSubscriptionId, stripeSubscriptionId);
+          const query = exec
+            .select({ status: sub.status, cancelAtPeriodEnd: sub.cancelAtPeriodEnd })
+            .from(sub)
+            .where(localId.isSome() ? or(byStripeId, eq(sub.id, localId.unwrap())) : byStripeId)
+            .limit(1);
+          const [row] = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+
+          return Result.ok(
+            Option.fromNullable(row).map(({ status, cancelAtPeriodEnd }) => ({
+              status,
+              cancelAtPeriodEnd: cancelAtPeriodEnd ?? false,
+            })),
+          );
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail(failure("find subscription sync state"));
+        }
+      },
+    );
+  }
+
+  async isKnownCustomer(stripeCustomerId: string): Promise<Result<boolean, BillingError>> {
+    const exec = resolveExecutor();
+
+    return this.instrumentation.startSpan(
+      { name: "DrizzleSubscriptionSyncRepository > isKnownCustomer" },
+      async () => {
+        try {
+          const query = exec
+            .select({ id: user.id })
+            .from(user)
+            .where(eq(user.stripeCustomerId, stripeCustomerId))
+            .limit(1);
+          const [row] = await this.instrumentation.startSpan(
+            { name: query.toSQL().sql, op: "db.query", attributes: dbAttrs },
+            () => query.execute(),
+          );
+
+          return Result.ok(row !== undefined);
+        } catch (err) {
+          this.instrumentation.capture(err);
+          return Result.fail(failure("isKnownCustomer"));
+        }
+      },
+    );
+  }
+}

@@ -5,8 +5,11 @@
   "type": "module",
   "exports": {
     "./module": "./src/quotas.module.ts",
-    "./ports/*": "./src/application/ports/*.port.ts",
-    "./rules/quota-remaining": "./src/domain/quota-remaining.ts",
+    "./ports/quota-usage": "./src/application/ports/repositories/quota-usage.port.ts",
+    "./ports/*": "./src/application/ports/services/*.port.ts",
+    "./usecases/reserve-quota": "./src/application/usecases/reserve-quota/reserve-quota.usecase.ts",
+    "./rules/quota-remaining": "./src/application/services/quota-policy.service.ts",
+    "./adapters/scoped-row-counter": "./src/infra/adapters/scoped-row-counter.adapter.ts",
     "./schemas/*": "./schemas/*.ts"
   },
   "scripts": {

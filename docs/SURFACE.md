@@ -28,7 +28,7 @@ bare `bun -e` from the root, which has no env file to load.
 Some modules ship no route at all, so `app.routes` can never list them and the map above cannot
 carry them. They are declared here instead, as a human claim clearly labelled as one:
 
-- **`modules/quotas/`** (`@modules/quotas`): a store-only infra module (`IQuotaUsageStore` + the
-  `quota_usage` table). It has no routes file and is never mounted. Its consumers are
-  `reserveQuota`/`requireQuota` (`modules/quotas/src/infrastructure/quota-reservation.ts` and `shared/middleware/billing.middleware.ts`),
+- **`modules/quotas/`** (`@modules/quotas`): a module with no routes (`ReserveQuotaUseCase`,
+  `IQuotaUsageStore` + the `quota_usage` table). It has no routes file and is never mounted. Its consumers are
+  `ReserveQuotaUseCase`/`requireQuota` (`modules/quotas/src/application/usecases/reserve-quota/` and `shared/middleware/billing.middleware.ts`),
   themselves dormant until a clone gates a resource. See `docs/QUOTA-GATING.md`.

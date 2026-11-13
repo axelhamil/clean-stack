@@ -37,6 +37,7 @@ import { apiSettings } from "./composition/settings";
 import { adminSources } from "./composition/sources/admin";
 import { authSources } from "./composition/sources/auth";
 import { notificationsSources } from "./composition/sources/notifications";
+import { quotaSources } from "./composition/sources/quotas";
 import { rgpdSources } from "./composition/sources/rgpd";
 import { healthModule } from "./health/module";
 import { env } from "./shared/env";
@@ -219,6 +220,7 @@ export const di = container()
   .addModule(webhooksModule)
   .addModule(policyModule)
   .addModule(consentModule)
+  .addModule(quotaSources)
   .addModule(quotaModule)
   .addModule(billingModule)
   .addModule(notificationsSources)

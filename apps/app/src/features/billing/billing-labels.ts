@@ -11,7 +11,7 @@ export const TIER_KEYS = {
 } as const satisfies Record<Tier, string>;
 
 // `EntitlementsView.status` widens to `string` on the wire: it carries
-// Stripe's subscription status verbatim (`subscription-events.ts` on the
+// Stripe's subscription status verbatim (`subscription-policy.service.ts` on the
 // server branches on the same set) plus the app's own "free" sentinel for an
 // org with no subscription row. Guarded, never cast, before it keys into the
 // catalog; an unrecognized value (a future Stripe status this app hasn't
