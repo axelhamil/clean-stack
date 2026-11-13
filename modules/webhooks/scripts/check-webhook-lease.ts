@@ -17,9 +17,11 @@ import type {
   DeliveryClaimRequest,
   DeliveryFailure,
   WebhookDeliveryRecord,
-} from "../src/application/ports/webhook-delivery.port";
-import { DrizzleWebhookDeliveryRepository } from "../src/infrastructure/repositories/drizzle-webhook-delivery.repository";
-import { WebhookFanoutSubscriber } from "../src/infrastructure/services/webhook-fanout-subscriber";
+} from "../src/application/ports/repositories/webhook-delivery.port";
+import { FanOutEventToEndpointsUseCase } from "../src/application/usecases/fan-out-event-to-endpoints/fan-out-event-to-endpoints.usecase";
+import { WebhookFanoutSubscriber } from "../src/infra/adapters/webhook-fanout-subscriber.adapter";
+import { DrizzleWebhookDeliveryRepository } from "../src/infra/repos/drizzle/webhook-delivery.repository";
+import { DrizzleWebhookEndpointRepository } from "../src/infra/repos/drizzle/webhook-endpoint.repository";
 
 const PROBE = `check-webhook-lease-${crypto.randomUUID()}`;
 const HOUR_MS = 3_600_000;
@@ -335,7 +337,11 @@ async function main(): Promise<void> {
     .set({ eventTypes: ["*"] })
     .where(eq(we.id, endpointId));
   const fanout = new WebhookFanoutSubscriber(
-    new TransactionService(instrumentation),
+    new FanOutEventToEndpointsUseCase(
+      new DrizzleWebhookEndpointRepository(instrumentation, silentLogger()),
+      repository,
+      new TransactionService(instrumentation),
+    ),
     instrumentation,
   );
   await withClockAhead(DAY_MS, () =>

@@ -33,7 +33,7 @@ modules/<name>/
 
 ## Folders
 
-What each folder of the Anatomy tree holds; a folder with nothing to hold does not exist. The `infrastructure/` list is open: a folder named after its concern (`crypto/` in webhooks, `adapters/` in billing) is fine.
+What each folder of the Anatomy tree holds; a folder with nothing to hold does not exist. The `infrastructure/` list is open: a folder named after its concern (`adapters/` in billing) is fine.
 
 - `domain/`: only aggregates and other `ddd-kit` primitives, never anemic data records, which live with their port. A pure rule with no aggregate is a policy service in `application/services/` (`billing/src/application/services/entitlement-policy.service.ts`, `quotas/src/application/services/quota-policy.service.ts`). An empty `domain/` is cargo-cult.
 - `application/config/`: the module's typed settings, which the host fills from the env (contract 2).

@@ -19,6 +19,7 @@ const MIGRATED_MODULES = [
   "quotas",
   "audit-log",
   "notifications",
+  "webhooks",
 ];
 const MIGRATED =
   MIGRATED_MODULES.length > 0 ? `${MODULES}/(${MIGRATED_MODULES.join("|")})/src/` : "^$";
