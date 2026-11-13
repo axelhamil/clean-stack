@@ -32,7 +32,7 @@ import { requireLocalDatabase } from "@packages/test/require-local-database";
 
 requireLocalDatabase("check-wipe-rollback");
 
-import { DrizzleStaffStore } from "@modules/admin/adapters/drizzle-staff-store";
+import { DrizzleStaffRepository } from "@modules/admin/adapters/drizzle-staff-store";
 import * as staffSchema from "@modules/admin/schemas/staff";
 import { DrizzleApiTokenRepository } from "@modules/api-token/adapters/drizzle-api-token-repository";
 import { generateToken, hmacToken } from "@modules/api-token/rules/api-token-crypto";
@@ -154,7 +154,7 @@ function buildService(): RgpdService {
     uow,
     outbox,
     instrumentation,
-    new DrizzleStaffStore(instrumentation, uow, logger),
+    new DrizzleStaffRepository(instrumentation, uow, logger),
     staffAccessRules(outbox, { PLATFORM_ADMIN_IDS: [] }),
     new DrizzleTotpVerifier(instrumentation, authSecretKey(env)),
     {

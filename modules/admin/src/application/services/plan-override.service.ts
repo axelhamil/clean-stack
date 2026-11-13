@@ -2,9 +2,12 @@ import { type AppError, type IUnitOfWork, Result, uuidv7 } from "@packages/ddd-k
 import { EventTypes } from "@packages/events";
 import { emitEvent } from "@packages/outbox/event-emitter";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
-import type { IAdminOrgStore } from "../ports/admin-org-store.port";
-import type { AdminStoreError } from "../ports/admin-user-store.port";
-import type { IPlanOverrideStore, PlanOverrideStoreError } from "../ports/plan-override.port";
+import type { IAdminOrgStore } from "../ports/repositories/admin-org-store.port";
+import type { AdminStoreError } from "../ports/repositories/admin-user-store.port";
+import type {
+  IPlanOverrideStore,
+  PlanOverrideStoreError,
+} from "../ports/repositories/plan-override.port";
 
 export type SetPlanOverrideError =
   | PlanOverrideStoreError

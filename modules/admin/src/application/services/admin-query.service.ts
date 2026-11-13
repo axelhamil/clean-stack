@@ -1,13 +1,12 @@
 import { type IInstrumentation, Option, Result } from "@packages/ddd-kit";
 import { encodeTimeIdCursor } from "@packages/http/time-id-cursor";
-import type { ListOrgsInput } from "../dto/list-orgs.dto";
-import type { ListUsersInput } from "../dto/list-users.dto";
 import type {
   AdminOrgListRow,
   AdminOrgMemberRow,
   AdminOrgRow,
   IAdminOrgStore,
-} from "../ports/admin-org-store.port";
+  ListOrgsQuery,
+} from "../ports/repositories/admin-org-store.port";
 import type {
   AdminMembershipRow,
   AdminSessionRow,
@@ -15,9 +14,16 @@ import type {
   AdminUserListRow,
   AdminUserRow,
   IAdminUserStore,
-} from "../ports/admin-user-store.port";
-import type { EntitlementsReadError, IEntitlementsReader } from "../ports/entitlements-reader.port";
-import type { ActivePlanOverride, IPlanOverrideReader } from "../ports/plan-override.port";
+  ListUsersQuery,
+} from "../ports/repositories/admin-user-store.port";
+import type {
+  ActivePlanOverride,
+  IPlanOverrideReader,
+} from "../ports/repositories/plan-override.port";
+import type {
+  EntitlementsReadError,
+  IEntitlementsReader,
+} from "../ports/services/entitlements-reader.port";
 
 export type AdminQueryError = AdminStoreError | EntitlementsReadError;
 
@@ -60,7 +66,7 @@ export class AdminQueryService {
   ) {}
 
   async listUsers(
-    input: ListUsersInput,
+    input: ListUsersQuery,
   ): Promise<Result<AdminPage<AdminUserListRow>, AdminQueryError>> {
     return this.instrumentation.startSpan({ name: "AdminQueryService > listUsers" }, async () => {
       const rows = await this.store.listUsers(input);
@@ -71,7 +77,7 @@ export class AdminQueryService {
   }
 
   async listOrgs(
-    input: ListOrgsInput,
+    input: ListOrgsQuery,
   ): Promise<Result<AdminPage<AdminOrgListRow>, AdminQueryError>> {
     return this.instrumentation.startSpan({ name: "AdminQueryService > listOrgs" }, async () => {
       const rows = await this.orgStore.listOrgs(input);

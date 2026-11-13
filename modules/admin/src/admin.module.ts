@@ -13,24 +13,24 @@ import type { ApprovalHandlers } from "./application/approved-action";
 import type { AdminSettings } from "./application/config/admin-settings";
 import { closeApprovalsOfDeletedUser } from "./application/event-handlers/close-approvals-of-deleted-user";
 import { notifyImpersonatedUser } from "./application/event-handlers/notify-impersonated-user";
-import type { IAdminOrgStore } from "./application/ports/admin-org-store.port";
-import type { IAdminUserStore } from "./application/ports/admin-user-store.port";
-import type { IApprovalStore } from "./application/ports/approval-store.port";
-import type { IDeadWebhookReader } from "./application/ports/dead-webhook-reader.port";
-import type { IEntitlementsReader } from "./application/ports/entitlements-reader.port";
-import type { ILocaleReader } from "./application/ports/locale-reader.port";
-import type { IOpsStore } from "./application/ports/ops-store.port";
-import type { IPlanOverrideStore } from "./application/ports/plan-override.port";
-import type { ISavedViewStore } from "./application/ports/saved-view-store.port";
-import type { IStaffNoteStore } from "./application/ports/staff-note-store.port";
-import type { IStaffStore } from "./application/ports/staff-store.port";
-import type { IStepUpStore } from "./application/ports/step-up-store.port";
+import type { IAdminOrgStore } from "./application/ports/repositories/admin-org-store.port";
+import type { IAdminUserStore } from "./application/ports/repositories/admin-user-store.port";
+import type { IApprovalStore } from "./application/ports/repositories/approval-store.port";
+import type { IOpsStore } from "./application/ports/repositories/ops-store.port";
+import type { IPlanOverrideStore } from "./application/ports/repositories/plan-override.port";
+import type { ISavedViewStore } from "./application/ports/repositories/saved-view-store.port";
+import type { IStaffNoteStore } from "./application/ports/repositories/staff-note-store.port";
+import type { IStaffStore } from "./application/ports/repositories/staff-store.port";
+import type { IStepUpStore } from "./application/ports/repositories/step-up-store.port";
 import type {
-  IStripeEventGateway,
   IStripeEventStore,
   StripeReplayRule,
-} from "./application/ports/stripe-event.port";
-import type { ITotpVerifier } from "./application/ports/totp-verifier.port";
+} from "./application/ports/repositories/stripe-event.port";
+import type { IDeadWebhookReader } from "./application/ports/services/dead-webhook-reader.port";
+import type { IEntitlementsReader } from "./application/ports/services/entitlements-reader.port";
+import type { ILocaleReader } from "./application/ports/services/locale-reader.port";
+import type { IStripeEventGateway } from "./application/ports/services/stripe-event-gateway.port";
+import type { ITotpVerifier } from "./application/ports/services/totp-verifier.port";
 import { AdminModerationService } from "./application/services/admin-moderation.service";
 import { AdminQueryService } from "./application/services/admin-query.service";
 import { ApprovalService } from "./application/services/approval.service";
@@ -47,14 +47,14 @@ import {
 import { StaffNoteService } from "./application/services/staff-note.service";
 import { StepUpService } from "./application/services/step-up.service";
 import { StripeReplayService } from "./application/services/stripe-replay.service";
-import { DrizzleAdminOrgStore } from "./infrastructure/repositories/drizzle-admin-org.store";
-import { DrizzleAdminUserStore } from "./infrastructure/repositories/drizzle-admin-user.store";
-import { DrizzleApprovalStore } from "./infrastructure/repositories/drizzle-approval.store";
-import { DrizzleOpsStore } from "./infrastructure/repositories/drizzle-ops.store";
-import { DrizzleSavedViewStore } from "./infrastructure/repositories/drizzle-saved-view.store";
-import { DrizzleStaffStore } from "./infrastructure/repositories/drizzle-staff.store";
-import { DrizzleStaffNoteStore } from "./infrastructure/repositories/drizzle-staff-note.store";
-import { DrizzleStepUpStore } from "./infrastructure/repositories/drizzle-step-up.store";
+import { DrizzleAdminOrgRepository } from "./infra/repos/drizzle/admin-org.repository";
+import { DrizzleAdminUserRepository } from "./infra/repos/drizzle/admin-user.repository";
+import { DrizzleApprovalRepository } from "./infra/repos/drizzle/approval.repository";
+import { DrizzleOpsRepository } from "./infra/repos/drizzle/ops.repository";
+import { DrizzleSavedViewRepository } from "./infra/repos/drizzle/saved-view.repository";
+import { DrizzleStaffRepository } from "./infra/repos/drizzle/staff.repository";
+import { DrizzleStaffNoteRepository } from "./infra/repos/drizzle/staff-note.repository";
+import { DrizzleStepUpRepository } from "./infra/repos/drizzle/step-up.repository";
 
 export interface AdminPrerequisites {
   IInstrumentation: IInstrumentation;
@@ -80,11 +80,11 @@ export const adminModule = defineModule<AdminPrerequisites>()((b) =>
   b
     .add(
       "IAdminUserStore",
-      (c): IAdminUserStore => new DrizzleAdminUserStore(c.IInstrumentation, c.ILogger),
+      (c): IAdminUserStore => new DrizzleAdminUserRepository(c.IInstrumentation, c.ILogger),
     )
     .add(
       "IAdminOrgStore",
-      (c): IAdminOrgStore => new DrizzleAdminOrgStore(c.IInstrumentation, c.ILogger),
+      (c): IAdminOrgStore => new DrizzleAdminOrgRepository(c.IInstrumentation, c.ILogger),
     )
     .add(
       "AdminQueryService",
@@ -100,7 +100,7 @@ export const adminModule = defineModule<AdminPrerequisites>()((b) =>
     .add(
       "IStaffStore",
       (c): IStaffStore =>
-        new DrizzleStaffStore(c.IInstrumentation, c.ITransactionService, c.ILogger),
+        new DrizzleStaffRepository(c.IInstrumentation, c.ITransactionService, c.ILogger),
     )
     .add(
       "StaffAccessService",
@@ -129,7 +129,10 @@ export const adminModule = defineModule<AdminPrerequisites>()((b) =>
       (c) =>
         new AdminModerationService(c.IAdminUserStore, c.IOutboxRepository, c.ITransactionService),
     )
-    .add("IStepUpStore", (c): IStepUpStore => new DrizzleStepUpStore(c.IInstrumentation, c.ILogger))
+    .add(
+      "IStepUpStore",
+      (c): IStepUpStore => new DrizzleStepUpRepository(c.IInstrumentation, c.ILogger),
+    )
     .add(
       "StepUpService",
       (c) =>
@@ -145,7 +148,7 @@ export const adminModule = defineModule<AdminPrerequisites>()((b) =>
     .add(
       "IApprovalStore",
       (c): IApprovalStore =>
-        new DrizzleApprovalStore(c.IInstrumentation, c.ITransactionService, c.ILogger),
+        new DrizzleApprovalRepository(c.IInstrumentation, c.ITransactionService, c.ILogger),
     )
     .add(
       "ApprovalHandlers",
@@ -302,7 +305,10 @@ export const adminModule = defineModule<AdminPrerequisites>()((b) =>
           c.adminSettings,
         ),
     )
-    .add("IOpsStore", (c): IOpsStore => new DrizzleOpsStore(c.IInstrumentation, c.WebhooksService))
+    .add(
+      "IOpsStore",
+      (c): IOpsStore => new DrizzleOpsRepository(c.IInstrumentation, c.WebhooksService),
+    )
     .add(
       "OpsService",
       (c) =>
@@ -331,12 +337,18 @@ export const adminModule = defineModule<AdminPrerequisites>()((b) =>
           c.ITransactionService,
         ),
     )
-    .add("IStaffNoteStore", (c): IStaffNoteStore => new DrizzleStaffNoteStore(c.IInstrumentation))
+    .add(
+      "IStaffNoteStore",
+      (c): IStaffNoteStore => new DrizzleStaffNoteRepository(c.IInstrumentation),
+    )
     .add(
       "StaffNoteService",
       (c) => new StaffNoteService(c.IStaffNoteStore, c.IOutboxRepository, c.ITransactionService),
     )
-    .add("ISavedViewStore", (c): ISavedViewStore => new DrizzleSavedViewStore(c.IInstrumentation))
+    .add(
+      "ISavedViewStore",
+      (c): ISavedViewStore => new DrizzleSavedViewRepository(c.IInstrumentation),
+    )
     .add(
       "SavedViewService",
       (c) => new SavedViewService(c.ISavedViewStore, c.IOutboxRepository, c.ITransactionService),

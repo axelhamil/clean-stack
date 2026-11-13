@@ -1,0 +1,139 @@
+import { beforeEach, describe, expect, it, mock } from "bun:test";
+import type { IInstrumentation, ILogger } from "@packages/ddd-kit";
+import { mockPort, type PortMock } from "@packages/test/bun";
+import { mockInstrumentation } from "@packages/test/bun/instrumentation";
+
+const mk =
+  (op: string) =>
+  (...args: unknown[]) => ({ _op: op, args });
+
+let dbBehavior: () => Promise<unknown[]> = async () => [];
+
+function buildQuery(result: () => Promise<unknown[]>) {
+  const q: Record<string, unknown> = {
+    toSQL: () => ({ sql: "SELECT 1", params: [] }),
+    execute: result,
+  };
+  for (const m of [
+    "select",
+    "from",
+    "limit",
+    "orderBy",
+    "innerJoin",
+    "leftJoin",
+    "insert",
+    "update",
+    "delete",
+    "values",
+    "set",
+    "returning",
+    "where",
+    "for",
+  ]) {
+    q[m] = () => buildQuery(result);
+  }
+  return q;
+}
+
+function makeDbQuery() {
+  return buildQuery(async () => dbBehavior());
+}
+
+// Only what this file's subject actually touches: test files do not share a module
+// registry, so this replacement is invisible to every other file (see apps/api/CLAUDE.md).
+mock.module("@packages/drizzle", () => ({
+  resolveExecutor: () => ({ select: () => makeDbQuery() }),
+  authSchema: {
+    user: {
+      id: {},
+      email: {},
+      name: {},
+      role: {},
+      banned: {},
+      banReason: {},
+      banExpires: {},
+      twoFactorEnabled: {},
+      createdAt: {},
+    },
+    session: {},
+  },
+  multiTenantSchema: {
+    member: { userId: {}, organizationId: {} },
+    organization: { id: {} },
+  },
+  banIsLive: mk("banIsLive"),
+  banIsNotLive: mk("banIsNotLive"),
+  and: mk("and"),
+  or: mk("or"),
+  eq: mk("eq"),
+  gt: mk("gt"),
+  lt: mk("lt"),
+  lte: mk("lte"),
+  isNull: mk("isNull"),
+  sql: mk("sql"),
+  inArray: mk("inArray"),
+  ilike: mk("ilike"),
+  desc: mk("desc"),
+}));
+
+const { DrizzleAdminUserRepository } = await import(
+  "../../../infra/repos/drizzle/admin-user.repository"
+);
+
+const fakeRow = {
+  id: "u-1",
+  email: "a@example.com",
+  name: "A",
+  banned: false,
+  banReason: null,
+  banExpires: null,
+  twoFactorEnabled: true,
+  createdAt: new Date("2026-01-01"),
+};
+
+describe("DrizzleAdminUserRepository", () => {
+  let instrumentation: PortMock<IInstrumentation>;
+  let store: InstanceType<typeof DrizzleAdminUserRepository>;
+
+  beforeEach(() => {
+    instrumentation = mockInstrumentation();
+    store = new DrizzleAdminUserRepository(instrumentation, mockPort<ILogger>());
+    dbBehavior = async () => [];
+  });
+
+  describe("listUsers", () => {
+    it("maps db rows, turning nullable columns into Options", async () => {
+      dbBehavior = async () => [fakeRow];
+      const rows = (await store.listUsers({ limit: 50 })).getValue();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.id).toBe("u-1");
+      expect(rows[0]?.banReason.isNone()).toBe(true);
+    });
+
+    it("emits outer and inner db.query spans", async () => {
+      const spy = instrumentation.startSpan;
+      await store.listUsers({ limit: 50 });
+      const calls = spy.mock.calls;
+      const outer = calls.find((c) => c[0]?.name === "DrizzleAdminUserRepository > listUsers");
+      const inner = calls.find((c) => c[0]?.op === "db.query");
+      expect(outer).toBeDefined();
+      expect(inner).toBeDefined();
+      expect(inner?.[0]?.attributes?.["db.system.name"]).toBe("postgresql");
+    });
+
+    it("captures the error and returns a failure when the db fails", async () => {
+      const boom = new Error("db boom");
+      const captureSpy = instrumentation.capture;
+      let callCount = 0;
+      instrumentation.startSpan.mockImplementation(((_opts: unknown, cb: unknown) => {
+        callCount++;
+        if (callCount === 2) throw boom;
+        return (cb as () => Promise<unknown>)();
+      }) as typeof instrumentation.startSpan);
+
+      const result = await store.listUsers({ limit: 50 });
+      expect(result.getError().code).toBe("ADMIN_QUERY_PROVIDER_FAILURE");
+      expect(captureSpy).toHaveBeenCalledWith(boom);
+    });
+  });
+});

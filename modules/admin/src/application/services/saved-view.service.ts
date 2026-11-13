@@ -13,7 +13,7 @@ import type {
   ISavedViewStore,
   SavedViewRow,
   SavedViewStoreError,
-} from "../ports/saved-view-store.port";
+} from "../ports/repositories/saved-view-store.port";
 
 export const SAVED_VIEWS_LIMIT = 200;
 

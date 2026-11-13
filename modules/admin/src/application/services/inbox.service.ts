@@ -5,8 +5,8 @@ import type {
   ApprovalStoreError,
   IApprovalStore,
   OpenApprovals,
-} from "../ports/approval-store.port";
-import type { IOpsStore, OpsStoreError } from "../ports/ops-store.port";
+} from "../ports/repositories/approval-store.port";
+import type { IOpsStore, OpsStoreError } from "../ports/repositories/ops-store.port";
 import type { SweepRunState } from "./ops.service";
 import { isSweepLate } from "./sweep-cadence";
 

@@ -8,7 +8,7 @@ import type {
   DeadQueueCounts,
   IOpsStore,
   OpsStoreError,
-} from "../ports/ops-store.port";
+} from "../ports/repositories/ops-store.port";
 import { isSweepLate } from "./sweep-cadence";
 
 export const DEAD_OUTBOX_PAGE = 100;

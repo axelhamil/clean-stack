@@ -6,10 +6,25 @@ import {
 } from "@packages/access-control";
 import { type AppError, Result } from "@packages/ddd-kit";
 import { z } from "zod";
-import { banUserBodySchema } from "./dto/ban-user.dto";
-import { setStaffRoleBodySchema } from "./dto/set-staff-role.dto";
-import { setStaffOverrideBodySchema } from "./dto/staff-override.dto";
-import type { ApprovalRecord } from "./ports/approval-store.port";
+import type { ApprovalRecord } from "./ports/repositories/approval-store.port";
+
+const MAX_TIMED_BAN_SECONDS = 90 * 24 * 60 * 60;
+
+export const banUserBodySchema = z.object({
+  reason: z.string().trim().min(1).max(500),
+  expiresIn: z.number().int().positive().max(MAX_TIMED_BAN_SECONDS).optional(),
+});
+
+export const setStaffRoleBodySchema = z.object({ role: z.enum(STAFF_ROLES) });
+
+export const setStaffOverrideBodySchema = z.object({
+  permission: z.enum(STAFF_PERMISSIONS),
+  effect: z.enum(["grant", "deny"]),
+  expiresAt: z.iso
+    .datetime()
+    .refine((value) => new Date(value).getTime() > Date.now())
+    .nullable(),
+});
 
 const storedRoleChangeSchema = setStaffRoleBodySchema.extend({
   fromRole: z.enum(STAFF_ROLES).nullable(),

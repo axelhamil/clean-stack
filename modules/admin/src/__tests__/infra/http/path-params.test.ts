@@ -1,0 +1,184 @@
+import { describe, expect, it } from "bun:test";
+import { mockPort } from "@packages/test/bun";
+import { z } from "zod";
+import { adminApp, send } from "../../fixtures/http-app";
+import type { AdminRoutesDeps } from "../../fixtures/mount-admin-routes";
+
+const MALFORMED = "not.an.id";
+const VALID = "u-2";
+const FUTURE = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+function services() {
+  return {
+    IAuthProvider: mockPort<AdminRoutesDeps["IAuthProvider"]>(),
+    AdminQueryService: mockPort<AdminRoutesDeps["AdminQueryService"]>(),
+    AdminModerationService: mockPort<AdminRoutesDeps["AdminModerationService"]>(),
+    AdminActionService: mockPort<AdminRoutesDeps["AdminActionService"]>(),
+    ApprovalService: mockPort<AdminRoutesDeps["ApprovalService"]>(),
+    StaffService: mockPort<AdminRoutesDeps["StaffService"]>(),
+    StaffNoteService: mockPort<AdminRoutesDeps["StaffNoteService"]>(),
+    SavedViewService: mockPort<AdminRoutesDeps["SavedViewService"]>(),
+    PlanOverrideService: mockPort<AdminRoutesDeps["PlanOverrideService"]>(),
+    StripeReplayService: mockPort<AdminRoutesDeps["StripeReplayService"]>(),
+  };
+}
+
+type Services = ReturnType<typeof services>;
+
+interface ParamCase {
+  method: string;
+  path: string;
+  body?: unknown;
+  field?: string;
+  reached: (s: Services) => unknown[];
+}
+
+const CASES: ParamCase[] = [
+  {
+    method: "GET",
+    path: `/admin/users/${MALFORMED}`,
+    reached: (s) => [s.AdminQueryService.getUser],
+  },
+  {
+    method: "POST",
+    path: `/admin/users/${MALFORMED}/ban`,
+    body: { reason: "abuse" },
+    reached: (s) => [s.StaffService.banIsSensitive, s.StaffService.moderateBan],
+  },
+  {
+    method: "POST",
+    path: `/admin/users/${MALFORMED}/unban`,
+    reached: (s) => [s.StaffService.moderate],
+  },
+  {
+    method: "POST",
+    path: `/admin/users/${MALFORMED}/reset-password`,
+    reached: (s) => [s.AdminQueryService.getUser, s.StaffService.moderate],
+  },
+  {
+    method: "DELETE",
+    path: `/admin/users/${MALFORMED}/sessions`,
+    reached: (s) => [s.AdminQueryService.getUser, s.StaffService.moderate],
+  },
+  {
+    method: "GET",
+    path: `/admin/users/${MALFORMED}/notes`,
+    reached: (s) => [s.StaffNoteService.list],
+  },
+  {
+    method: "POST",
+    path: `/admin/users/${MALFORMED}/notes`,
+    body: { body: "note" },
+    reached: (s) => [s.StaffNoteService.add],
+  },
+  {
+    method: "PUT",
+    path: `/admin/staff/${MALFORMED}/role`,
+    body: { role: "support" },
+    reached: (s) => [s.ApprovalService.gate, s.StaffService.assignRole],
+  },
+  {
+    method: "DELETE",
+    path: `/admin/staff/${MALFORMED}`,
+    reached: (s) => [s.ApprovalService.gate, s.StaffService.revoke],
+  },
+  {
+    method: "GET",
+    path: `/admin/staff/${MALFORMED}/overrides`,
+    reached: (s) => [s.StaffService.listOverrides],
+  },
+  {
+    method: "POST",
+    path: `/admin/staff/${MALFORMED}/overrides`,
+    body: { permission: "users.read", effect: "grant", expiresAt: null },
+    reached: (s) => [s.ApprovalService.gate, s.StaffService.setOverride],
+  },
+  {
+    method: "DELETE",
+    path: `/admin/staff/${MALFORMED}/overrides/override-1`,
+    reached: (s) => [s.ApprovalService.gate, s.StaffService.removeOverride],
+  },
+  {
+    method: "DELETE",
+    path: `/admin/staff/${VALID}/overrides/${MALFORMED}`,
+    field: "overrideId",
+    reached: (s) => [s.ApprovalService.gate, s.StaffService.removeOverride],
+  },
+  {
+    method: "DELETE",
+    path: `/admin/views/${MALFORMED}`,
+    reached: (s) => [s.SavedViewService.remove],
+  },
+  { method: "GET", path: `/admin/approvals/${MALFORMED}`, reached: (s) => [s.ApprovalService.get] },
+  {
+    method: "POST",
+    path: `/admin/approvals/${MALFORMED}/decide`,
+    body: { decision: "approve", note: "ok" },
+    reached: (s) => [s.ApprovalService.decide],
+  },
+  {
+    method: "POST",
+    path: `/admin/approvals/${MALFORMED}/cancel`,
+    reached: (s) => [s.ApprovalService.cancel],
+  },
+  { method: "GET", path: `/admin/orgs/${MALFORMED}`, reached: (s) => [s.AdminQueryService.getOrg] },
+  {
+    method: "POST",
+    path: `/admin/orgs/${MALFORMED}/plan-override`,
+    body: { tier: "pro", expiresAt: FUTURE, note: "deal" },
+    reached: (s) => [s.PlanOverrideService.set],
+  },
+  {
+    method: "DELETE",
+    path: `/admin/orgs/${MALFORMED}/plan-override`,
+    reached: (s) => [s.PlanOverrideService.revoke],
+  },
+  {
+    method: "GET",
+    path: `/admin/orgs/${MALFORMED}/notes`,
+    reached: (s) => [s.StaffNoteService.list],
+  },
+  {
+    method: "POST",
+    path: `/admin/orgs/${MALFORMED}/notes`,
+    body: { body: "note" },
+    reached: (s) => [s.StaffNoteService.add],
+  },
+  {
+    method: "POST",
+    path: `/admin/orgs/${MALFORMED}/sso-enforcement`,
+    body: { enforced: true },
+    reached: (s) => [s.AdminActionService.setSsoEnforcement],
+  },
+  {
+    method: "POST",
+    path: `/admin/ops/stripe-events/${MALFORMED}/replay`,
+    reached: (s) => [s.StripeReplayService.replay, s.IAuthProvider.handle],
+  },
+  {
+    method: "POST",
+    path: `/admin/impersonation/${MALFORMED}/start`,
+    body: { reason: "support ticket" },
+    reached: (s) => [s.AdminModerationService.startImpersonation, s.IAuthProvider.impersonateUser],
+  },
+];
+
+const refusal = z.object({ error: z.object({ code: z.string(), message: z.string() }) });
+
+describe("path params", () => {
+  it.each(CASES.map((c) => [`${c.method} ${c.path}`, c] as const))(
+    "%s refuses a malformed id with 400 and reaches no service",
+    async (_name, { method, path, body, field = "id", reached }) => {
+      const s = services();
+
+      const res = await send(adminApp(s), method, path, body);
+
+      expect(res.status).toBe(400);
+      expect(refusal.parse(await res.json()).error).toEqual({
+        code: "REQUEST_INVALID",
+        message: `${field}: Not a valid id.`,
+      });
+      for (const call of reached(s)) expect(call).not.toHaveBeenCalled();
+    },
+  );
+});

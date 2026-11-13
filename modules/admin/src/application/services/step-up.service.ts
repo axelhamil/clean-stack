@@ -8,8 +8,12 @@ import {
 import { EventTypes } from "@packages/events";
 import { emitEvent, emitEventBestEffort } from "@packages/outbox/event-emitter";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
-import type { IStepUpStore, StepUpStoreError } from "../ports/step-up-store.port";
-import type { ITotpVerifier, TotpOutcome, TotpVerifierError } from "../ports/totp-verifier.port";
+import type { IStepUpStore, StepUpStoreError } from "../ports/repositories/step-up-store.port";
+import type {
+  ITotpVerifier,
+  TotpOutcome,
+  TotpVerifierError,
+} from "../ports/services/totp-verifier.port";
 
 export type StepUpError =
   | StepUpStoreError
