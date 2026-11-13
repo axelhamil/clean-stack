@@ -4,7 +4,7 @@
  * `apps/api/CLAUDE.md` on asserting call shape only against a mock, and on never
  * asserting on the SQL text a builder produced).
  *
- * The unit test suite (`packages/email/src/__TESTS__/drizzle-email-queue.test.ts`) mocks `onConflictDoNothing` as a
+ * The unit test suite (`packages/email/src/__tests__/drizzle-email-queue.test.ts`) mocks `onConflictDoNothing` as a
  * no-op passthrough and asserts on a return value the test itself controls (`insertReturns`),
  * deleting `.onConflictDoNothing(...)` from the service leaves that suite green. Nothing there
  * proves:
