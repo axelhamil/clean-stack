@@ -5,9 +5,11 @@
   "type": "module",
   "exports": {
     "./module": "./src/policies.module.ts",
-    "./routes/policies": "./src/infrastructure/http/policies.routes.ts",
-    "./ports/*": "./src/application/ports/*.port.ts",
+    "./routes/policies": "./src/infra/http/routes/policies/policies.ts",
+    "./ports/policy-acceptance": "./src/application/ports/repositories/policy-acceptance.port.ts",
     "./services/policy-acceptance": "./src/application/services/policy-acceptance.service.ts",
+    "./usecases/accept-policies": "./src/application/usecases/accept-policies/accept-policies.usecase.ts",
+    "./queries/*": "./src/application/queries/*.query.ts",
     "./schemas/*": "./schemas/*.ts"
   },
   "scripts": {
