@@ -5,6 +5,68 @@
 * **infra:** back up postgres with pgbackrest and harden the vps host ([8f29788](https://github.com/axelhamil/clean-stack/commit/8f297885b0bf24ba9dd7a0e72f84935b2634ad9f))
 * **infra:** deploy to a vps through coolify instead of railway ([fac42c4](https://github.com/axelhamil/clean-stack/commit/fac42c4accfef9055880b1e0606fa200a4931dad))
 
+## [2.3.0](https://github.com/axelhamil/clean-stack/compare/v2.2.2...v2.3.0) (2026-11-13)
+
+
+### Features
+
+* **kit:** add the use case type, dispatch helper and id param schema ([#219](https://github.com/axelhamil/clean-stack/issues/219)) ([2ed9699](https://github.com/axelhamil/clean-stack/commit/2ed96996f0d67a8f063fdcbfd6f1608281d56205)), closes [#214](https://github.com/axelhamil/clean-stack/issues/214)
+
+
+### Bug Fixes
+
+* **admin:** keep deleted and banned staff out of approval notifications ([#209](https://github.com/axelhamil/clean-stack/issues/209)) ([f016173](https://github.com/axelhamil/clean-stack/commit/f0161732f1fae536bfbef51cdc972a998fcc33e0))
+* **api:** freeze the api shape in the form its check compares ([#206](https://github.com/axelhamil/clean-stack/issues/206)) ([83d3862](https://github.com/axelhamil/clean-stack/commit/83d3862a1a021d32107b381eade0a6addfc6be1f))
+* **api:** refuse check:email-lease on a queue it did not seed ([#201](https://github.com/axelhamil/clean-stack/issues/201)) ([ee4ec1a](https://github.com/axelhamil/clean-stack/commit/ee4ec1a0789359de638b3fa959864b59fc8b1a84))
+* **api:** stop the admin checks leaving email and notification rows ([#204](https://github.com/axelhamil/clean-stack/issues/204)) ([e739e47](https://github.com/axelhamil/clean-stack/commit/e739e47cd290a29b8c52bba3ce9334f1d8905b96))
+* **api:** stop the outbox sweep cleanly on a still referenced event ([#194](https://github.com/axelhamil/clean-stack/issues/194)) ([5e969d8](https://github.com/axelhamil/clean-stack/commit/5e969d8da3218e008bb098ed11fd6238ee2e132d))
+* give each package its own vitest module cache ([#155](https://github.com/axelhamil/clean-stack/issues/155)) ([550f697](https://github.com/axelhamil/clean-stack/commit/550f69794426aabde68c2946000e5506aa42a96d))
+* **infra:** make the older running execution case of the deploy test deterministic ([#222](https://github.com/axelhamil/clean-stack/issues/222)) ([c1f2462](https://github.com/axelhamil/clean-stack/commit/c1f24621e98282e68df2f6730f6bdb4c92a1be81)), closes [#221](https://github.com/axelhamil/clean-stack/issues/221)
+* **test:** type-check the test kit on its own ([#203](https://github.com/axelhamil/clean-stack/issues/203)) ([2ee90c3](https://github.com/axelhamil/clean-stack/commit/2ee90c3451c534dc87c61f2abd594dad12f9d836))
+* **webhooks:** stop following redirects on webhook delivery ([#197](https://github.com/axelhamil/clean-stack/issues/197)) ([d05c4d0](https://github.com/axelhamil/clean-stack/commit/d05c4d0a5adcb7932a6e0691fdaf7f61fab5f91e))
+
+
+### Refactor
+
+* **admin:** approval request aggregate and staff domain service ([#249](https://github.com/axelhamil/clean-stack/issues/249)) ([07077d2](https://github.com/axelhamil/clean-stack/commit/07077d2e0893a4acbce2417ab4d8d94e9705fb3a))
+* **admin:** safety net, ports, schemas and param validation ([#244](https://github.com/axelhamil/clean-stack/issues/244)) ([809a9b4](https://github.com/axelhamil/clean-stack/commit/809a9b4520a08f6f37386c7ce9fa4e738ac6d481))
+* **admin:** use cases and queries for the flat services ([#248](https://github.com/axelhamil/clean-stack/issues/248)) ([3d3ab69](https://github.com/axelhamil/clean-stack/commit/3d3ab69a38ae3d6df4ba189934a8eb5b9b35df2e))
+* **api-token:** migrate the module to the target architecture ([#228](https://github.com/axelhamil/clean-stack/issues/228)) ([9799c7c](https://github.com/axelhamil/clean-stack/commit/9799c7c15f26cb03a7b3c82aa4c11f6af730ed6a))
+* **api:** build auth from injected deps, not the container ([#181](https://github.com/axelhamil/clean-stack/issues/181)) ([9421be7](https://github.com/axelhamil/clean-stack/commit/9421be757406f2f6f2f7f4385286af12b19f33c6))
+* **api:** compose api-token, notifications, uploads and billing ([#152](https://github.com/axelhamil/clean-stack/issues/152)) ([f208bec](https://github.com/axelhamil/clean-stack/commit/f208bec8f2e46e531606eb02167d7de931b887b4))
+* **api:** compose quotas, policies, consents, profile and audit-log ([#151](https://github.com/axelhamil/clean-stack/issues/151)) ([efd37be](https://github.com/axelhamil/clean-stack/commit/efd37be1b006c65907529f1fbcab73c2d7653d31))
+* **api:** compose webhooks, rgpd and admin ([#156](https://github.com/axelhamil/clean-stack/issues/156)) ([ab0025d](https://github.com/axelhamil/clean-stack/commit/ab0025d44c8c19d7a3e4357f58068c668b80f124)), closes [#150](https://github.com/axelhamil/clean-stack/issues/150)
+* **api:** move health, organization and auth helpers to host folders ([#188](https://github.com/axelhamil/clean-stack/issues/188)) ([595ec82](https://github.com/axelhamil/clean-stack/commit/595ec82a4fa0837781e9ebfd2ae2b1eaf9ff10fb))
+* **api:** move quota-reservation to the quotas module ([#190](https://github.com/axelhamil/clean-stack/issues/190)) ([bfe4179](https://github.com/axelhamil/clean-stack/commit/bfe417980b5e7d40fd14b536ff99a05560a2501a))
+* **api:** move shared business services into their modules ([#158](https://github.com/axelhamil/clean-stack/issues/158)) ([0a50cf5](https://github.com/axelhamil/clean-stack/commit/0a50cf5dd7b4589a6f86313b052b57a5fe25eb6e))
+* **api:** rebind the wave 2 facades to the migrated modules ([#251](https://github.com/axelhamil/clean-stack/issues/251)) ([a391b4a](https://github.com/axelhamil/clean-stack/commit/a391b4a6e9057b224bda5a3e0dedc293a2130f70))
+* **api:** share one route builder across the table sweeps ([#191](https://github.com/axelhamil/clean-stack/issues/191)) ([605e97d](https://github.com/axelhamil/clean-stack/commit/605e97d29fce070086a99afb463cc9afcc4e5b5b))
+* **audit-log:** migrate the module to the target architecture ([#238](https://github.com/axelhamil/clean-stack/issues/238)) ([ed364df](https://github.com/axelhamil/clean-stack/commit/ed364df571081a8b1ba080e2fc5a3bfe854b433b))
+* **auth:** read the password length bounds from one shared source ([#200](https://github.com/axelhamil/clean-stack/issues/200)) ([7e0ceef](https://github.com/axelhamil/clean-stack/commit/7e0ceef69b13c5a485fc17f76888cda91865af33))
+* **auth:** trace the bridge queries under the injected instrumentation ([#210](https://github.com/axelhamil/clean-stack/issues/210)) ([3bec6db](https://github.com/axelhamil/clean-stack/commit/3bec6dba42eab9e8ab282fba51a37111a216a417))
+* **billing:** migrate billing and quotas to the target architecture ([#237](https://github.com/axelhamil/clean-stack/issues/237)) ([88406a0](https://github.com/axelhamil/clean-stack/commit/88406a0cebdfb1f38e5ac20c779857745249efc8))
+* **consents:** migrate the module to the target architecture ([#236](https://github.com/axelhamil/clean-stack/issues/236)) ([57cf39f](https://github.com/axelhamil/clean-stack/commit/57cf39f1aeebb6576510285dd17e577d6d8aa10e))
+* **ddd-kit:** align the kit with typed ids, own clone collections and payload parsing ([#139](https://github.com/axelhamil/clean-stack/issues/139)) ([c3317e7](https://github.com/axelhamil/clean-stack/commit/c3317e744fb29a4b8c0df3449068f33daa248ed8))
+* extract the http, outbox and email kit packages from the api ([#145](https://github.com/axelhamil/clean-stack/issues/145)) ([c0e6d69](https://github.com/axelhamil/clean-stack/commit/c0e6d6962d4a424b477f96433ebd70a019dfd60b))
+* **modules:** expose a stable public surface instead of path-mirroring exports ([#223](https://github.com/axelhamil/clean-stack/issues/223)) ([2671d3d](https://github.com/axelhamil/clean-stack/commit/2671d3d08248e69bbf5828f99cc148b5f9d43d1b)), closes [#215](https://github.com/axelhamil/clean-stack/issues/215)
+* move admin into modules ([#175](https://github.com/axelhamil/clean-stack/issues/175)) ([a2bf7db](https://github.com/axelhamil/clean-stack/commit/a2bf7db67f1ea77cc929f009c4d72f21497f55e4))
+* move api-token and billing into modules ([#167](https://github.com/axelhamil/clean-stack/issues/167)) ([4d83faf](https://github.com/axelhamil/clean-stack/commit/4d83fafdebd191cd48309bcb83da58eab83ed459))
+* move audit log, billing and webhook tables into their modules ([#176](https://github.com/axelhamil/clean-stack/issues/176)) ([bb6ab38](https://github.com/axelhamil/clean-stack/commit/bb6ab38d72ae88daf791c3ec9d3b95dfdbf3e2b6)), closes [#172](https://github.com/axelhamil/clean-stack/issues/172)
+* move audit-log, uploads and notifications into modules ([#163](https://github.com/axelhamil/clean-stack/issues/163)) ([317605d](https://github.com/axelhamil/clean-stack/commit/317605d02be9c1bfb46bd00304292274864fc7f6)), closes [#161](https://github.com/axelhamil/clean-stack/issues/161)
+* move notification and staff tables into their modules ([#177](https://github.com/axelhamil/clean-stack/issues/177)) ([f29bd3e](https://github.com/axelhamil/clean-stack/commit/f29bd3e634ad46384bd6a33106f46d54e3e4d239)), closes [#173](https://github.com/axelhamil/clean-stack/issues/173)
+* move quota, policy, consent and api token tables into their modules ([#174](https://github.com/axelhamil/clean-stack/issues/174)) ([6def15d](https://github.com/axelhamil/clean-stack/commit/6def15db10f1a3ce1cd78443610712cda4c07211))
+* move quotas, policies, consents and profile into modules ([#160](https://github.com/axelhamil/clean-stack/issues/160)) ([1f3fb83](https://github.com/axelhamil/clean-stack/commit/1f3fb83cd7267bc226759d410de3f72e0e014c41)), closes [#159](https://github.com/axelhamil/clean-stack/issues/159)
+* move webhooks and rgpd into modules ([#170](https://github.com/axelhamil/clean-stack/issues/170)) ([bad773b](https://github.com/axelhamil/clean-stack/commit/bad773be8e53c7aeaf5edbccedcf7c022422b776))
+* **notifications:** migrate the module to the target architecture ([#246](https://github.com/axelhamil/clean-stack/issues/246)) ([f8f8b7e](https://github.com/axelhamil/clean-stack/commit/f8f8b7e44045dacc64e794a7e2f7d0008c1e0d87))
+* **policies:** migrate the module to the target architecture ([#235](https://github.com/axelhamil/clean-stack/issues/235)) ([89f9a73](https://github.com/axelhamil/clean-stack/commit/89f9a737bdb0f330b15bb9cbb60b664f6ee4d1d1))
+* **profile:** migrate the module to the target architecture ([#234](https://github.com/axelhamil/clean-stack/issues/234)) ([2b0d847](https://github.com/axelhamil/clean-stack/commit/2b0d8471e22315db42f6fc84e3c4e163f5940158))
+* promote the sweep, handler and health kit out of the api ([#169](https://github.com/axelhamil/clean-stack/issues/169)) ([1123f9e](https://github.com/axelhamil/clean-stack/commit/1123f9ea4eaeb65fee3c8a085295e0a3a0571a21)), closes [#164](https://github.com/axelhamil/clean-stack/issues/164)
+* **rgpd:** migrate the module to the target architecture ([#253](https://github.com/axelhamil/clean-stack/issues/253)) ([1208123](https://github.com/axelhamil/clean-stack/commit/1208123a5f2df12f63d5061b5f25eb86a1d7bea9))
+* split auth into one file per plugin and hook ([#180](https://github.com/axelhamil/clean-stack/issues/180)) ([abc5b4e](https://github.com/axelhamil/clean-stack/commit/abc5b4ed8e113467d16fd9468e3dada2b3e31c53))
+* **test:** promote the check harness and move module-only checks ([#192](https://github.com/axelhamil/clean-stack/issues/192)) ([1505108](https://github.com/axelhamil/clean-stack/commit/15051082d7a9369626efa52574af8d6b2c30f269))
+* **uploads:** migrate the module to the target architecture ([#226](https://github.com/axelhamil/clean-stack/issues/226)) ([97461d9](https://github.com/axelhamil/clean-stack/commit/97461d91e67101a49f3b375bd18e5d40f6bec324)), closes [#225](https://github.com/axelhamil/clean-stack/issues/225)
+* **webhooks:** migrate the module to the target architecture ([#247](https://github.com/axelhamil/clean-stack/issues/247)) ([327c624](https://github.com/axelhamil/clean-stack/commit/327c62412804aa78eca23558433563e9451b3038))
+
 ## [2.2.2](https://github.com/axelhamil/clean-stack/compare/v2.2.1...v2.2.2) (2026-11-06)
 
 
