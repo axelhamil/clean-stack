@@ -6,6 +6,7 @@
   "exports": {
     "./validator": "./src/validator.ts",
     "./error-handler": "./src/error-handler.ts",
+    "./id-param": "./src/id-param.ts",
     "./time-id-cursor": "./src/time-id-cursor.ts",
     "./route-guards": "./src/route-guards.ts",
     "./internal-signature": "./src/internal-signature.ts",
