@@ -1,9 +1,12 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { join, posix, relative, sep } from "node:path";
+import { readsRawRequest } from "./route-inputs";
 
 interface CodeViews {
+  source: string;
   code: string;
   blanked: string;
+  masked: string;
 }
 
 const TEST_DIRECTORIES = new Set(["__TESTS__", "__tests__"]);
@@ -48,16 +51,24 @@ function endOfRegex(source: string, start: number): number {
   return index;
 }
 
+function maskOf(raw: string, head: number, tail: number): string {
+  const end = Math.max(head, raw.length - tail);
+
+  return raw.slice(0, head) + raw.slice(head, end).replace(/[^\n]/g, " ") + raw.slice(end);
+}
+
 function lex(source: string): CodeViews {
   const code: string[] = [];
   const blanked: string[] = [];
+  const masked: string[] = [];
   const templateBraces: number[] = [];
   let previous = "";
   let index = 0;
 
-  function emit(raw: string, blank = raw): void {
+  function emit(raw: string, blank = raw, mask = raw): void {
     code.push(raw);
     blanked.push(blank);
+    masked.push(mask);
     if (raw.trim() !== "") previous = raw.trimEnd().at(-1) ?? previous;
   }
 
@@ -68,12 +79,14 @@ function lex(source: string): CodeViews {
       const char = source[cursor];
 
       if (char === "`") {
-        emit(source.slice(start, cursor + 1), `${source[start]}\``);
+        const raw = source.slice(start, cursor + 1);
+        emit(raw, `${source[start]}\``, maskOf(raw, 1, 1));
         return cursor + 1;
       }
 
       if (char === "$" && source[cursor + 1] === "{") {
-        emit(source.slice(start, cursor + 2), `${source[start]}\${`);
+        const raw = source.slice(start, cursor + 2);
+        emit(raw, `${source[start]}\${`, maskOf(raw, 1, 2));
         templateBraces.push(0);
         return cursor + 2;
       }
@@ -81,7 +94,8 @@ function lex(source: string): CodeViews {
       cursor += char === "\\" ? 2 : 1;
     }
 
-    emit(source.slice(start), source[start]);
+    const raw = source.slice(start);
+    emit(raw, source[start], maskOf(raw, 1, 0));
     return source.length;
   }
 
@@ -92,26 +106,32 @@ function lex(source: string): CodeViews {
 
     if (char === "/" && next === "/") {
       const end = source.indexOf("\n", index);
-      index = end === -1 ? source.length : end;
+      const stop = end === -1 ? source.length : end;
+      masked.push(maskOf(source.slice(index, stop), 0, 0));
+      index = stop;
       continue;
     }
 
     if (char === "/" && next === "*") {
       const end = source.indexOf("*/", index + 2);
-      index = end === -1 ? source.length : end + 2;
+      const stop = end === -1 ? source.length : end + 2;
+      masked.push(maskOf(source.slice(index, stop), 0, 0));
+      index = stop;
       continue;
     }
 
     if (char === "/" && (previous === "" || REGEX_PRECEDERS.has(previous))) {
       const end = endOfRegex(source, index);
-      emit(source.slice(index, end), "//");
+      const raw = source.slice(index, end);
+      emit(raw, "//", maskOf(raw, 1, 0));
       index = end;
       continue;
     }
 
     if (char === '"' || char === "'") {
       const end = endOfQuoted(source, index);
-      emit(source.slice(index, end), `${char}${char}`);
+      const raw = source.slice(index, end);
+      emit(raw, `${char}${char}`, maskOf(raw, 1, raw.length > 1 && raw.endsWith(char) ? 1 : 0));
       index = end;
       continue;
     }
@@ -133,7 +153,7 @@ function lex(source: string): CodeViews {
     index += 1;
   }
 
-  return { code: code.join(""), blanked: blanked.join("") };
+  return { source, code: code.join(""), blanked: blanked.join(""), masked: masked.join("") };
 }
 
 function countOf(text: string, pattern: RegExp): number {
@@ -219,6 +239,7 @@ export function createSourceScan(root: string) {
 
   return {
     sourceFiles,
+    viewsOf,
     codeOf,
     throwsPerFile,
     writeCallsPerFile,
@@ -247,16 +268,127 @@ export function reachesHost(code: string): boolean {
 }
 
 export function isRouteFile(file: string): boolean {
-  const name = file.split(sep).at(-1) ?? "";
+  const segments = file.split(sep);
+  const name = segments.at(-1) ?? "";
+  const underHttpRoutes = segments.some(
+    (segment, index) => segment === "http" && segments[index + 1] === "routes",
+  );
 
-  return name === "routes.ts" || name.endsWith(".routes.ts");
+  return underHttpRoutes || name === "routes.ts" || name.endsWith(".routes.ts");
 }
 
 function existingLayers(root: string, names: string[]): string[] {
   return names.filter((name) => existsSync(join(root, name)));
 }
 
-export function assertModuleLayering(srcRoot: string): void {
+const ROOT_ENTRIES = new Set([
+  "application",
+  "domain",
+  "infra",
+  "infrastructure",
+  ...TEST_DIRECTORIES,
+]);
+const DOMAIN_CATEGORIES = new Set([
+  "aggregates",
+  "entities",
+  "value-objects",
+  "events",
+  "services",
+]);
+const INFRASTRUCTURE_DIRECTORIES = new Set(["infra", "infrastructure"]);
+const TEMPLATE_IMPORT = /\bimport\s*\(\s*`([^`]*)`/g;
+const HANDLER_KIT_IMPORTS = new Set([
+  "@packages/ddd-kit",
+  "@packages/events",
+  "@packages/outbox/payload-parser",
+]);
+
+function entriesOf(root: string, folder: string): string[] {
+  const path = join(root, folder);
+
+  if (!existsSync(path)) return [];
+
+  return readdirSync(path).sort();
+}
+
+function isRootEntry(entry: string): boolean {
+  return (
+    ROOT_ENTRIES.has(entry) ||
+    entry.startsWith(".") ||
+    entry.endsWith(".module.ts") ||
+    entry.endsWith(".d.ts")
+  );
+}
+
+function strayRootEntries(srcRoot: string): string[] {
+  return entriesOf(srcRoot, ".").filter((entry) => !isRootEntry(entry));
+}
+
+function domainCategoryFolders(srcRoot: string): string[] {
+  return entriesOf(srcRoot, "domain")
+    .filter((entry) => DOMAIN_CATEGORIES.has(entry))
+    .map((entry) => join("domain", entry));
+}
+
+function isHttpEntryFile(file: string): boolean {
+  const segments = file.split(sep);
+  const underInfrastructureHttp = segments.some(
+    (segment, index) => INFRASTRUCTURE_DIRECTORIES.has(segment) && segments[index + 1] === "http",
+  );
+
+  return underInfrastructureHttp || isRouteFile(file) || file.endsWith(".route.ts");
+}
+
+function importSpecifiers(code: string): string[] {
+  return [...code.matchAll(SPECIFIER), ...code.matchAll(TEMPLATE_IMPORT)].map((match) =>
+    match[0].includes("`") ? (match[1] ?? "") : (match[2] ?? ""),
+  );
+}
+
+function isHandlerImport(handler: string, specifier: string): boolean {
+  if (HANDLER_KIT_IMPORTS.has(specifier)) return true;
+  if (!specifier.startsWith(".") || specifier.includes("${")) return false;
+
+  const target = posix.join(posix.dirname(handler.split(sep).join("/")), specifier);
+  const name = (target.split("/").at(-1) ?? "").replace(/\.[jt]s$/, "");
+  const isEvent =
+    name.endsWith(".event") &&
+    (target.startsWith("application/events/") || /^domain\/(?:[^/]+\/)+events\//.test(target));
+
+  return isEvent || target.startsWith("application/usecases/");
+}
+
+function importsBeyondHandlerReach(handler: string, code: string): boolean {
+  return importSpecifiers(code).some((specifier) => !isHandlerImport(handler, specifier));
+}
+
+function isEventHandlerFile(file: string): boolean {
+  return file.split(sep).slice(0, 2).join("/") === "application/event-handlers";
+}
+
+export interface ModuleLayeringOptions {
+  targetShape?: boolean;
+}
+
+function targetShapeGuards(
+  srcRoot: string,
+  scan: ReturnType<typeof createSourceScan>,
+  files: string[],
+): Record<string, string[]> {
+  return {
+    "module root holds only the target entries": strayRootEntries(srcRoot),
+    "no category folder at the root of domain": domainCategoryFolders(srcRoot),
+    "no application dto folder": existingLayers(srcRoot, [join("application", "dto")]),
+    "route inputs validated by zV": files
+      .filter(isHttpEntryFile)
+      .filter((file) => readsRawRequest(scan.viewsOf(file))),
+    "handlers import only use cases, the event and the payload parser": files
+      .filter(isEventHandlerFile)
+      .filter((file) => importsBeyondHandlerReach(file, scan.codeOf(file))),
+  };
+}
+
+export function assertModuleLayering(srcRoot: string, options: ModuleLayeringOptions = {}): void {
   const scan = createSourceScan(srcRoot);
   const files = scan.sourceFiles(".");
 
@@ -273,6 +405,7 @@ export function assertModuleLayering(srcRoot: string): void {
     "no transaction opened": Object.keys(scan.transactionOpenersPerFile(".")),
     "no environment read": Object.keys(scan.envReadsPerFile(".")),
     "no host reach": files.filter((file) => reachesHost(scan.codeOf(file))),
+    ...(options.targetShape ? targetShapeGuards(srcRoot, scan, files) : {}),
   };
 
   const violations = Object.entries(guards).flatMap(([guard, offenders]) =>
