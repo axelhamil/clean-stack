@@ -5,8 +5,12 @@
   "type": "module",
   "exports": {
     "./module": "./src/profile.module.ts",
-    "./routes/profile": "./src/infrastructure/http/profile.routes.ts",
-    "./ports/*": "./src/application/ports/*.port.ts"
+    "./routes/profile": "./src/infra/http/routes/profile/profile.ts",
+    "./ports/profile": "./src/application/ports/repositories/profile.port.ts",
+    "./ports/*": "./src/application/ports/services/*.port.ts",
+    "./usecases/set-locale": "./src/application/usecases/set-locale/set-locale.usecase.ts",
+    "./usecases/update-display-name": "./src/application/usecases/update-display-name/update-display-name.usecase.ts",
+    "./queries/*": "./src/application/queries/*.query.ts"
   },
   "scripts": {
     "format": "biome format . --write",
