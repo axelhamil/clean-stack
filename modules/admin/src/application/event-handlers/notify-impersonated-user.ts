@@ -3,7 +3,7 @@ import type { IEmailService } from "@packages/email/email.port";
 import { EventTypes, PayloadByEventType } from "@packages/events";
 import { handlerIdempotency } from "@packages/outbox/handler-idempotency";
 import { payloadParser } from "@packages/outbox/payload-parser";
-import type { ILocaleReader } from "../ports/locale-reader.port";
+import type { ILocaleReader } from "../ports/services/locale-reader.port";
 import type { AdminQueryService } from "../services/admin-query.service";
 
 interface NotifyImpersonatedUserDeps {

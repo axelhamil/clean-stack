@@ -1,24 +1,59 @@
-import type { IAuthProvider } from "@modules/admin/ports/auth-provider";
-import type { IInstrumentation } from "@packages/ddd-kit";
+import type {
+  AuthRequestCredentials,
+  IAuthProvider,
+  ImpersonationRefusedError,
+  SessionCookies,
+  StopImpersonationRefusedError,
+} from "@modules/admin/ports/auth-provider";
+import { type AppError, type ErrorCode, type IInstrumentation, Result } from "@packages/ddd-kit";
 import { auth } from "../auth";
 import { IMPERSONATION_TTL_SECONDS } from "../auth/impersonation-ttl";
 import { deliverPasswordReset } from "../auth/password-reset-delivery";
+
+function headersOf(credentials: AuthRequestCredentials): Headers {
+  const headers = new Headers();
+  for (const [name, value] of credentials) headers.append(name, value);
+
+  return headers;
+}
+
+function sessionCookiesOf<Code extends ErrorCode>(
+  upstream: Response,
+  code: Code,
+): Result<SessionCookies, AppError<Code>> {
+  if (upstream.ok) return Result.ok(upstream.headers.getSetCookie());
+
+  return Result.fail({ code, message: "The impersonation request was refused." });
+}
 
 export class BetterAuthProvider implements IAuthProvider {
   readonly impersonationTtlSeconds = IMPERSONATION_TTL_SECONDS;
 
   constructor(private readonly instrumentation: IInstrumentation) {}
 
-  impersonateUser(userId: string, headers: Headers): Promise<Response> {
-    return this.traced("impersonateUser", () =>
-      auth.api.impersonateUser({ body: { userId }, headers, asResponse: true }),
+  async impersonateUser(
+    userId: string,
+    credentials: AuthRequestCredentials,
+  ): Promise<Result<SessionCookies, ImpersonationRefusedError>> {
+    const upstream = await this.traced("impersonateUser", () =>
+      auth.api.impersonateUser({
+        body: { userId },
+        headers: headersOf(credentials),
+        asResponse: true,
+      }),
     );
+
+    return sessionCookiesOf(upstream, "ADMIN_IMPERSONATION_FORBIDDEN");
   }
 
-  stopImpersonating(headers: Headers): Promise<Response> {
-    return this.traced("stopImpersonating", () =>
-      auth.api.stopImpersonating({ headers, asResponse: true }),
+  async stopImpersonating(
+    credentials: AuthRequestCredentials,
+  ): Promise<Result<SessionCookies, StopImpersonationRefusedError>> {
+    const upstream = await this.traced("stopImpersonating", () =>
+      auth.api.stopImpersonating({ headers: headersOf(credentials), asResponse: true }),
     );
+
+    return sessionCookiesOf(upstream, "ADMIN_STOP_IMPERSONATION_FORBIDDEN");
   }
 
   requestPasswordReset(email: string): ReturnType<IAuthProvider["requestPasswordReset"]> {

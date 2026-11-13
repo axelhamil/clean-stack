@@ -11,6 +11,7 @@ import {
   Result,
 } from "@packages/ddd-kit";
 import { type EventType, EventTypes } from "@packages/events";
+import { encodeTimeIdCursor } from "@packages/http/time-id-cursor";
 import { emitEvent } from "@packages/outbox/event-emitter";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import {
@@ -22,14 +23,14 @@ import {
   sameApprovalParams,
 } from "../approved-action";
 import type { AdminSettings } from "../config/admin-settings";
-import { approvalCursorOf, type ListApprovalsInput } from "../dto/list-approvals.dto";
-import type { AdminStoreError, IAdminUserStore } from "../ports/admin-user-store.port";
+import type { AdminStoreError, IAdminUserStore } from "../ports/repositories/admin-user-store.port";
 import type {
   ApprovalRecord,
   ApprovalStoreError,
   IApprovalStore,
-} from "../ports/approval-store.port";
-import type { IStaffStore, StaffStoreError } from "../ports/staff-store.port";
+  ListApprovalsQuery,
+} from "../ports/repositories/approval-store.port";
+import type { IStaffStore, StaffStoreError } from "../ports/repositories/staff-store.port";
 import { type StaffEnv, staffAccessOf } from "./staff-access";
 
 export type ApprovalSettings = Pick<
@@ -97,6 +98,10 @@ const expired: AppError<"ADMIN_APPROVAL_EXPIRED_CONFLICT"> = {
 
 function isOver(record: ApprovalRecord): boolean {
   return record.expiresAt.getTime() <= Date.now();
+}
+
+function approvalCursorOf(record: ApprovalRecord): string {
+  return encodeTimeIdCursor(record.createdAt.toISOString(), record.id);
 }
 
 function refOf(record: ApprovalRecord) {
@@ -186,7 +191,7 @@ export class ApprovalService {
     });
   }
 
-  async list(input: ListApprovalsInput): Promise<Result<ApprovalPage, ApprovalStoreError>> {
+  async list(input: ListApprovalsQuery): Promise<Result<ApprovalPage, ApprovalStoreError>> {
     const found = await this.store.list(input);
     if (found.isFailure) return Result.fail(found.getError());
 

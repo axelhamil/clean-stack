@@ -1,4 +1,3 @@
-import type { IAuthProvider } from "@modules/admin/ports/auth-provider";
 import { createAdminUserRoutes } from "@modules/admin/routes/admin";
 import { createAdminImpersonationRoutes } from "@modules/admin/routes/admin-impersonation";
 import { createAdminInternalRoutes } from "@modules/admin/routes/admin-internal";
@@ -88,7 +87,7 @@ const routeDeps = di.scope(
     routeGuards: (): AppRouteGuards => routeGuards,
     internalGuards: (): readonly RouteGuard[] => internalLayers,
     runSweep: (): typeof runSweepRequest => runSweepRequest,
-    IAuthProvider: (c): IAuthProvider => new BetterAuthProvider(c.IInstrumentation),
+    IAuthProvider: (c) => new BetterAuthProvider(c.IInstrumentation),
     accountDeleteRateLimit: (c): RouteGuard =>
       requireRateLimit(
         { limiter: c.IRateLimiter, outbox: c.IOutboxRepository },

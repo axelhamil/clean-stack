@@ -1,7 +1,7 @@
 import { type AdminImpersonationStoppedPayload, EventTypes } from "@packages/events";
 import { emitEvent } from "@packages/outbox/event-emitter";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
-import type { EndedImpersonation } from "../ports/staff-store.port";
+import type { EndedImpersonation } from "../ports/repositories/staff-store.port";
 
 export async function announceImpersonationsEnded(
   outbox: IOutboxRepository,

@@ -3,15 +3,17 @@ import { EventTypes } from "@packages/events";
 import { emitEvent } from "@packages/outbox/event-emitter";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
 import type {
-  IStripeEventGateway,
   IStripeEventStore,
-  StripeEventRetrieveError,
   StripeEventRow,
   StripeEventStoreError,
-  StripeGatewayError,
   StripeReplayRule,
+} from "../ports/repositories/stripe-event.port";
+import type {
+  IStripeEventGateway,
+  StripeEventRetrieveError,
+  StripeGatewayError,
   StripeWebhookHandler,
-} from "../ports/stripe-event.port";
+} from "../ports/services/stripe-event-gateway.port";
 
 export const STRIPE_EVENTS_PAGE = 100;
 

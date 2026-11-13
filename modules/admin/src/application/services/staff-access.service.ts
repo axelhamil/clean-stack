@@ -3,7 +3,11 @@ import { type IUnitOfWork, Option, Result } from "@packages/ddd-kit";
 import { EventTypes } from "@packages/events";
 import { emitEvent } from "@packages/outbox/event-emitter";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
-import type { IStaffStore, StaffRecord, StaffStoreError } from "../ports/staff-store.port";
+import type {
+  IStaffStore,
+  StaffRecord,
+  StaffStoreError,
+} from "../ports/repositories/staff-store.port";
 import {
   IMPERSONATE_PERMISSION,
   type StaffEnv,

@@ -3,7 +3,7 @@ import { type AppError, type IUnitOfWork, type Option, Result } from "@packages/
 import { EventTypes } from "@packages/events";
 import { emitEvent } from "@packages/outbox/event-emitter";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
-import type { AdminStoreError, IAdminUserStore } from "../ports/admin-user-store.port";
+import type { AdminStoreError, IAdminUserStore } from "../ports/repositories/admin-user-store.port";
 import type {
   EndedImpersonation,
   IStaffStore,
@@ -11,7 +11,7 @@ import type {
   StaffOverrideRow,
   StaffRecord,
   StaffStoreError,
-} from "../ports/staff-store.port";
+} from "../ports/repositories/staff-store.port";
 import { announceImpersonationsEnded } from "./impersonation-end";
 import { announceSessionsEnded } from "./session-end";
 import {

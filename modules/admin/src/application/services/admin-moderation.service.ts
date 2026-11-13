@@ -2,8 +2,8 @@ import { type AppError, type IUnitOfWork, Option, Result } from "@packages/ddd-k
 import { EventTypes } from "@packages/events";
 import { emitEvent } from "@packages/outbox/event-emitter";
 import type { IOutboxRepository } from "@packages/outbox/outbox.port";
-import type { AdminStoreError, IAdminUserStore } from "../ports/admin-user-store.port";
-import type { EndedSessions } from "../ports/staff-store.port";
+import type { AdminStoreError, IAdminUserStore } from "../ports/repositories/admin-user-store.port";
+import type { EndedSessions } from "../ports/repositories/staff-store.port";
 import { announceImpersonationsEnded } from "./impersonation-end";
 import { announceSessionsEnded } from "./session-end";
 

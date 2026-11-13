@@ -7,7 +7,7 @@ import type {
   StaffNoteRow,
   StaffNoteStoreError,
   StaffNoteSubject,
-} from "../ports/staff-note-store.port";
+} from "../ports/repositories/staff-note-store.port";
 
 export const STAFF_NOTES_PAGE = 100;
 

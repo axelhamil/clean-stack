@@ -4,7 +4,7 @@ import {
   type StaffPermission,
 } from "@packages/access-control";
 import { Option } from "@packages/ddd-kit";
-import type { StaffRecord, StaffSource } from "../ports/staff-store.port";
+import type { StaffRecord, StaffSource } from "../ports/repositories/staff-store.port";
 
 export interface StaffEnv {
   PLATFORM_ADMIN_IDS: readonly string[];
